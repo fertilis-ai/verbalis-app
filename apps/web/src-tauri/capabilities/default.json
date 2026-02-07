@@ -3,5 +3,19 @@
   "identifier": "default",
   "description": "enables the default permissions",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        "http://localhost:1234/*",
+        "http://127.0.0.1:1234/*",
+        "http://localhost:11434/*",
+        "http://127.0.0.1:11434/*",
+        "https://**",
+        "http://**"
+      ]
+    }
+  ]
 }

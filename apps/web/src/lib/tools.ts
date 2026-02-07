@@ -1,0 +1,362 @@
+import { Type, type Static, type TSchema } from "@sinclair/typebox";
+import { invoke } from "@tauri-apps/api/core";
+import type { Tool, ToolCall } from "@mariozechner/pi-ai";
+import type { ToolCategory, RiskLevel } from "./tools/categories";
+import {
+  WEB_TOOL_DEFINITIONS,
+  executeWebTool,
+  HttpFetchParams,
+  WebSearchParams,
+  ScrapeWebpageParams,
+} from "./tools/web-tools";
+
+// Tool result returned after execution
+export interface ToolResult {
+  toolCallId: string;
+  toolName: string;
+  status: "success" | "error";
+  result?: string;
+  error?: string;
+}
+
+// Tool call state for UI tracking
+export type ToolCallStatus =
+  | "pending"
+  | "pending_confirmation"
+  | "executing"
+  | "success"
+  | "error"
+  | "cancelled"
+  | "timeout";
+
+export interface ToolCallState {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+  status: ToolCallStatus;
+  result?: string;
+  error?: string;
+  // Enhanced tracking
+  queuedAt?: Date;
+  startedAt?: Date;
+  completedAt?: Date;
+  durationMs?: number;
+  category?: ToolCategory;
+  riskLevel?: RiskLevel;
+  undoAvailable?: boolean;
+  // Guardrail context
+  guardrailReason?: string;
+  guardrailViolations?: Array<{ type: string; message: string; severity: string }>;
+}
+
+// Define parameter schemas for each tool
+const ReadFileParams = Type.Object({
+  path: Type.String({ description: "Path to the file to read" }),
+});
+
+const WriteFileParams = Type.Object({
+  path: Type.String({ description: "Path to write the file" }),
+  content: Type.String({ description: "Content to write" }),
+});
+
+const DeletePathParams = Type.Object({
+  path: Type.String({ description: "Path to delete (file or directory)" }),
+});
+
+const CreateDirectoryParams = Type.Object({
+  path: Type.String({ description: "Path to the directory to create" }),
+});
+
+const ReadDirectoryParams = Type.Object({
+  path: Type.String({ description: "Path to the directory to read" }),
+  max_depth: Type.Optional(
+    Type.Number({ description: "Maximum depth to recurse (default: 3)" })
+  ),
+});
+
+const PathExistsParams = Type.Object({
+  path: Type.String({ description: "Path to check" }),
+});
+
+const ListFilesParams = Type.Object({
+  dir: Type.String({ description: "Directory to list files from" }),
+  extension: Type.Optional(
+    Type.String({ description: "Filter by file extension (e.g., 'md', 'yaml')" })
+  ),
+});
+
+const RenamePathParams = Type.Object({
+  old_path: Type.String({ description: "Current path" }),
+  new_path: Type.String({ description: "New path" }),
+});
+
+// Tool definitions with metadata (enhanced with categories and risk levels)
+interface ToolDefinition<T extends TSchema = TSchema> {
+  name: string;
+  description: string;
+  parameters: T;
+  requiresConfirmation: boolean;
+  // Enhanced metadata
+  category: ToolCategory;
+  riskLevel: RiskLevel;
+  supportsUndo: boolean;
+  requiresNetwork: boolean;
+  estimatedDurationMs?: number;
+}
+
+export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
+  read_file: {
+    name: "read_file",
+    description: "Read the contents of a file at the specified path",
+    parameters: ReadFileParams,
+    requiresConfirmation: false,
+    category: "file_system",
+    riskLevel: "low",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 100,
+  },
+  write_file: {
+    name: "write_file",
+    description: "Write content to a file, creating parent directories if needed",
+    parameters: WriteFileParams,
+    requiresConfirmation: true,
+    category: "file_system",
+    riskLevel: "medium",
+    supportsUndo: true,
+    requiresNetwork: false,
+    estimatedDurationMs: 200,
+  },
+  delete_path: {
+    name: "delete_path",
+    description: "Delete a file or directory at the specified path",
+    parameters: DeletePathParams,
+    requiresConfirmation: true,
+    category: "file_system",
+    riskLevel: "high",
+    supportsUndo: true,
+    requiresNetwork: false,
+    estimatedDurationMs: 100,
+  },
+  create_directory: {
+    name: "create_directory",
+    description: "Create a directory at the specified path, including parent directories",
+    parameters: CreateDirectoryParams,
+    requiresConfirmation: true,
+    category: "file_system",
+    riskLevel: "medium",
+    supportsUndo: true,
+    requiresNetwork: false,
+    estimatedDurationMs: 50,
+  },
+  read_directory: {
+    name: "read_directory",
+    description: "Read the contents of a directory recursively up to a max depth",
+    parameters: ReadDirectoryParams,
+    requiresConfirmation: false,
+    category: "file_system",
+    riskLevel: "low",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 500,
+  },
+  path_exists: {
+    name: "path_exists",
+    description: "Check if a file or directory exists at the specified path",
+    parameters: PathExistsParams,
+    requiresConfirmation: false,
+    category: "file_system",
+    riskLevel: "low",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 10,
+  },
+  list_files: {
+    name: "list_files",
+    description: "List files in a directory, optionally filtered by extension",
+    parameters: ListFilesParams,
+    requiresConfirmation: false,
+    category: "file_system",
+    riskLevel: "low",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 100,
+  },
+  rename_path: {
+    name: "rename_path",
+    description: "Rename or move a file or directory from old_path to new_path",
+    parameters: RenamePathParams,
+    requiresConfirmation: true,
+    category: "file_system",
+    riskLevel: "medium",
+    supportsUndo: true,
+    requiresNetwork: false,
+    estimatedDurationMs: 100,
+  },
+  http_fetch: {
+    name: WEB_TOOL_DEFINITIONS.http_fetch.name,
+    description: WEB_TOOL_DEFINITIONS.http_fetch.description,
+    parameters: HttpFetchParams,
+    requiresConfirmation: true,
+    category: WEB_TOOL_DEFINITIONS.http_fetch.category,
+    riskLevel: WEB_TOOL_DEFINITIONS.http_fetch.riskLevel,
+    supportsUndo: WEB_TOOL_DEFINITIONS.http_fetch.supportsUndo,
+    requiresNetwork: WEB_TOOL_DEFINITIONS.http_fetch.requiresNetwork,
+    estimatedDurationMs: WEB_TOOL_DEFINITIONS.http_fetch.estimatedDurationMs,
+  },
+  web_search: {
+    name: WEB_TOOL_DEFINITIONS.web_search.name,
+    description: WEB_TOOL_DEFINITIONS.web_search.description,
+    parameters: WebSearchParams,
+    requiresConfirmation: false,
+    category: WEB_TOOL_DEFINITIONS.web_search.category,
+    riskLevel: WEB_TOOL_DEFINITIONS.web_search.riskLevel,
+    supportsUndo: WEB_TOOL_DEFINITIONS.web_search.supportsUndo,
+    requiresNetwork: WEB_TOOL_DEFINITIONS.web_search.requiresNetwork,
+    estimatedDurationMs: WEB_TOOL_DEFINITIONS.web_search.estimatedDurationMs,
+  },
+  scrape_webpage: {
+    name: WEB_TOOL_DEFINITIONS.scrape_webpage.name,
+    description: WEB_TOOL_DEFINITIONS.scrape_webpage.description,
+    parameters: ScrapeWebpageParams,
+    requiresConfirmation: false,
+    category: WEB_TOOL_DEFINITIONS.scrape_webpage.category,
+    riskLevel: WEB_TOOL_DEFINITIONS.scrape_webpage.riskLevel,
+    supportsUndo: WEB_TOOL_DEFINITIONS.scrape_webpage.supportsUndo,
+    requiresNetwork: WEB_TOOL_DEFINITIONS.scrape_webpage.requiresNetwork,
+    estimatedDurationMs: WEB_TOOL_DEFINITIONS.scrape_webpage.estimatedDurationMs,
+  },
+};
+
+// Convert to pi-ai Tool format for context
+export function getToolsForContext(): Tool[] {
+  return Object.values(TOOL_DEFINITIONS).map((def) => ({
+    name: def.name,
+    description: def.description,
+    parameters: def.parameters as Tool["parameters"],
+  }));
+}
+
+// Check if a tool requires user confirmation
+export function toolRequiresConfirmation(toolName: string): boolean {
+  return TOOL_DEFINITIONS[toolName]?.requiresConfirmation ?? true;
+}
+
+// Get tool category
+export function getToolCategory(toolName: string): ToolCategory {
+  return TOOL_DEFINITIONS[toolName]?.category ?? "custom";
+}
+
+// Get tool risk level
+export function getToolRiskLevel(toolName: string): RiskLevel {
+  return TOOL_DEFINITIONS[toolName]?.riskLevel ?? "high";
+}
+
+// Get tool definition
+export function getToolDefinition(toolName: string): ToolDefinition | undefined {
+  return TOOL_DEFINITIONS[toolName];
+}
+
+// Check if tool supports undo
+export function toolSupportsUndo(toolName: string): boolean {
+  return TOOL_DEFINITIONS[toolName]?.supportsUndo ?? false;
+}
+
+// Execute a tool call via Tauri invoke
+export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
+  const { id, name, arguments: args } = toolCall;
+
+  try {
+    let result: unknown;
+
+    switch (name) {
+      case "read_file": {
+        const params = args as Static<typeof ReadFileParams>;
+        result = await invoke("read_file", { path: params.path });
+        break;
+      }
+      case "write_file": {
+        const params = args as Static<typeof WriteFileParams>;
+        await invoke("write_file", {
+          path: params.path,
+          content: params.content,
+        });
+        result = `Successfully wrote to ${params.path}`;
+        break;
+      }
+      case "delete_path": {
+        const params = args as Static<typeof DeletePathParams>;
+        await invoke("delete_path", { path: params.path });
+        result = `Successfully deleted ${params.path}`;
+        break;
+      }
+      case "create_directory": {
+        const params = args as Static<typeof CreateDirectoryParams>;
+        await invoke("create_directory", { path: params.path });
+        result = `Successfully created directory ${params.path}`;
+        break;
+      }
+      case "read_directory": {
+        const params = args as Static<typeof ReadDirectoryParams>;
+        result = await invoke("read_directory", {
+          path: params.path,
+          maxDepth: params.max_depth,
+        });
+        // Format as readable string
+        result = JSON.stringify(result, null, 2);
+        break;
+      }
+      case "path_exists": {
+        const params = args as Static<typeof PathExistsParams>;
+        const exists = await invoke("path_exists", { path: params.path });
+        result = exists ? `Path exists: ${params.path}` : `Path does not exist: ${params.path}`;
+        break;
+      }
+      case "list_files": {
+        const params = args as Static<typeof ListFilesParams>;
+        const files = await invoke("list_files", {
+          dir: params.dir,
+          extension: params.extension,
+        });
+        result = Array.isArray(files) ? files.join("\n") : String(files);
+        break;
+      }
+      case "rename_path": {
+        const params = args as Static<typeof RenamePathParams>;
+        await invoke("rename_path", {
+          oldPath: params.old_path,
+          newPath: params.new_path,
+        });
+        result = `Successfully renamed ${params.old_path} to ${params.new_path}`;
+        break;
+      }
+      case "http_fetch":
+      case "web_search":
+      case "scrape_webpage": {
+        result = await executeWebTool(name, args);
+        break;
+      }
+      default:
+        return {
+          toolCallId: id,
+          toolName: name,
+          status: "error",
+          error: `Unknown tool: ${name}`,
+        };
+    }
+
+    return {
+      toolCallId: id,
+      toolName: name,
+      status: "success",
+      result: typeof result === "string" ? result : JSON.stringify(result),
+    };
+  } catch (error) {
+    return {
+      toolCallId: id,
+      toolName: name,
+      status: "error",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}

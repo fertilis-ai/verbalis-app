@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "sapio-app",
+  "productName": "Sapio",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.sapio.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3001",
@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "sapio-app",
-        "width": 800,
-        "height": 600,
+        "title": "Sapio",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
         "resizable": true,
         "fullscreen": false
       }
@@ -26,6 +28,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "externalBin": [
+      "bin/pi-sidecar"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -33,5 +38,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
   }
 }

@@ -1,9 +1,16 @@
+import { useEffect, useState } from "react";
 import { HeadContent, Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
-import Header from "@/components/header";
-import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { initAppDataDir } from "@/lib/storage";
+import { initConfigSync } from "@/lib/config-sync";
+import { startSchedulerRunner } from "@/lib/scheduler-runner";
+import { useAgentStore } from "@/stores/agent-store";
+import { useChatStore } from "@/stores/chat-store";
+import { useSettingsStore } from "@/stores/settings-store";
+import { getHueCssOverrides, applyHueOverrides, clearHueOverrides } from "@/lib/hue-presets";
 
 import "../index.css";
 
@@ -14,11 +21,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   head: () => ({
     meta: [
       {
-        title: "sapio-app",
+        title: "Sapio",
       },
       {
         name: "description",
-        content: "sapio-app is a web application",
+        content: "Sapio - Your personal AI agent",
       },
     ],
     links: [
@@ -31,6 +38,38 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 });
 
 function RootComponent() {
+  const [initialized, setInitialized] = useState(false);
+  const loadAgentsFromDisk = useAgentStore((state) => state.loadAgentsFromDisk);
+  const agents = useAgentStore((state) => state.agents);
+  const agentId = useChatStore((state) => state.agentId);
+  const setAgentId = useChatStore((state) => state.setAgentId);
+
+  // Initialize storage directories on app start - must complete before rendering children
+  useEffect(() => {
+    initAppDataDir()
+      .then(() => initConfigSync())
+      .then(() => setInitialized(true));
+  }, []);
+
+  useEffect(() => {
+    if (!initialized) return;
+    loadAgentsFromDisk();
+    startSchedulerRunner();
+  }, [initialized, loadAgentsFromDisk]);
+
+  useEffect(() => {
+    if (!initialized) return;
+    if (!agentId && agents.length > 0) {
+      setAgentId(agents[0].name);
+    }
+  }, [initialized, agentId, agents, setAgentId]);
+
+  // Don't render children until storage directories are initialized
+  // This prevents race conditions where stores try to load before directories exist
+  if (!initialized) {
+    return null;
+  }
+
   return (
     <>
       <HeadContent />
@@ -38,10 +77,10 @@ function RootComponent() {
         attribute="class"
         defaultTheme="dark"
         disableTransitionOnChange
-        storageKey="vite-ui-theme"
+        storageKey="sapio-theme"
       >
-        <div className="grid grid-rows-[auto_1fr] h-svh">
-          <Header />
+        <HueApplicator />
+        <div className="h-svh overflow-hidden">
           <Outlet />
         </div>
         <Toaster richColors />
@@ -49,4 +88,21 @@ function RootComponent() {
       <TanStackRouterDevtools position="bottom-left" />
     </>
   );
+}
+
+function HueApplicator() {
+  const hue = useSettingsStore((s) => s.hue);
+  const { resolvedTheme } = useTheme();
+
+  useEffect(() => {
+    const mode = resolvedTheme === "dark" ? "dark" : "light";
+    const overrides = getHueCssOverrides(hue, mode);
+    if (overrides) {
+      applyHueOverrides(overrides);
+    } else {
+      clearHueOverrides();
+    }
+  }, [hue, resolvedTheme]);
+
+  return null;
 }

@@ -1,0 +1,11 @@
+{
+  "name": "@sapio-app/pi-sidecar",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:sidecar": "node scripts/build-sidecar.mjs"
+  },
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "latest"
+  }
+}
