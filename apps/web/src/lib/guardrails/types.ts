@@ -11,17 +11,14 @@ export interface CategoryConfirmationMatrix {
   critical: boolean;
 }
 
-export interface PathRestrictions {
-  allowlist: string[];  // Glob patterns
-  blocklist: string[];
-  defaultPolicy: "allow" | "deny";
-}
-
-export interface DomainRestrictions {
+export interface RestrictionConfig {
   allowlist: string[];
   blocklist: string[];
   defaultPolicy: "allow" | "deny";
 }
+
+export type PathRestrictions = RestrictionConfig;
+export type DomainRestrictions = RestrictionConfig;
 
 export interface ShellCommandRestrictions {
   allowlist: string[];  // Command prefixes
@@ -65,13 +62,6 @@ export interface GuardrailsConfig {
 // ============================================================================
 // Default Configuration
 // ============================================================================
-
-export const DEFAULT_CATEGORY_CONFIRMATION: CategoryConfirmationMatrix = {
-  low: false,
-  medium: true,
-  high: true,
-  critical: true,
-};
 
 export const DEFAULT_GUARDRAILS_CONFIG: GuardrailsConfig = {
   enabled: true,
@@ -181,10 +171,7 @@ export type ViolationType =
   | "blocked_path"
   | "blocked_domain"
   | "blocked_command"
-  | "rate_limit_exceeded"
-  | "sandbox_violation"
-  | "guardrails_disabled"
-  | "custom_rule";
+  | "rate_limit_exceeded";
 
 export interface GuardrailViolation {
   type: ViolationType;
@@ -251,7 +238,6 @@ export interface UndoOperation {
 export interface FileWriteUndoData {
   path: string;
   originalContent: string | null;  // null if file didn't exist
-  backupPath?: string;
 }
 
 export interface FileDeleteUndoData {
@@ -269,42 +255,3 @@ export interface ClipboardWriteUndoData {
   previousContent: string;
 }
 
-// ============================================================================
-// Autonomy Levels
-// ============================================================================
-
-export type AutonomyLevel = "supervised" | "semi_autonomous" | "autonomous";
-
-export const AUTONOMY_LEVEL_CONFIG: Record<AutonomyLevel, {
-  label: string;
-  description: string;
-  confirmLow: boolean;
-  confirmMedium: boolean;
-  confirmHigh: boolean;
-  confirmCritical: boolean;
-}> = {
-  supervised: {
-    label: "Supervised",
-    description: "Confirm all tool executions",
-    confirmLow: true,
-    confirmMedium: true,
-    confirmHigh: true,
-    confirmCritical: true,
-  },
-  semi_autonomous: {
-    label: "Semi-Autonomous",
-    description: "Only confirm risky operations",
-    confirmLow: false,
-    confirmMedium: true,
-    confirmHigh: true,
-    confirmCritical: true,
-  },
-  autonomous: {
-    label: "Autonomous",
-    description: "Execute without confirmation",
-    confirmLow: false,
-    confirmMedium: false,
-    confirmHigh: false,
-    confirmCritical: false,
-  },
-};

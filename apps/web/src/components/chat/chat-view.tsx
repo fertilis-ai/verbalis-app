@@ -5,21 +5,21 @@ import { useChatStore } from "@/stores/chat-store";
 import { useAgenticLoopStore } from "@/stores/agentic-loop-store";
 import { ChatInput } from "./chat-input";
 import { ChatHeader } from "./chat-header";
-import { ToolCallCardV2 } from "./tool-call-card-v2";
+import { ToolCallCard } from "./tool-call-card";
 import { MarkdownContent } from "./markdown-content";
 import { GuardrailConfirmationBar } from "./guardrail-confirmation-bar";
-import { useElapsedTime } from "./loop-progress-panel";
+import { useElapsedTime } from "@/lib/hooks/use-elapsed-time";
 import { getUndoManager } from "@/lib/guardrails/undo-manager";
 
 export function ChatView() {
   const {
-    currentConversation,
     sendMessage,
     isStreaming,
     isGhostMode,
     confirmToolExecution,
     rejectToolExecution,
   } = useChatStore();
+  const currentConversation = useChatStore((s) => s.getCurrentConversation());
 
   const currentStatus = useAgenticLoopStore((s) => s.currentStatus);
   const pendingToolCalls = useAgenticLoopStore((s) => s.pendingToolCalls);
@@ -155,7 +155,7 @@ export function ChatView() {
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
                     <div className="space-y-2 w-full">
                       {msg.toolCalls.map((toolCall) => (
-                        <ToolCallCardV2
+                        <ToolCallCard
                           key={toolCall.id}
                           toolCall={toolCall}
                           onConfirm={confirmToolExecution}
@@ -191,7 +191,12 @@ export function ChatView() {
       />
 
       {/* Input */}
-      <ChatInput onSend={handleSend} disabled={isStreaming || isLoopActive} />
+      <ChatInput
+        onSend={handleSend}
+        disabled={isStreaming || isLoopActive}
+        isLoopActive={isLoopActive}
+        onStop={() => conversationId && useAgenticLoopStore.getState().stopLoop(conversationId)}
+      />
     </div>
   );
 }

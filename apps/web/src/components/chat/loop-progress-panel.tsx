@@ -8,7 +8,6 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -210,9 +209,11 @@ export function LoopProgressPanel({
           <div
             className={cn(
               "h-full transition-all duration-300",
-              status === "completed" ? "bg-green-500" :
-              status === "error" || status === "aborted" ? "bg-red-500" :
-              "bg-primary"
+              ({
+                completed: "bg-green-500",
+                error: "bg-red-500",
+                aborted: "bg-red-500",
+              } as Record<string, string>)[status] ?? "bg-primary"
             )}
             style={{ width: `${progressPercent}%` }}
           />
@@ -338,9 +339,10 @@ export function LoopProgressPanel({
         {isFinished && (
           <div className="flex items-center gap-2 text-sm">
             <span className={statusConfig.color}>
-              {status === "completed" ? "Task completed" :
-               status === "error" ? "Task failed" :
-               "Task stopped"}
+              {({
+                completed: "Task completed",
+                error: "Task failed",
+              } as Record<string, string>)[status] ?? "Task stopped"}
             </span>
           </div>
         )}
@@ -349,37 +351,3 @@ export function LoopProgressPanel({
   );
 }
 
-// ============================================================================
-// Hook for elapsed time tracking
-// ============================================================================
-
-export function useElapsedTime(isRunning: boolean): number {
-  const [elapsed, setElapsed] = React.useState(0);
-  const startTimeRef = React.useRef<number | null>(null);
-
-  React.useEffect(() => {
-    if (isRunning) {
-      if (startTimeRef.current === null) {
-        startTimeRef.current = Date.now();
-      }
-
-      const interval = setInterval(() => {
-        if (startTimeRef.current) {
-          setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
-        }
-      }, 1000);
-
-      return () => clearInterval(interval);
-    }
-  }, [isRunning]);
-
-  // Reset when starting fresh
-  React.useEffect(() => {
-    if (!isRunning) {
-      startTimeRef.current = null;
-      // Don't reset elapsed - keep showing final time
-    }
-  }, [isRunning]);
-
-  return elapsed;
-}

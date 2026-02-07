@@ -1,5 +1,6 @@
 import { v4 as uuid } from "uuid";
 import type { ToolCategory } from "./categories";
+import { createSingleton } from "@/lib/utils";
 
 // ============================================================================
 // Execution Record Types
@@ -119,56 +120,43 @@ class ExecutionTracker {
    * Mark execution as successful
    */
   markSuccess(id: string, result: string): void {
-    const record = this.records.get(id);
-    if (record) {
-      record.status = "success";
-      record.result = result;
-      record.completedAt = new Date();
-      if (record.startedAt) {
-        record.durationMs = record.completedAt.getTime() - record.startedAt.getTime();
-      }
-    }
+    this.completeRecord(id, "success", { result });
   }
 
   /**
    * Mark execution as failed
    */
   markError(id: string, error: string): void {
-    const record = this.records.get(id);
-    if (record) {
-      record.status = "error";
-      record.error = error;
-      record.completedAt = new Date();
-      if (record.startedAt) {
-        record.durationMs = record.completedAt.getTime() - record.startedAt.getTime();
-      }
-    }
+    this.completeRecord(id, "error", { error });
   }
 
   /**
    * Mark execution as cancelled
    */
   markCancelled(id: string, reason?: string): void {
-    const record = this.records.get(id);
-    if (record) {
-      record.status = "cancelled";
-      record.error = reason || "Cancelled by user";
-      record.completedAt = new Date();
-    }
+    this.completeRecord(id, "cancelled", { error: reason || "Cancelled by user" });
   }
 
   /**
    * Mark execution as timed out
    */
   markTimeout(id: string): void {
+    this.completeRecord(id, "timeout", { error: "Execution timed out" });
+  }
+
+  private completeRecord(
+    id: string,
+    status: ExecutionStatus,
+    data: { result?: string; error?: string },
+  ): void {
     const record = this.records.get(id);
-    if (record) {
-      record.status = "timeout";
-      record.error = "Execution timed out";
-      record.completedAt = new Date();
-      if (record.startedAt) {
-        record.durationMs = record.completedAt.getTime() - record.startedAt.getTime();
-      }
+    if (!record) return;
+    record.status = status;
+    if (data.result !== undefined) record.result = data.result;
+    if (data.error !== undefined) record.error = data.error;
+    record.completedAt = new Date();
+    if (record.startedAt) {
+      record.durationMs = record.completedAt.getTime() - record.startedAt.getTime();
     }
   }
 
@@ -205,67 +193,54 @@ class ExecutionTracker {
   }
 
   /**
-   * Get all records
+   * Get all records sorted by queuedAt descending
    */
   getAllRecords(): ToolExecutionRecord[] {
     return Array.from(this.records.values())
       .sort((a, b) => b.queuedAt.getTime() - a.queuedAt.getTime());
   }
 
+  private filterRecords(predicate: (r: ToolExecutionRecord) => boolean): ToolExecutionRecord[] {
+    const results: ToolExecutionRecord[] = [];
+    for (const record of this.records.values()) {
+      if (predicate(record)) results.push(record);
+    }
+    return results.sort((a, b) => b.queuedAt.getTime() - a.queuedAt.getTime());
+  }
+
   /**
    * Get records by conversation
    */
   getByConversation(conversationId: string): ToolExecutionRecord[] {
-    return this.getAllRecords()
-      .filter(r => r.conversationId === conversationId);
-  }
-
-  /**
-   * Get records by iteration
-   */
-  getByIteration(iterationId: string): ToolExecutionRecord[] {
-    return this.getAllRecords()
-      .filter(r => r.iterationId === iterationId);
+    return this.filterRecords(r => r.conversationId === conversationId);
   }
 
   /**
    * Get records by status
    */
   getByStatus(status: ExecutionStatus): ToolExecutionRecord[] {
-    return this.getAllRecords()
-      .filter(r => r.status === status);
+    return this.filterRecords(r => r.status === status);
   }
 
   /**
    * Get records by category
    */
   getByCategory(category: ToolCategory): ToolExecutionRecord[] {
-    return this.getAllRecords()
-      .filter(r => r.category === category);
+    return this.filterRecords(r => r.category === category);
   }
 
   /**
    * Get records by tool name
    */
   getByToolName(toolName: string): ToolExecutionRecord[] {
-    return this.getAllRecords()
-      .filter(r => r.toolName === toolName);
-  }
-
-  /**
-   * Get records in a time range
-   */
-  getByTimeRange(start: Date, end: Date): ToolExecutionRecord[] {
-    return this.getAllRecords()
-      .filter(r => r.queuedAt >= start && r.queuedAt <= end);
+    return this.filterRecords(r => r.toolName === toolName);
   }
 
   /**
    * Get records with undo available
    */
   getUndoAvailable(): ToolExecutionRecord[] {
-    return this.getAllRecords()
-      .filter(r => r.undoAvailable);
+    return this.filterRecords(r => r.undoAvailable);
   }
 
   // ============================================================================
@@ -372,11 +347,14 @@ class ExecutionTracker {
   private pruneOldRecords(): void {
     if (this.records.size <= this.maxRecords) return;
 
-    const records = this.getAllRecords();
-    const toRemove = records.slice(this.maxRecords);
-
-    for (const record of toRemove) {
-      this.records.delete(record.id);
+    // Find the oldest records to remove without sorting all records.
+    // Collect all entries, partial-sort to find the ones to remove.
+    const entries = Array.from(this.records.entries());
+    // Sort ascending by queuedAt so oldest are first
+    entries.sort((a, b) => a[1].queuedAt.getTime() - b[1].queuedAt.getTime());
+    const removeCount = entries.length - this.maxRecords;
+    for (let i = 0; i < removeCount; i++) {
+      this.records.delete(entries[i][0]);
     }
   }
 
@@ -421,21 +399,13 @@ export interface ExecutionStatistics {
 // Singleton Instance
 // ============================================================================
 
-let trackerInstance: ExecutionTracker | null = null;
+const executionTrackerSingleton = createSingleton(
+  () => new ExecutionTracker(),
+  (instance) => instance.clear(),
+);
 
-export function getExecutionTracker(): ExecutionTracker {
-  if (!trackerInstance) {
-    trackerInstance = new ExecutionTracker();
-  }
-  return trackerInstance;
-}
-
-export function resetExecutionTracker(): void {
-  if (trackerInstance) {
-    trackerInstance.clear();
-  }
-  trackerInstance = null;
-}
+export const getExecutionTracker = executionTrackerSingleton.get;
+export const resetExecutionTracker = executionTrackerSingleton.reset;
 
 // Export class for testing
 export { ExecutionTracker };

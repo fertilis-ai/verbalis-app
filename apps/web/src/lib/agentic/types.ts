@@ -87,31 +87,6 @@ export const createInitialLoopContext = (
 });
 
 // ============================================================================
-// Loop Controller Interface
-// ============================================================================
-
-export interface LoopController {
-  // Control
-  start(initialPrompt: string): Promise<void>;
-  pause(): void;
-  resume(): void;
-  stop(): void;
-  abort(): void;
-
-  // Tool approval
-  confirmTool(toolCallId: string): Promise<void>;
-  confirmAllPending(): Promise<void>;
-  rejectTool(toolCallId: string, reason?: string): void;
-  rejectAllPending(reason?: string): void;
-
-  // State
-  getContext(): LoopContext;
-  getCurrentIteration(): LoopIteration | null;
-  isRunning(): boolean;
-  isPaused(): boolean;
-}
-
-// ============================================================================
 // Stop Conditions
 // ============================================================================
 

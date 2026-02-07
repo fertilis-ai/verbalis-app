@@ -6,6 +6,8 @@ import type {
   GuardrailsEvaluation,
   GuardrailViolation,
   RateLimitState,
+  RestrictionConfig,
+  ViolationType,
 } from "./types";
 import { createInitialRateLimitState } from "./types";
 
@@ -142,61 +144,52 @@ export class GuardrailsEvaluator {
     return violations;
   }
 
-  private extractPaths(args: Record<string, unknown>): string[] {
-    const paths: string[] = [];
-    const pathKeys = ["path", "old_path", "new_path", "dir", "source", "destination"];
-
-    for (const key of pathKeys) {
+  private extractStringArgs(args: Record<string, unknown>, keys: string[]): string[] {
+    const result: string[] = [];
+    for (const key of keys) {
       if (typeof args[key] === "string") {
-        paths.push(args[key] as string);
+        result.push(args[key] as string);
       }
     }
+    return result;
+  }
 
-    return paths;
+  private extractPaths(args: Record<string, unknown>): string[] {
+    return this.extractStringArgs(args, ["path", "old_path", "new_path", "dir", "source", "destination"]);
   }
 
   private extractUrls(args: Record<string, unknown>): string[] {
-    const urls: string[] = [];
-    const urlKeys = ["url", "endpoint", "uri"];
-
-    for (const key of urlKeys) {
-      if (typeof args[key] === "string") {
-        urls.push(args[key] as string);
-      }
-    }
-
-    return urls;
+    return this.extractStringArgs(args, ["url", "endpoint", "uri"]);
   }
 
-  private checkPathAllowed(path: string): GuardrailViolation | null {
-    const { paths } = this.config;
-    const normalizedPath = this.normalizePath(path);
-
-    // Check blocklist first
-    for (const pattern of paths.blocklist) {
-      if (this.matchGlob(normalizedPath, pattern)) {
+  private checkRestriction(
+    value: string,
+    matchValue: string,
+    restriction: RestrictionConfig,
+    violationType: ViolationType,
+  ): GuardrailViolation | null {
+    for (const pattern of restriction.blocklist) {
+      if (this.matchGlob(matchValue, pattern)) {
         return {
-          type: "blocked_path",
-          message: `Path "${path}" matches blocked pattern "${pattern}"`,
+          type: violationType,
+          message: `"${matchValue}" matches blocked pattern "${pattern}"`,
           severity: "error",
           rule: pattern,
-          value: path,
+          value,
         };
       }
     }
 
-    // Check allowlist if default policy is deny
-    if (paths.defaultPolicy === "deny") {
-      const allowed = paths.allowlist.some(pattern =>
-        this.matchGlob(normalizedPath, pattern)
+    if (restriction.defaultPolicy === "deny") {
+      const allowed = restriction.allowlist.some(pattern =>
+        this.matchGlob(matchValue, pattern)
       );
-
       if (!allowed) {
         return {
-          type: "blocked_path",
-          message: `Path "${path}" is not in allowlist`,
+          type: violationType,
+          message: `"${matchValue}" is not in allowlist`,
           severity: "error",
-          value: path,
+          value,
         };
       }
     }
@@ -204,48 +197,19 @@ export class GuardrailsEvaluator {
     return null;
   }
 
-  private checkDomainAllowed(url: string): GuardrailViolation | null {
-    const { domains } = this.config;
+  private checkPathAllowed(path: string): GuardrailViolation | null {
+    return this.checkRestriction(path, path, this.config.paths, "blocked_path");
+  }
 
+  private checkDomainAllowed(url: string): GuardrailViolation | null {
     let domain: string;
     try {
       const parsed = new URL(url);
       domain = parsed.hostname + (parsed.port ? `:${parsed.port}` : "");
     } catch {
-      // If URL parsing fails, extract domain from string
       domain = url.replace(/^https?:\/\//, "").split("/")[0];
     }
-
-    // Check blocklist first
-    for (const pattern of domains.blocklist) {
-      if (this.matchGlob(domain, pattern)) {
-        return {
-          type: "blocked_domain",
-          message: `Domain "${domain}" matches blocked pattern "${pattern}"`,
-          severity: "error",
-          rule: pattern,
-          value: url,
-        };
-      }
-    }
-
-    // Check allowlist if default policy is deny
-    if (domains.defaultPolicy === "deny") {
-      const allowed = domains.allowlist.some(pattern =>
-        this.matchGlob(domain, pattern)
-      );
-
-      if (!allowed) {
-        return {
-          type: "blocked_domain",
-          message: `Domain "${domain}" is not in allowlist`,
-          severity: "error",
-          value: url,
-        };
-      }
-    }
-
-    return null;
+    return this.checkRestriction(url, domain, this.config.domains, "blocked_domain");
   }
 
   private checkCommandAllowed(command: string): GuardrailViolation | null {
@@ -398,14 +362,6 @@ export class GuardrailsEvaluator {
   // ============================================================================
   // Helper Methods
   // ============================================================================
-
-  private normalizePath(path: string): string {
-    // Expand ~ to home directory marker for pattern matching
-    if (path.startsWith("~/")) {
-      return path; // Keep as-is for pattern matching
-    }
-    return path;
-  }
 
   private matchGlob(value: string, pattern: string): boolean {
     return minimatch(value, pattern, {

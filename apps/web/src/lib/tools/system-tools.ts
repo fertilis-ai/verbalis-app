@@ -2,6 +2,7 @@ import { Type, type Static } from "@sinclair/typebox";
 import { invoke } from "@tauri-apps/api/core";
 import type { ToolDefinitionV2 } from "./categories";
 import { isTauri } from "@/lib/storage";
+import { truncateText } from "@/lib/utils";
 
 // ============================================================================
 // Parameter Schemas
@@ -137,24 +138,13 @@ function formatShellOutput(output: ShellOutput): string {
   if (output.stdout) {
     lines.push("");
     lines.push("stdout:");
-    // Truncate very long output
-    const maxLength = 10000;
-    if (output.stdout.length > maxLength) {
-      lines.push(output.stdout.slice(0, maxLength) + `\n... (truncated, ${output.stdout.length} total chars)`);
-    } else {
-      lines.push(output.stdout);
-    }
+    lines.push(truncateText(output.stdout, 10000));
   }
 
   if (output.stderr) {
     lines.push("");
     lines.push("stderr:");
-    const maxLength = 5000;
-    if (output.stderr.length > maxLength) {
-      lines.push(output.stderr.slice(0, maxLength) + `\n... (truncated, ${output.stderr.length} total chars)`);
-    } else {
-      lines.push(output.stderr);
-    }
+    lines.push(truncateText(output.stderr, 5000));
   }
 
   if (!output.stdout && !output.stderr) {

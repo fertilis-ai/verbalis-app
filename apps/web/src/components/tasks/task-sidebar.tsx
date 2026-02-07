@@ -1,23 +1,14 @@
-import * as React from "react";
 import {
   Plus,
   FolderPlus,
-  MoreVertical,
-  Pin,
-  Pencil,
-  Trash2,
   Folder,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useTaskStore, type TaskTreeNode } from "@/stores/task-store";
+import { usePollingLoader } from "@/lib/hooks/use-polling-loader";
+import { useInlineEditing } from "@/lib/hooks/use-inline-editing";
+import { FolderContextMenu } from "@/components/shared/item-context-menu";
 
 export function TaskSidebar() {
   const {
@@ -32,20 +23,14 @@ export function TaskSidebar() {
     loadTasksFromDisk,
   } = useTaskStore();
 
-  const [editingId, setEditingId] = React.useState<string | null>(null);
-  const [editingName, setEditingName] = React.useState("");
+  usePollingLoader(loadTasksFromDisk);
 
-  // Load tasks on mount and set up polling
-  React.useEffect(() => {
-    loadTasksFromDisk();
-
-    // Poll every 5 seconds for external changes
-    const interval = setInterval(() => {
-      loadTasksFromDisk();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [loadTasksFromDisk]);
+  const { editingId, editingName, startEditing, setEditingName, handleRenameSubmit, handleKeyDown } =
+    useInlineEditing({
+      onRename: async (id, name) => {
+        await renameFolder(id, name);
+      },
+    });
 
   const handleCreateFolder = async () => {
     await createFolder("New Folder");
@@ -53,27 +38,6 @@ export function TaskSidebar() {
 
   const handleCreateTask = async () => {
     await createTask("New Task");
-  };
-
-  const startEditing = (id: string, name: string) => {
-    setEditingId(id);
-    setEditingName(name);
-  };
-
-  const handleRenameSubmit = async () => {
-    if (!editingId || !editingName.trim()) return;
-    await renameFolder(editingId, editingName.trim());
-    setEditingId(null);
-    setEditingName("");
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleRenameSubmit();
-    } else if (e.key === "Escape") {
-      setEditingId(null);
-      setEditingName("");
-    }
   };
 
   // Separate pinned folders
@@ -217,55 +181,20 @@ function FolderItem({
           className="h-5 w-5"
           onClick={(e) => {
             e.stopPropagation();
-            onSelect(); // Select folder first
-            onCreateTask(); // Then create task
+            onSelect();
+            onCreateTask();
           }}
           title="New task"
         >
           <Plus className="h-3 w-3" />
         </Button>
         <FolderContextMenu
-          folder={folder}
+          isPinned={folder.isPinned}
           onRename={onStartEditing}
           onDelete={onDelete}
           onTogglePin={onTogglePin}
         />
       </div>
     </div>
-  );
-}
-
-interface FolderContextMenuProps {
-  folder: TaskTreeNode;
-  onRename: () => void;
-  onDelete: () => void;
-  onTogglePin: () => void;
-}
-
-function FolderContextMenu({ folder, onRename, onDelete, onTogglePin }: FolderContextMenuProps) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon-xs" className="h-5 w-5" />}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MoreVertical className="h-3 w-3" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem onClick={onRename}>
-          <Pencil className="mr-2 h-4 w-4" />
-          Rename
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onTogglePin}>
-          <Pin className="mr-2 h-4 w-4" />
-          {folder.isPinned ? "Unpin" : "Pin"}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onDelete} className="text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }

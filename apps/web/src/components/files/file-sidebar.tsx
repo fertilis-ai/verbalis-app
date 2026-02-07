@@ -25,23 +25,13 @@ import { cn } from "@/lib/utils";
 import { useFileStore, type FileNode } from "@/stores/file-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
-// Platform detection for folder colors
-function usePlatform() {
-  const [platform, setPlatform] = React.useState<"mac" | "windows" | "linux">("mac");
-
-  React.useEffect(() => {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.includes("mac")) {
-      setPlatform("mac");
-    } else if (userAgent.includes("win")) {
-      setPlatform("windows");
-    } else {
-      setPlatform("linux");
-    }
-  }, []);
-
-  return platform;
-}
+// Platform detection for folder colors (never changes at runtime)
+const detectedPlatform: "mac" | "windows" | "linux" = (() => {
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes("mac")) return "mac";
+  if (ua.includes("win")) return "windows";
+  return "linux";
+})();
 
 // Folder color classes by platform
 const folderColorClasses = {
@@ -63,12 +53,13 @@ export function FileSidebar() {
     createFolder,
   } = useFileStore();
   const { workingDirectory } = useSettingsStore();
-  const platform = usePlatform();
-  const folderColorClass = folderColorClasses[platform];
-  const [isCreatingFile, setIsCreatingFile] = React.useState(false);
-  const [isCreatingFolder, setIsCreatingFolder] = React.useState(false);
+  const folderColorClass = folderColorClasses[detectedPlatform];
+  const [creatingInPath, setCreatingInPath] = React.useState<string | null>(null);
+  const [creatingType, setCreatingType] = React.useState<"file" | "folder">("file");
   const [newItemName, setNewItemName] = React.useState("");
   const newItemInputRef = React.useRef<HTMLInputElement>(null);
+
+  const isCreating = creatingInPath !== null;
 
   // Load file tree on mount and when workingDirectory changes
   React.useEffect(() => {
@@ -99,48 +90,43 @@ export function FileSidebar() {
 
   // Focus new item input when creating
   React.useEffect(() => {
-    if ((isCreatingFile || isCreatingFolder) && newItemInputRef.current) {
+    if (isCreating && newItemInputRef.current) {
       newItemInputRef.current.focus();
     }
-  }, [isCreatingFile, isCreatingFolder]);
+  }, [isCreating]);
 
-  const handleCreateFile = () => {
-    setIsCreatingFile(true);
-    setIsCreatingFolder(false);
+  const startCreating = (path: string, type: "file" | "folder") => {
+    setCreatingInPath(path);
+    setCreatingType(type);
     setNewItemName("");
   };
 
-  const handleCreateFolder = () => {
-    setIsCreatingFolder(true);
-    setIsCreatingFile(false);
+  const cancelCreating = () => {
+    setCreatingInPath(null);
     setNewItemName("");
   };
 
   const handleNewItemSubmit = async () => {
-    if (!newItemName.trim()) {
-      setIsCreatingFile(false);
-      setIsCreatingFolder(false);
+    if (!newItemName.trim() || creatingInPath === null) {
+      cancelCreating();
       return;
     }
 
-    if (isCreatingFile) {
-      await createFile(null, newItemName.trim());
-    } else if (isCreatingFolder) {
-      await createFolder(null, newItemName.trim());
+    const parentPath = creatingInPath === "__root__" ? null : creatingInPath;
+    if (creatingType === "file") {
+      await createFile(parentPath, newItemName.trim());
+    } else {
+      await createFolder(parentPath, newItemName.trim());
     }
 
-    setIsCreatingFile(false);
-    setIsCreatingFolder(false);
-    setNewItemName("");
+    cancelCreating();
   };
 
   const handleNewItemKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleNewItemSubmit();
     } else if (e.key === "Escape") {
-      setIsCreatingFile(false);
-      setIsCreatingFolder(false);
-      setNewItemName("");
+      cancelCreating();
     }
   };
 
@@ -161,7 +147,7 @@ export function FileSidebar() {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={handleCreateFolder}
+            onClick={() => startCreating("__root__", "folder")}
             title="New folder"
           >
             <FolderPlus className="h-5 w-5" />
@@ -169,7 +155,7 @@ export function FileSidebar() {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={handleCreateFile}
+            onClick={() => startCreating("__root__", "file")}
             title="New file"
           >
             <Plus className="h-5 w-5" />
@@ -185,9 +171,9 @@ export function FileSidebar() {
       {/* Tree content */}
       <div className="flex-1 overflow-auto px-2">
         {/* New item input at root */}
-        {(isCreatingFile || isCreatingFolder) && (
+        {creatingInPath === "__root__" && (
           <div className="flex items-center gap-1 py-0.5 px-1">
-            {isCreatingFolder ? (
+            {creatingType === "folder" ? (
               <Folder className={cn("h-3.5 w-3.5 flex-shrink-0", folderColorClass)} />
             ) : (
               <File className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
@@ -199,7 +185,7 @@ export function FileSidebar() {
               onKeyDown={handleNewItemKeyDown}
               onBlur={handleNewItemSubmit}
               className="h-5 text-xs px-1 py-0"
-              placeholder={isCreatingFolder ? "folder name" : "file name"}
+              placeholder={creatingType === "folder" ? "folder name" : "file name"}
             />
           </div>
         )}
@@ -215,6 +201,14 @@ export function FileSidebar() {
             onSelectFile={(path) => openFile(path)}
             onToggleDirectory={toggleDirectory}
             folderColorClass={folderColorClass}
+            creatingInPath={creatingInPath}
+            creatingType={creatingType}
+            newItemName={newItemName}
+            setNewItemName={setNewItemName}
+            newItemInputRef={newItemInputRef}
+            onNewItemKeyDown={handleNewItemKeyDown}
+            onNewItemSubmit={handleNewItemSubmit}
+            onStartCreating={startCreating}
           />
         )}
       </div>
@@ -229,6 +223,14 @@ interface FileTreeProps {
   onToggleDirectory: (path: string) => void;
   folderColorClass: string;
   depth?: number;
+  creatingInPath: string | null;
+  creatingType: "file" | "folder";
+  newItemName: string;
+  setNewItemName: (name: string) => void;
+  newItemInputRef: React.RefObject<HTMLInputElement | null>;
+  onNewItemKeyDown: (e: React.KeyboardEvent) => void;
+  onNewItemSubmit: () => void;
+  onStartCreating: (path: string, type: "file" | "folder") => void;
 }
 
 function FileTree({
@@ -238,6 +240,14 @@ function FileTree({
   onToggleDirectory,
   folderColorClass,
   depth = 0,
+  creatingInPath,
+  creatingType,
+  newItemName,
+  setNewItemName,
+  newItemInputRef,
+  onNewItemKeyDown,
+  onNewItemSubmit,
+  onStartCreating,
 }: FileTreeProps) {
   return (
     <div className="flex flex-col">
@@ -250,6 +260,14 @@ function FileTree({
           onToggleDirectory={onToggleDirectory}
           folderColorClass={folderColorClass}
           depth={depth}
+          creatingInPath={creatingInPath}
+          creatingType={creatingType}
+          newItemName={newItemName}
+          setNewItemName={setNewItemName}
+          newItemInputRef={newItemInputRef}
+          onNewItemKeyDown={onNewItemKeyDown}
+          onNewItemSubmit={onNewItemSubmit}
+          onStartCreating={onStartCreating}
         />
       ))}
     </div>
@@ -263,6 +281,14 @@ interface FileTreeNodeProps {
   onToggleDirectory: (path: string) => void;
   folderColorClass: string;
   depth: number;
+  creatingInPath: string | null;
+  creatingType: "file" | "folder";
+  newItemName: string;
+  setNewItemName: (name: string) => void;
+  newItemInputRef: React.RefObject<HTMLInputElement | null>;
+  onNewItemKeyDown: (e: React.KeyboardEvent) => void;
+  onNewItemSubmit: () => void;
+  onStartCreating: (path: string, type: "file" | "folder") => void;
 }
 
 function FileTreeNode({
@@ -272,6 +298,14 @@ function FileTreeNode({
   onToggleDirectory,
   folderColorClass,
   depth,
+  creatingInPath,
+  creatingType,
+  newItemName,
+  setNewItemName,
+  newItemInputRef,
+  onNewItemKeyDown,
+  onNewItemSubmit,
+  onStartCreating,
 }: FileTreeNodeProps) {
   const {
     editingPath,
@@ -281,18 +315,12 @@ function FileTreeNode({
     cancelEditing,
     submitEditing,
     deleteItem,
-    createFile,
-    createFolder,
   } = useFileStore();
 
-  const [isHovered, setIsHovered] = React.useState(false);
-  const [isCreatingFileInside, setIsCreatingFileInside] = React.useState(false);
-  const [isCreatingFolderInside, setIsCreatingFolderInside] = React.useState(false);
-  const [newItemName, setNewItemName] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const newItemInputRef = React.useRef<HTMLInputElement>(null);
 
   const isEditing = editingPath === node.path;
+  const isCreatingInside = creatingInPath === node.path;
 
   // Focus input when editing
   React.useEffect(() => {
@@ -302,41 +330,11 @@ function FileTreeNode({
     }
   }, [isEditing]);
 
-  // Focus new item input when creating inside folder
-  React.useEffect(() => {
-    if ((isCreatingFileInside || isCreatingFolderInside) && newItemInputRef.current) {
-      newItemInputRef.current.focus();
-    }
-  }, [isCreatingFileInside, isCreatingFolderInside]);
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       submitEditing();
     } else if (e.key === "Escape") {
       cancelEditing();
-    }
-  };
-
-  const handleNewItemSubmit = async () => {
-    if (newItemName.trim()) {
-      if (isCreatingFileInside) {
-        await createFile(node.path, newItemName.trim());
-      } else if (isCreatingFolderInside) {
-        await createFolder(node.path, newItemName.trim());
-      }
-    }
-    setIsCreatingFileInside(false);
-    setIsCreatingFolderInside(false);
-    setNewItemName("");
-  };
-
-  const handleNewItemKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleNewItemSubmit();
-    } else if (e.key === "Escape") {
-      setIsCreatingFileInside(false);
-      setIsCreatingFolderInside(false);
-      setNewItemName("");
     }
   };
 
@@ -361,8 +359,6 @@ function FileTreeNode({
             onSelectFile(node.path);
           }
         }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
       >
         {/* Chevron / icon */}
         {node.isDirectory ? (
@@ -400,10 +396,10 @@ function FileTreeNode({
           <span className="truncate flex-1">{node.name}</span>
         )}
 
-        {/* Actions on hover */}
-        {isHovered && !isEditing && (
+        {/* Actions on hover (CSS-driven visibility) */}
+        {!isEditing && (
           <div
-            className="flex items-center gap-0.5"
+            className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Add folder/file inside folder */}
@@ -412,9 +408,7 @@ function FileTreeNode({
                 <button
                   className="p-0.5 rounded-sm hover:bg-background"
                   onClick={() => {
-                    setIsCreatingFolderInside(true);
-                    setIsCreatingFileInside(false);
-                    setNewItemName("");
+                    onStartCreating(node.path, "folder");
                     if (!node.isExpanded) {
                       onToggleDirectory(node.path);
                     }
@@ -426,9 +420,7 @@ function FileTreeNode({
                 <button
                   className="p-0.5 rounded-sm hover:bg-background"
                   onClick={() => {
-                    setIsCreatingFileInside(true);
-                    setIsCreatingFolderInside(false);
-                    setNewItemName("");
+                    onStartCreating(node.path, "file");
                     if (!node.isExpanded) {
                       onToggleDirectory(node.path);
                     }
@@ -472,13 +464,13 @@ function FileTreeNode({
       </div>
 
       {/* New file/folder input inside folder */}
-      {node.isDirectory && node.isExpanded && (isCreatingFileInside || isCreatingFolderInside) && (
+      {node.isDirectory && node.isExpanded && isCreatingInside && (
         <div
           className="flex items-center gap-1 py-0.5"
           style={{ paddingLeft: (depth + 1) * 12 + 4 }}
         >
           <span className="h-3 w-3" />
-          {isCreatingFolderInside ? (
+          {creatingType === "folder" ? (
             <Folder className={cn("h-3.5 w-3.5 flex-shrink-0", folderColorClass)} />
           ) : (
             <File className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
@@ -487,10 +479,10 @@ function FileTreeNode({
             ref={newItemInputRef}
             value={newItemName}
             onChange={(e) => setNewItemName(e.target.value)}
-            onKeyDown={handleNewItemKeyDown}
-            onBlur={handleNewItemSubmit}
+            onKeyDown={onNewItemKeyDown}
+            onBlur={onNewItemSubmit}
             className="h-5 text-xs px-1 py-0 flex-1"
-            placeholder={isCreatingFolderInside ? "folder name" : "file name"}
+            placeholder={creatingType === "folder" ? "folder name" : "file name"}
           />
         </div>
       )}
@@ -504,6 +496,14 @@ function FileTreeNode({
           onToggleDirectory={onToggleDirectory}
           folderColorClass={folderColorClass}
           depth={depth + 1}
+          creatingInPath={creatingInPath}
+          creatingType={creatingType}
+          newItemName={newItemName}
+          setNewItemName={setNewItemName}
+          newItemInputRef={newItemInputRef}
+          onNewItemKeyDown={onNewItemKeyDown}
+          onNewItemSubmit={onNewItemSubmit}
+          onStartCreating={onStartCreating}
         />
       )}
     </div>

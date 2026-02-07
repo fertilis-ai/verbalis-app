@@ -2,6 +2,7 @@ import { Type, type Static } from "@sinclair/typebox";
 import { invoke } from "@tauri-apps/api/core";
 import type { ToolDefinitionV2 } from "./categories";
 import { isTauri } from "@/lib/storage";
+import { truncateText } from "@/lib/utils";
 
 // ============================================================================
 // Parameter Schemas
@@ -74,9 +75,6 @@ export async function executeHttpFetch(
 ): Promise<string> {
   const { url, method = "GET", headers, body, timeout_ms } = args;
 
-  // Determine risk level based on method
-  const isModifying = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
-
   if (isTauri()) {
     const response = await invoke<HttpResponse>("http_request", {
       url,
@@ -121,7 +119,7 @@ export async function executeHttpFetch(
 export async function executeWebSearch(
   args: Static<typeof WebSearchParams>
 ): Promise<string> {
-  const { query, provider = "duckduckgo", max_results = 5 } = args;
+  const { query, max_results = 5 } = args;
 
   // Use DuckDuckGo HTML API (doesn't require API key)
   const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
@@ -185,13 +183,7 @@ function formatHttpResponse(response: HttpResponse): string {
   }
   lines.push("");
   lines.push("Body:");
-  // Truncate very long bodies
-  const maxBodyLength = 10000;
-  if (response.body.length > maxBodyLength) {
-    lines.push(response.body.slice(0, maxBodyLength) + `\n... (truncated, ${response.body.length} total chars)`);
-  } else {
-    lines.push(response.body);
-  }
+  lines.push(truncateText(response.body, 10000));
   return lines.join("\n");
 }
 
@@ -287,13 +279,7 @@ function formatScrapeResult(url: string, result: ScrapeResult): string {
   lines.push(`Title: ${result.title}`);
   lines.push("");
   lines.push("Content:");
-  // Truncate very long content
-  const maxLength = 5000;
-  if (result.text.length > maxLength) {
-    lines.push(result.text.slice(0, maxLength) + `\n... (truncated, ${result.text.length} total chars)`);
-  } else {
-    lines.push(result.text);
-  }
+  lines.push(truncateText(result.text, 5000));
 
   if (result.links.length > 0) {
     lines.push("");

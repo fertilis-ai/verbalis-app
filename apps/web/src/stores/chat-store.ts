@@ -4,12 +4,8 @@ import {
   streamSimple,
   getModel,
   type Context,
-  type Message as PiMessage,
-  type AssistantMessage as PiAssistantMessage,
-  type ToolResultMessage as PiToolResultMessage,
   type Api,
   type Model,
-  type Usage,
 } from "@mariozechner/pi-ai";
 import {
   type ToolCallState,
@@ -17,6 +13,7 @@ import {
   getToolsForContext,
 } from "@/lib/tools";
 import { stripProtocolMarkers } from "@/lib/protocol-parser";
+import { messagesToPiMessages } from "@/lib/message-conversion";
 import { useSettingsStore } from "./settings-store";
 import { useAgentStore } from "./agent-store";
 import { useAgenticLoopStore, subscribeToToolEvents } from "./agentic-loop-store";
@@ -70,17 +67,6 @@ function buildOpenAiUrl(baseUrl: string, path: string): string {
   return `${buildOpenAiBaseUrl(baseUrl)}${path}`;
 }
 
-function buildEmptyUsage(): Usage {
-  return {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    totalTokens: 0,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-  };
-}
-
 function buildContextFromConversation(params: {
   conversation: Conversation;
   systemPrompt?: string;
@@ -90,78 +76,9 @@ function buildContextFromConversation(params: {
   includeTools?: boolean;
 }): Context {
   const { conversation, systemPrompt, api, provider, model, includeTools } = params;
-  const messages: PiMessage[] = [];
-
-  for (const message of conversation.messages) {
-    if (message.role === "user") {
-      messages.push({
-        role: "user",
-        content: message.content,
-        timestamp: message.createdAt.getTime(),
-      });
-      continue;
-    }
-
-    // Build assistant message content array
-    const content: PiAssistantMessage["content"] = [];
-
-    const trimmed = message.content.trim();
-    if (trimmed) {
-      content.push({ type: "text", text: trimmed });
-    }
-
-    // Include tool calls if any
-    if (message.toolCalls) {
-      for (const tc of message.toolCalls) {
-        if (tc.status === "success" || tc.status === "error") {
-          content.push({
-            type: "toolCall",
-            id: tc.id,
-            name: tc.name,
-            arguments: tc.arguments as Record<string, unknown>,
-          });
-        }
-      }
-    }
-
-    // Skip empty assistant messages
-    if (content.length === 0) continue;
-
-    const assistantMessage: PiAssistantMessage = {
-      role: "assistant",
-      content,
-      api,
-      provider,
-      model,
-      usage: buildEmptyUsage(),
-      stopReason: message.toolCalls?.some(tc => tc.status === "success" || tc.status === "error")
-        ? "toolUse"
-        : "stop",
-      timestamp: message.createdAt.getTime(),
-    };
-    messages.push(assistantMessage);
-
-    // Add tool result messages for completed tool calls
-    if (message.toolCalls) {
-      for (const tc of message.toolCalls) {
-        if (tc.status === "success" || tc.status === "error") {
-          const toolResultMessage: PiToolResultMessage = {
-            role: "toolResult",
-            toolCallId: tc.id,
-            toolName: tc.name,
-            content: [{ type: "text", text: tc.result || tc.error || "" }],
-            isError: tc.status === "error",
-            timestamp: message.createdAt.getTime(),
-          };
-          messages.push(toolResultMessage);
-        }
-      }
-    }
-  }
-
   return {
     systemPrompt,
-    messages,
+    messages: messagesToPiMessages(conversation.messages, api, provider, model),
     tools: includeTools ? getToolsForContext() : undefined,
   };
 }
@@ -228,19 +145,13 @@ export interface Conversation {
   background?: boolean;
 }
 
-export interface ChatFolder {
-  id: string;
-  name: string;
-  path: string;
-  isExpanded: boolean;
-  isPinned: boolean;
-}
-
 interface ChatState {
   // Conversations (in-memory + synced to disk)
   conversations: Conversation[];
   currentConversationId: string | null;
-  currentConversation: Conversation | null;
+
+  // Derived getter for current conversation
+  getCurrentConversation: () => Conversation | null;
 
   // Folder tree from disk
   chatTree: ChatTreeNode[];
@@ -279,7 +190,6 @@ interface ChatState {
 
   // Actions - chat management
   renameChat: (chatId: string, newTitle: string) => Promise<void>;
-  moveChat: (chatId: string, targetFolderId: string | null) => Promise<void>;
 
   // Actions - ghost mode
   startGhostSession: () => void;
@@ -288,6 +198,9 @@ interface ChatState {
   // Actions - tool execution
   confirmToolExecution: (toolCallId: string) => Promise<void>;
   rejectToolExecution: (toolCallId: string) => void;
+
+  // Actions - tool state management
+  markToolCallsStopped: (conversationId: string) => void;
 }
 
 // Helper to find a node in the tree
@@ -330,22 +243,54 @@ function getSiblingFolderNames(tree: ChatTreeNode[], parentFolderId?: string): s
   return [];
 }
 
-// Helper to find parent folder path
-function findParentPath(tree: ChatTreeNode[], id: string, currentPath?: string): string | null {
-  for (const node of tree) {
-    if (node.id === id) return currentPath || null;
-    if (node.children) {
-      const found = findParentPath(node.children, id, node.path);
-      if (found !== null) return found;
-    }
-  }
-  return null;
-}
-
 function deriveConversationTitle(content: string, maxLength = 50): string | null {
   const trimmed = content.trim();
   if (!trimmed) return null;
   return trimmed.slice(0, maxLength);
+}
+
+/** Update the last assistant message in a messages array with the given partial updates. */
+function updateLastAssistantMessage(messages: Message[], updates: Partial<Message>): Message[] {
+  const result = [...messages];
+  const lastIdx = result.length - 1;
+  if (lastIdx >= 0 && result[lastIdx].role === "assistant") {
+    result[lastIdx] = { ...result[lastIdx], ...updates };
+  }
+  return result;
+}
+
+/** Serialize a Conversation's messages to ChatData message format for disk persistence. */
+function serializeMessages(messages: Message[]): ChatData["messages"] {
+  return messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    createdAt: m.createdAt.toISOString(),
+    ...(m.toolCalls?.length ? {
+      toolCalls: m.toolCalls.map((tc) => ({
+        id: tc.id,
+        name: tc.name,
+        arguments: tc.arguments,
+        status: tc.status,
+        result: tc.result,
+        error: tc.error,
+        durationMs: tc.durationMs,
+      })),
+    } : {}),
+  }));
+}
+
+/** Build a ChatData object from a Conversation for disk persistence. */
+function conversationToChatData(conv: Conversation, model: string, agentId: string | null): ChatData {
+  return {
+    id: conv.id,
+    title: conv.title,
+    model,
+    agentId,
+    messages: serializeMessages(conv.messages),
+    createdAt: conv.createdAt.toISOString(),
+    updatedAt: conv.updatedAt.toISOString(),
+  };
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
@@ -383,7 +328,6 @@ export const useChatStore = create<ChatState>((set, get) => {
     set((state) => ({
       conversations: options.select ? [newConversation, ...state.conversations] : [...state.conversations, newConversation],
       currentConversationId: options.select ? id : state.currentConversationId,
-      currentConversation: options.select ? newConversation : state.currentConversation,
     }));
 
     // Skip disk save for background conversations (e.g. scheduler runs)
@@ -445,28 +389,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (isGhost) {
         set((state) => {
           if (!state.ghostConversation) return state;
-          const updated = updater(state.ghostConversation);
-          return {
-            ghostConversation: updated,
-            currentConversation: state.currentConversationId === updated.id ? updated : state.currentConversation,
-          };
+          return { ghostConversation: updater(state.ghostConversation) };
         });
       } else {
-        set((state) => {
-          const conversations = state.conversations.map((c) => {
-            if (c.id === conversationId) {
-              return updater(c);
-            }
-            return c;
-          });
-          return {
-            conversations,
-            currentConversation:
-              state.currentConversationId === conversationId
-                ? conversations.find((c) => c.id === conversationId) ?? null
-                : state.currentConversation,
-          };
-        });
+        set((state) => ({
+          conversations: state.conversations.map((c) =>
+            c.id === conversationId ? updater(c) : c
+          ),
+        }));
       }
     };
 
@@ -543,7 +473,6 @@ export const useChatStore = create<ChatState>((set, get) => {
         // Helper to sync tool call state to conversation
         // Searches ALL messages (not just last) to find the tool call by ID
         const syncToolCallToConversation = (toolCall: ToolCallState) => {
-          console.log(`[chat-store] syncToolCallToConversation: id=${toolCall.id}, name=${toolCall.name}, status=${toolCall.status}`);
           updateConversation((c) => {
             let found = false;
             const messages = c.messages.map((m) => {
@@ -556,7 +485,6 @@ export const useChatStore = create<ChatState>((set, get) => {
               return { ...m, toolCalls: updatedToolCalls };
             });
             if (!found) {
-              console.log(`[chat-store] syncToolCallToConversation: not found in messages, using fallback (last assistant msg)`);
               // Tool call not in any message yet — append to last assistant message
               const lastIdx = messages.length - 1;
               if (lastIdx >= 0 && messages[lastIdx].role === "assistant") {
@@ -568,8 +496,6 @@ export const useChatStore = create<ChatState>((set, get) => {
                   };
                 }
               }
-            } else {
-              console.log(`[chat-store] syncToolCallToConversation: found and updated in existing message`);
             }
             return { ...c, messages, updatedAt: new Date() };
           });
@@ -579,18 +505,12 @@ export const useChatStore = create<ChatState>((set, get) => {
         const unsubscribe = adapter.onEvent((event: AgentLoopEvent) => {
           switch (event.type) {
             case "assistant_message_started": {
-              // Create a new assistant message for subsequent LLM turns (after tool execution)
-              // Only create if the last message already has content (meaning it's not the initial empty message)
-              const convForLog = isGhost ? get().ghostConversation : get().conversations.find((c) => c.id === conversationId);
-              const lastMsgForLog = convForLog?.messages[convForLog.messages.length - 1];
-              console.log(`[chat-store] assistant_message_started: messageId=${event.messageId}, lastMsg role=${lastMsgForLog?.role}, content length=${lastMsgForLog?.content?.length ?? 0}, toolCalls=${lastMsgForLog?.toolCalls?.length ?? 0}`);
               updateConversation((c) => {
                 const messages = [...c.messages];
                 const lastMsg = messages[messages.length - 1];
 
                 // If last message has content and tool calls, this is a follow-up turn
                 if (lastMsg?.role === "assistant" && (lastMsg.content.trim() !== "" || (lastMsg.toolCalls && lastMsg.toolCalls.length > 0))) {
-                  console.log("[chat-store] assistant_message_started: creating NEW assistant message (follow-up turn)");
                   const newAssistantMessage: Message = {
                     id: event.messageId,
                     role: "assistant",
@@ -599,34 +519,22 @@ export const useChatStore = create<ChatState>((set, get) => {
                   };
                   return { ...c, messages: [...messages, newAssistantMessage], updatedAt: new Date() };
                 }
-                console.log("[chat-store] assistant_message_started: reusing existing empty assistant message");
                 return c; // First turn - use existing empty message
               });
               break;
             }
             case "text_delta":
-              // Update message content during streaming
-              updateConversation((c) => {
-                const messages = [...c.messages];
-                const lastIdx = messages.length - 1;
-                messages[lastIdx] = {
-                  ...messages[lastIdx],
-                  content: event.fullContent,
-                };
-                return { ...c, messages, updatedAt: new Date() };
-              });
+              updateConversation((c) => ({
+                ...c,
+                messages: updateLastAssistantMessage(c.messages, { content: event.fullContent }),
+                updatedAt: new Date(),
+              }));
               break;
             case "thinking_completed":
-              // Update message content and attach tool calls from this LLM turn
-              console.log(`[chat-store] thinking_completed: content length=${event.content.length}, toolCalls=${event.toolCalls.length}`);
-              if (event.toolCalls.length > 0) {
-                console.log("[chat-store] thinking_completed: tool call names:", event.toolCalls.map((tc: ToolCallState) => tc.name));
-              }
               updateConversation((c) => {
                 const messages = [...c.messages];
                 const lastIdx = messages.length - 1;
                 if (lastIdx < 0 || messages[lastIdx].role !== "assistant") {
-                  console.warn(`[chat-store] thinking_completed: no assistant message to attach to (lastIdx=${lastIdx}, role=${messages[lastIdx]?.role})`);
                   return c;
                 }
                 messages[lastIdx] = {
@@ -648,19 +556,18 @@ export const useChatStore = create<ChatState>((set, get) => {
             case "tool_executing":
             case "tool_completed":
             case "tool_failed":
-              console.log(`[chat-store] tool event: ${event.type}, name=${event.toolCall.name}, id=${event.toolCall.id}, status=${event.toolCall.status}`);
               syncToolCallToConversation(event.toolCall);
               break;
             case "loop_error":
               updateConversation((c) => {
-                const messages = [...c.messages];
-                const lastIdx = messages.length - 1;
-                const existingContent = messages[lastIdx]?.content || "";
-                messages[lastIdx] = {
-                  ...messages[lastIdx],
-                  content: existingContent + `\n\nError: ${event.error}`,
+                const lastContent = c.messages[c.messages.length - 1]?.content || "";
+                return {
+                  ...c,
+                  messages: updateLastAssistantMessage(c.messages, {
+                    content: lastContent + `\n\nError: ${event.error}`,
+                  }),
+                  updatedAt: new Date(),
                 };
-                return { ...c, messages, updatedAt: new Date() };
               });
               break;
           }
@@ -691,15 +598,13 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (isLocal) {
         const localSettings = settings.localLLM;
         if (!localSettings.enabled) {
-          updateConversation((c) => {
-            const messages = [...c.messages];
-            const lastIdx = messages.length - 1;
-            messages[lastIdx] = {
-              ...messages[lastIdx],
+          updateConversation((c) => ({
+            ...c,
+            messages: updateLastAssistantMessage(c.messages, {
               content: "Local LLM is disabled. Enable it in Settings to use a local model.",
-            };
-            return { ...c, messages, updatedAt: new Date() };
-          });
+            }),
+            updatedAt: new Date(),
+          }));
           return;
         }
 
@@ -709,15 +614,13 @@ export const useChatStore = create<ChatState>((set, get) => {
           localSettings.model
         );
         if (!resolvedModel) {
-          updateConversation((c) => {
-            const messages = [...c.messages];
-            const lastIdx = messages.length - 1;
-            messages[lastIdx] = {
-              ...messages[lastIdx],
+          updateConversation((c) => ({
+            ...c,
+            messages: updateLastAssistantMessage(c.messages, {
               content: "No local model found. Configure a model name or check your local server.",
-            };
-            return { ...c, messages, updatedAt: new Date() };
-          });
+            }),
+            updatedAt: new Date(),
+          }));
           return;
         }
 
@@ -750,15 +653,11 @@ export const useChatStore = create<ChatState>((set, get) => {
             if (event.type === "text_delta") {
               fullContent += event.delta;
               const displayContent = stripProtocolMarkers(fullContent);
-              updateConversation((c) => {
-                const messages = [...c.messages];
-                const lastIdx = messages.length - 1;
-                messages[lastIdx] = {
-                  ...messages[lastIdx],
-                  content: displayContent,
-                };
-                return { ...c, messages, updatedAt: new Date() };
-              });
+              updateConversation((c) => ({
+                ...c,
+                messages: updateLastAssistantMessage(c.messages, { content: displayContent }),
+                updatedAt: new Date(),
+              }));
             } else if (event.type === "error") {
               throw new Error(event.error.errorMessage || "Local LLM error");
             }
@@ -771,23 +670,16 @@ export const useChatStore = create<ChatState>((set, get) => {
           throw new Error(`Unknown model: ${model}`);
         }
 
-        const apiKey =
-          modelConfig.provider === "anthropic"
-            ? settings.apiKeys.anthropic
-            : modelConfig.provider === "openai"
-              ? settings.apiKeys.openai
-              : settings.apiKeys.google;
+        const apiKey = settings.apiKeys[modelConfig.provider];
 
         if (!apiKey) {
-          updateConversation((c) => {
-            const messages = [...c.messages];
-            const lastIdx = messages.length - 1;
-            messages[lastIdx] = {
-              ...messages[lastIdx],
+          updateConversation((c) => ({
+            ...c,
+            messages: updateLastAssistantMessage(c.messages, {
               content: `Please configure a ${modelConfig.provider} API key in Settings to use the chat.`,
-            };
-            return { ...c, messages, updatedAt: new Date() };
-          });
+            }),
+            updatedAt: new Date(),
+          }));
           return;
         }
 
@@ -821,15 +713,13 @@ export const useChatStore = create<ChatState>((set, get) => {
           for await (const event of stream) {
             if (event.type === "text_delta") {
               fullContent += event.delta;
-              updateConversation((c) => {
-                const messages = [...c.messages];
-                const lastIdx = messages.length - 1;
-                messages[lastIdx] = {
-                  ...messages[lastIdx],
+              updateConversation((c) => ({
+                ...c,
+                messages: updateLastAssistantMessage(c.messages, {
                   content: stripProtocolMarkers(fullContent),
-                };
-                return { ...c, messages, updatedAt: new Date() };
-              });
+                }),
+                updatedAt: new Date(),
+              }));
             } else if (event.type === "error") {
               throw new Error(event.error.errorMessage || "Failed to send message");
             }
@@ -840,31 +730,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (!isGhost) {
         const finalConversation = get().conversations.find((c) => c.id === conversationId);
         if (finalConversation?.path && !finalConversation.background) {
-          const chatData: ChatData = {
-            id: finalConversation.id,
-            title: finalConversation.title,
-            model: model,
-            agentId: agentId,
-            messages: finalConversation.messages.map((m) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              createdAt: m.createdAt.toISOString(),
-              ...(m.toolCalls?.length ? {
-                toolCalls: m.toolCalls.map((tc) => ({
-                  id: tc.id,
-                  name: tc.name,
-                  arguments: tc.arguments,
-                  status: tc.status,
-                  result: tc.result,
-                  error: tc.error,
-                  durationMs: tc.durationMs,
-                })),
-              } : {}),
-            })),
-            createdAt: finalConversation.createdAt.toISOString(),
-            updatedAt: finalConversation.updatedAt.toISOString(),
-          };
+          const chatData = conversationToChatData(finalConversation, model, agentId);
           const folderPath = finalConversation.path.substring(0, finalConversation.path.lastIndexOf("/"));
           const dir = await getAppDataDir();
           await saveChatToFolder(chatData, folderPath === `${dir}/chats` ? undefined : folderPath);
@@ -873,15 +739,16 @@ export const useChatStore = create<ChatState>((set, get) => {
     } catch (error) {
       console.error("Error sending message:", error);
       updateConversation((c) => {
-        const messages = [...c.messages];
-        const lastIdx = messages.length - 1;
-        if (messages[lastIdx]?.role === "assistant") {
-          messages[lastIdx] = {
-            ...messages[lastIdx],
-            content: `Error: ${error instanceof Error ? error.message : "Failed to send message"}`,
+        if (c.messages[c.messages.length - 1]?.role === "assistant") {
+          return {
+            ...c,
+            messages: updateLastAssistantMessage(c.messages, {
+              content: `Error: ${error instanceof Error ? error.message : "Failed to send message"}`,
+            }),
+            updatedAt: new Date(),
           };
         }
-        return { ...c, messages, updatedAt: new Date() };
+        return { ...c, updatedAt: new Date() };
       });
     } finally {
       if (setStreaming) {
@@ -893,7 +760,13 @@ export const useChatStore = create<ChatState>((set, get) => {
   return {
     conversations: [],
     currentConversationId: null,
-    currentConversation: null,
+    getCurrentConversation: () => {
+      const state = get();
+      if (state.isGhostMode && state.ghostConversation?.id === state.currentConversationId) {
+        return state.ghostConversation;
+      }
+      return state.conversations.find((c) => c.id === state.currentConversationId) ?? null;
+    },
     chatTree: [],
     expandedFolders: new Set<string>(),
     model: useSettingsStore.getState().defaultModel ?? DEFAULT_MODEL_ID,
@@ -902,7 +775,6 @@ export const useChatStore = create<ChatState>((set, get) => {
     isGhostMode: false,
     ghostConversation: null,
     createConversation: async (folderId?: string) => {
-    console.log("[chat-store] createConversation called, folderId:", folderId, "isTauri:", isTauri());
     await createConversationInternal({ folderId, select: true });
   },
 
@@ -919,12 +791,12 @@ export const useChatStore = create<ChatState>((set, get) => {
     // Check if it's the ghost conversation
     const { ghostConversation, isGhostMode } = get();
     if (isGhostMode && ghostConversation?.id === id) {
-      set({ currentConversationId: id, currentConversation: ghostConversation });
+      set({ currentConversationId: id });
       return;
     }
 
     const conversation = get().conversations.find((c) => c.id === id) ?? null;
-    set({ currentConversationId: id, currentConversation: conversation });
+    set({ currentConversationId: id });
 
     if (!conversation || !conversation.path) return;
     if (conversation.messages.length > 0) return;
@@ -975,10 +847,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           updatedAt: new Date(loaded.updatedAt),
         };
       });
-      return {
-        conversations,
-        currentConversation: conversations.find((c) => c.id === id) ?? state.currentConversation,
-      };
+      return { conversations };
     });
 
     // Refresh tree if we migrated
@@ -1000,7 +869,6 @@ export const useChatStore = create<ChatState>((set, get) => {
       return {
         conversations: newConversations,
         currentConversationId: newCurrentId,
-        currentConversation: newConversations.find((c) => c.id === newCurrentId) ?? null,
       };
     });
 
@@ -1037,7 +905,6 @@ export const useChatStore = create<ChatState>((set, get) => {
       set({
         ghostConversation: ghostConv,
         currentConversationId: ghostConv.id,
-        currentConversation: ghostConv,
       });
     }
 
@@ -1067,11 +934,8 @@ export const useChatStore = create<ChatState>((set, get) => {
 
   // Folder management
   loadChatsFromDisk: async () => {
-    console.log("[chat-store] loadChatsFromDisk called, isTauri:", isTauri());
-
     try {
       const tree = await loadChatTree();
-      console.log("[chat-store] loaded tree:", tree);
       set({ chatTree: tree });
 
       // Also sync conversations in memory from the tree
@@ -1101,22 +965,13 @@ export const useChatStore = create<ChatState>((set, get) => {
       const inMemoryOnly = get().conversations.filter((c) => !conversationIds.has(c.id));
       const mergedConversations = [...conversations, ...inMemoryOnly];
 
-      console.log("[chat-store] synced conversations:", conversations.length);
-
-      set((state) => ({
-        conversations: mergedConversations,
-        currentConversation:
-          mergedConversations.find((c) => c.id === state.currentConversationId) ??
-          state.currentConversation,
-      }));
+      set({ conversations: mergedConversations });
     } catch (error) {
       console.error("[chat-store] Failed to load chats from disk:", error);
     }
   },
 
   createFolder: async (name: string, parentFolderId?: string) => {
-    console.log("[chat-store] createFolder called, name:", name, "isTauri:", isTauri());
-
     try {
       const existingNames = getSiblingFolderNames(get().chatTree, parentFolderId);
       const uniqueName = getUniqueFolderName(name, existingNames);
@@ -1127,11 +982,8 @@ export const useChatStore = create<ChatState>((set, get) => {
           parentPath = folder.path;
         }
       }
-      console.log("[chat-store] creating folder at parentPath:", parentPath);
       await createChatFolder(uniqueName, parentPath);
-      console.log("[chat-store] folder created, refreshing tree...");
       await get().loadChatsFromDisk();
-      console.log("[chat-store] tree refreshed");
     } catch (error) {
       console.error("[chat-store] Failed to create folder:", error);
     }
@@ -1197,10 +1049,6 @@ export const useChatStore = create<ChatState>((set, get) => {
       conversations: state.conversations.map((c) =>
         c.id === chatId ? { ...c, title: newTitle, updatedAt: new Date() } : c
       ),
-      currentConversation:
-        state.currentConversation?.id === chatId
-          ? { ...state.currentConversation, title: newTitle, updatedAt: new Date() }
-          : state.currentConversation,
     }));
 
     // Save to disk if Tauri is available
@@ -1208,31 +1056,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       try {
         const updated = get().conversations.find((c) => c.id === chatId);
         if (updated?.path) {
-          const chatData: ChatData = {
-            id: updated.id,
-            title: updated.title,
-            model: get().model,
-            agentId: get().agentId,
-            messages: updated.messages.map((m) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              createdAt: m.createdAt.toISOString(),
-              ...(m.toolCalls?.length ? {
-                toolCalls: m.toolCalls.map((tc) => ({
-                  id: tc.id,
-                  name: tc.name,
-                  arguments: tc.arguments,
-                  status: tc.status,
-                  result: tc.result,
-                  error: tc.error,
-                  durationMs: tc.durationMs,
-                })),
-              } : {}),
-            })),
-            createdAt: updated.createdAt.toISOString(),
-            updatedAt: updated.updatedAt.toISOString(),
-          };
+          const chatData = conversationToChatData(updated, get().model, get().agentId);
           const folderPath = updated.path.substring(0, updated.path.lastIndexOf("/"));
           const dir = await getAppDataDir();
           await saveChatToFolder(chatData, folderPath === `${dir}/chats` ? undefined : folderPath);
@@ -1244,28 +1068,20 @@ export const useChatStore = create<ChatState>((set, get) => {
     }
   },
 
-  moveChat: async (chatId: string, targetFolderId: string | null) => {
-    // TODO: Implement move functionality
-    console.log("Move chat", chatId, "to", targetFolderId);
-  },
-
   // Ghost mode
   startGhostSession: () => {
     set({
       isGhostMode: true,
       ghostConversation: null,
       currentConversationId: null,
-      currentConversation: null,
     });
   },
 
   exitGhostSession: () => {
-    const { conversations } = get();
     set({
       isGhostMode: false,
       ghostConversation: null,
-      currentConversationId: conversations[0]?.id ?? null,
-      currentConversation: conversations[0] ?? null,
+      currentConversationId: get().conversations[0]?.id ?? null,
     });
   },
 
@@ -1286,6 +1102,40 @@ export const useChatStore = create<ChatState>((set, get) => {
     // Delegate to the loop store
     useAgenticLoopStore.getState().rejectTool(conversationId, toolCallId, "Rejected by user");
   },
+
+  markToolCallsStopped: (conversationId: string) => {
+    const state = get();
+    const isGhost = state.isGhostMode && state.ghostConversation?.id === conversationId;
+
+    const updateFn = (c: Conversation): Conversation => {
+      let changed = false;
+      const messages = c.messages.map((m) => {
+        if (!m.toolCalls) return m;
+        const updatedToolCalls = m.toolCalls.map((tc) => {
+          if (tc.status === "pending" || tc.status === "executing") {
+            changed = true;
+            return { ...tc, status: "stopped" as const };
+          }
+          return tc;
+        });
+        return changed ? { ...m, toolCalls: updatedToolCalls } : m;
+      });
+      return changed ? { ...c, messages, updatedAt: new Date() } : c;
+    };
+
+    if (isGhost) {
+      set((s) => {
+        if (!s.ghostConversation) return s;
+        return { ghostConversation: updateFn(s.ghostConversation) };
+      });
+    } else {
+      set((s) => ({
+        conversations: s.conversations.map((c) =>
+          c.id === conversationId ? updateFn(c) : c
+        ),
+      }));
+    }
+  },
   };
 });
 
@@ -1297,7 +1147,6 @@ export const useChatStore = create<ChatState>((set, get) => {
 // This ensures conversation state stays in sync when tools are executed
 // outside of the streaming context (e.g., when user confirms a tool)
 subscribeToToolEvents((conversationId, toolCall) => {
-  console.log(`[chat-store] external subscribeToToolEvents: convId=${conversationId}, toolCallId=${toolCall.id}, name=${toolCall.name}, status=${toolCall.status}`);
   const state = useChatStore.getState();
 
   // Determine if this is a ghost conversation or regular
@@ -1352,24 +1201,13 @@ subscribeToToolEvents((conversationId, toolCall) => {
   if (isGhost) {
     useChatStore.setState((state) => {
       if (!state.ghostConversation) return state;
-      const updated = updateFn(state.ghostConversation);
-      return {
-        ghostConversation: updated,
-        currentConversation: state.currentConversationId === updated.id ? updated : state.currentConversation,
-      };
+      return { ghostConversation: updateFn(state.ghostConversation) };
     });
   } else {
-    useChatStore.setState((state) => {
-      const conversations = state.conversations.map((c) =>
+    useChatStore.setState((state) => ({
+      conversations: state.conversations.map((c) =>
         c.id === conversationId ? updateFn(c) : c
-      );
-      return {
-        conversations,
-        currentConversation:
-          state.currentConversationId === conversationId
-            ? conversations.find((c) => c.id === conversationId) ?? null
-            : state.currentConversation,
-      };
-    });
+      ),
+    }));
   }
 });

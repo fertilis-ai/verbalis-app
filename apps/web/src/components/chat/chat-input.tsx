@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Send, Plus, ChevronDown } from "lucide-react";
+import { Send, Square, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,9 +24,11 @@ const MODELS = [
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
+  isLoopActive?: boolean;
+  onStop?: () => void;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, isLoopActive, onStop }: ChatInputProps) {
   const { model, setModel } = useChatStore();
   const { localLLM } = useSettingsStore();
   const [input, setInput] = React.useState("");
@@ -146,16 +148,27 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
             </DropdownMenu>
           </div>
 
-          {/* Right: Send button */}
-          <Button
-            variant={hasContent ? "default" : "ghost"}
-            size="icon"
-            className="h-7 w-7 rounded-lg"
-            onClick={handleSubmit}
-            disabled={!hasContent || disabled}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+          {/* Right: Send / Stop button */}
+          {isLoopActive ? (
+            <Button
+              variant="destructive"
+              size="icon"
+              className="h-7 w-7 rounded-lg"
+              onClick={onStop}
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </Button>
+          ) : (
+            <Button
+              variant={hasContent ? "default" : "ghost"}
+              size="icon"
+              className="h-7 w-7 rounded-lg"
+              onClick={handleSubmit}
+              disabled={!hasContent || disabled}
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

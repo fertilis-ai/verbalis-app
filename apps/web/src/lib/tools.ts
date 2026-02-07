@@ -27,7 +27,8 @@ export type ToolCallStatus =
   | "success"
   | "error"
   | "cancelled"
-  | "timeout";
+  | "timeout"
+  | "stopped";
 
 export interface ToolCallState {
   id: string;
@@ -194,37 +195,19 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     estimatedDurationMs: 100,
   },
   http_fetch: {
-    name: WEB_TOOL_DEFINITIONS.http_fetch.name,
-    description: WEB_TOOL_DEFINITIONS.http_fetch.description,
+    ...WEB_TOOL_DEFINITIONS.http_fetch,
     parameters: HttpFetchParams,
     requiresConfirmation: true,
-    category: WEB_TOOL_DEFINITIONS.http_fetch.category,
-    riskLevel: WEB_TOOL_DEFINITIONS.http_fetch.riskLevel,
-    supportsUndo: WEB_TOOL_DEFINITIONS.http_fetch.supportsUndo,
-    requiresNetwork: WEB_TOOL_DEFINITIONS.http_fetch.requiresNetwork,
-    estimatedDurationMs: WEB_TOOL_DEFINITIONS.http_fetch.estimatedDurationMs,
   },
   web_search: {
-    name: WEB_TOOL_DEFINITIONS.web_search.name,
-    description: WEB_TOOL_DEFINITIONS.web_search.description,
+    ...WEB_TOOL_DEFINITIONS.web_search,
     parameters: WebSearchParams,
     requiresConfirmation: false,
-    category: WEB_TOOL_DEFINITIONS.web_search.category,
-    riskLevel: WEB_TOOL_DEFINITIONS.web_search.riskLevel,
-    supportsUndo: WEB_TOOL_DEFINITIONS.web_search.supportsUndo,
-    requiresNetwork: WEB_TOOL_DEFINITIONS.web_search.requiresNetwork,
-    estimatedDurationMs: WEB_TOOL_DEFINITIONS.web_search.estimatedDurationMs,
   },
   scrape_webpage: {
-    name: WEB_TOOL_DEFINITIONS.scrape_webpage.name,
-    description: WEB_TOOL_DEFINITIONS.scrape_webpage.description,
+    ...WEB_TOOL_DEFINITIONS.scrape_webpage,
     parameters: ScrapeWebpageParams,
     requiresConfirmation: false,
-    category: WEB_TOOL_DEFINITIONS.scrape_webpage.category,
-    riskLevel: WEB_TOOL_DEFINITIONS.scrape_webpage.riskLevel,
-    supportsUndo: WEB_TOOL_DEFINITIONS.scrape_webpage.supportsUndo,
-    requiresNetwork: WEB_TOOL_DEFINITIONS.scrape_webpage.requiresNetwork,
-    estimatedDurationMs: WEB_TOOL_DEFINITIONS.scrape_webpage.estimatedDurationMs,
   },
 };
 
@@ -237,11 +220,6 @@ export function getToolsForContext(): Tool[] {
   }));
 }
 
-// Check if a tool requires user confirmation
-export function toolRequiresConfirmation(toolName: string): boolean {
-  return TOOL_DEFINITIONS[toolName]?.requiresConfirmation ?? true;
-}
-
 // Get tool category
 export function getToolCategory(toolName: string): ToolCategory {
   return TOOL_DEFINITIONS[toolName]?.category ?? "custom";
@@ -250,11 +228,6 @@ export function getToolCategory(toolName: string): ToolCategory {
 // Get tool risk level
 export function getToolRiskLevel(toolName: string): RiskLevel {
   return TOOL_DEFINITIONS[toolName]?.riskLevel ?? "high";
-}
-
-// Get tool definition
-export function getToolDefinition(toolName: string): ToolDefinition | undefined {
-  return TOOL_DEFINITIONS[toolName];
 }
 
 // Check if tool supports undo

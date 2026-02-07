@@ -188,11 +188,15 @@ function webListFiles(dir: string, extension?: string): string[] {
 // Original types and exports
 // ============================================================================
 
-// Chat folder metadata
-export interface ChatFolderMeta {
+// Folder metadata (shared by chats, scheduler, etc.)
+export interface FolderMeta {
   isPinned: boolean;
   createdAt: string;
 }
+
+// Backward-compatible aliases
+export type ChatFolderMeta = FolderMeta;
+export type SchedulerFolderMeta = FolderMeta;
 
 // Chat tree node (folder or chat)
 export interface ChatTreeNode {
@@ -215,15 +219,6 @@ export interface FileNode {
   children?: FileNode[];
 }
 
-export interface AppConfig {
-  theme: string;
-  working_directory: string;
-  user_mode: string;
-  yolo: boolean;
-  sandboxed: boolean;
-  guardrails: boolean;
-}
-
 // Re-export isTauri from @tauri-apps/api/core for convenience
 export { isTauri };
 
@@ -233,6 +228,12 @@ export async function getAppDataDir(): Promise<string> {
     return "/sapio-data";  // Virtual path for localStorage
   }
   return invoke<string>("get_app_data_dir");
+}
+
+let appDataDirPromise: Promise<string> | null = null;
+function getAppDataDirCached(): Promise<string> {
+  if (!appDataDirPromise) appDataDirPromise = getAppDataDir();
+  return appDataDirPromise;
 }
 
 export async function initAppDataDir(): Promise<void> {
@@ -313,25 +314,6 @@ export async function listFiles(
   return invoke<string[]>("list_files", { dir, extension });
 }
 
-export async function readConfig(): Promise<AppConfig> {
-  if (!isTauri()) {
-    return {
-      theme: "dark",
-      working_directory: "~/Projects",
-      user_mode: "normal",
-      yolo: false,
-      sandboxed: true,
-      guardrails: true,
-    };
-  }
-  return invoke<AppConfig>("read_config");
-}
-
-export async function saveConfig(config: AppConfig): Promise<void> {
-  if (!isTauri()) return;
-  return invoke("save_config", { config });
-}
-
 // Higher-level storage operations
 
 // Chat storage
@@ -359,20 +341,6 @@ export interface ChatData {
   updatedAt: string;
 }
 
-export async function saveChat(chat: ChatData): Promise<void> {
-  const dir = await getAppDataDir();
-  const path = `${dir}/chats/${chat.id}.json`;
-  await writeFile(path, JSON.stringify(chat, null, 2));
-}
-
-export async function loadChat(id: string): Promise<ChatData | null> {
-  const dir = await getAppDataDir();
-  const path = `${dir}/chats/${id}.json`;
-  if (!(await pathExists(path))) return null;
-  const content = await readFile(path);
-  return JSON.parse(content);
-}
-
 // Load a chat directly by its file path (supports nested folders)
 export async function loadChatByPath(path: string): Promise<ChatData | null> {
   if (!(await pathExists(path))) return null;
@@ -384,16 +352,6 @@ export async function loadChatByPath(path: string): Promise<ChatData | null> {
   }
 }
 
-export async function listChats(): Promise<string[]> {
-  const dir = await getAppDataDir();
-  return listFiles(`${dir}/chats`, "json");
-}
-
-export async function deleteChat(id: string): Promise<void> {
-  const dir = await getAppDataDir();
-  await deletePath(`${dir}/chats/${id}.json`);
-}
-
 // Rename/move a file or directory
 export async function renamePath(oldPath: string, newPath: string): Promise<void> {
   if (!isTauri()) {
@@ -403,21 +361,18 @@ export async function renamePath(oldPath: string, newPath: string): Promise<void
   return invoke("rename_path", { oldPath, newPath });
 }
 
-// Chat folder operations
-export async function createChatFolder(name: string, parentPath?: string): Promise<string> {
-  const dir = await getAppDataDir();
-  const chatsDir = `${dir}/chats`;
-
-  // Ensure base chats directory exists before creating subfolder
-  if (!(await pathExists(chatsDir))) {
-    await createDirectory(chatsDir);
+// Generic folder creation for any storage section (chats, scheduler, etc.)
+async function createItemFolder(sectionDir: string, name: string, parentPath?: string): Promise<string> {
+  // Ensure base directory exists before creating subfolder
+  if (!(await pathExists(sectionDir))) {
+    await createDirectory(sectionDir);
   }
 
-  const basePath = parentPath ? `${parentPath}/${name}` : `${chatsDir}/${name}`;
+  const basePath = parentPath ? `${parentPath}/${name}` : `${sectionDir}/${name}`;
   await createDirectory(basePath);
 
   // Create folder metadata
-  const meta: ChatFolderMeta = {
+  const meta: FolderMeta = {
     isPinned: false,
     createdAt: new Date().toISOString(),
   };
@@ -426,110 +381,130 @@ export async function createChatFolder(name: string, parentPath?: string): Promi
   return basePath;
 }
 
-export async function saveFolderMeta(folderPath: string, meta: ChatFolderMeta): Promise<void> {
+// Chat folder operations
+export async function createChatFolder(name: string, parentPath?: string): Promise<string> {
+  const dir = await getAppDataDirCached();
+  return createItemFolder(`${dir}/chats`, name, parentPath);
+}
+
+export async function saveFolderMeta(folderPath: string, meta: FolderMeta): Promise<void> {
   await writeFile(`${folderPath}/_meta.yaml`, YAML.stringify(meta));
 }
 
-export async function loadFolderMeta(folderPath: string): Promise<ChatFolderMeta | null> {
+export async function loadFolderMeta(folderPath: string): Promise<FolderMeta | null> {
   const metaPath = `${folderPath}/_meta.yaml`;
   if (!(await pathExists(metaPath))) return null;
   const content = await readFile(metaPath);
   return YAML.parse(content);
 }
 
-export async function listChatFolders(): Promise<string[]> {
-  const dir = await getAppDataDir();
-  const nodes = await readDirectory(`${dir}/chats`, 1);
-  return nodes.filter((n) => n.is_directory).map((n) => n.name);
-}
-
 // Save chat to a specific folder (or root if no folderId)
 export async function saveChatToFolder(chat: ChatData, folderPath?: string): Promise<void> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const basePath = folderPath || `${dir}/chats`;
   const path = `${basePath}/${chat.id}.json`;
   await writeFile(path, JSON.stringify(chat, null, 2));
 }
 
-// Load entire chat tree from disk
-export async function loadChatTree(): Promise<ChatTreeNode[]> {
-  console.log("[storage] loadChatTree called");
-  const dir = await getAppDataDir();
-  const chatsDir = `${dir}/chats`;
-  console.log("[storage] chatsDir:", chatsDir);
-
-  if (!(await pathExists(chatsDir))) {
-    console.log("[storage] chatsDir does not exist");
-    return [];
-  }
-
-  const result = await loadChatTreeRecursive(chatsDir, chatsDir);
-  console.log("[storage] loadChatTree result:", result);
-  return result;
+// Generic recursive tree loader for any folder-based storage section.
+// `parseLeafEntry` converts a non-directory file entry into a leaf node, or returns null to skip.
+// `folderType` is the type string used for folder nodes (e.g. "folder").
+// `TNode` must have at minimum: type, id, name, path, isPinned, and optional children.
+interface TreeNodeBase {
+  type: string;
+  id: string;
+  name: string;
+  path: string;
+  isPinned: boolean;
+  children?: TreeNodeBase[];
 }
 
-async function loadChatTreeRecursive(path: string, rootPath: string): Promise<ChatTreeNode[]> {
-  const nodes: ChatTreeNode[] = [];
-  const entries = await readDirectory(path, 1);
+async function loadTreeRecursive<TNode extends TreeNodeBase>(
+  dirPath: string,
+  folderType: string,
+  parseLeafEntry: (entry: FileNode) => Promise<TNode | null>,
+): Promise<TNode[]> {
+  const nodes: TNode[] = [];
+  const entries = await readDirectory(dirPath, 1);
 
   for (const entry of entries) {
     if (entry.is_directory) {
-      // It's a folder
       const meta = await loadFolderMeta(entry.path);
-      const children = await loadChatTreeRecursive(entry.path, rootPath);
+      const children = await loadTreeRecursive<TNode>(entry.path, folderType, parseLeafEntry);
       nodes.push({
-        type: "folder",
+        type: folderType,
         id: entry.name,
         name: entry.name,
         path: entry.path,
         isPinned: meta?.isPinned ?? false,
         children,
-      });
-    } else if (entry.name.endsWith(".json") && entry.name !== "_meta.json") {
-      // It's a chat file (JSON format)
-      try {
-        const content = await readFile(entry.path);
-        const chat: ChatData = JSON.parse(content);
-        nodes.push({
-          type: "chat",
-          id: chat.id,
-          name: entry.name.replace(".json", ""),
-          path: entry.path,
-          isPinned: false,
-          title: chat.title,
-          updatedAt: chat.updatedAt,
-        });
-      } catch {
-        // Skip malformed chat files
-      }
-    } else if (entry.name.endsWith(".yaml") && entry.name !== "_meta.yaml") {
-      // Legacy: load old YAML chats for backward compatibility
-      try {
-        const content = await readFile(entry.path);
-        const chat: ChatData = YAML.parse(content);
-        nodes.push({
-          type: "chat",
-          id: chat.id,
-          name: entry.name.replace(".yaml", ""),
-          path: entry.path,
-          isPinned: false,
-          title: chat.title,
-          updatedAt: chat.updatedAt,
-        });
-      } catch {
-        // Skip malformed chat files
-      }
+      } as unknown as TNode);
+    } else {
+      const leaf = await parseLeafEntry(entry);
+      if (leaf) nodes.push(leaf);
     }
   }
 
-  // Sort: pinned first, folders before chats, then alphabetically
+  // Sort: pinned first, folders before leaves, then alphabetically
   nodes.sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-    if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+    if (a.type !== b.type) return a.type === folderType ? -1 : 1;
     return a.name.localeCompare(b.name);
   });
 
   return nodes;
+}
+
+// Parse a file entry as a ChatTreeNode (JSON or legacy YAML)
+async function parseChatEntry(entry: FileNode): Promise<ChatTreeNode | null> {
+  if (entry.name.endsWith(".json") && entry.name !== "_meta.json") {
+    try {
+      const content = await readFile(entry.path);
+      const chat: ChatData = JSON.parse(content);
+      return {
+        type: "chat",
+        id: chat.id,
+        name: entry.name.replace(".json", ""),
+        path: entry.path,
+        isPinned: false,
+        title: chat.title,
+        updatedAt: chat.updatedAt,
+      };
+    } catch {
+      return null;
+    }
+  }
+  if (entry.name.endsWith(".yaml") && entry.name !== "_meta.yaml") {
+    try {
+      const content = await readFile(entry.path);
+      const chat: ChatData = YAML.parse(content);
+      return {
+        type: "chat",
+        id: chat.id,
+        name: entry.name.replace(".yaml", ""),
+        path: entry.path,
+        isPinned: false,
+        title: chat.title,
+        updatedAt: chat.updatedAt,
+      };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// Load entire chat tree from disk
+export async function loadChatTree(): Promise<ChatTreeNode[]> {
+  const dir = await getAppDataDirCached();
+  const chatsDir = `${dir}/chats`;
+
+  if (!(await pathExists(chatsDir))) {
+    return [];
+  }
+
+  const result = await loadTreeRecursive<ChatTreeNode>(chatsDir, "folder", parseChatEntry);
+  return result;
 }
 
 // Delete a chat by path (works for nested chats)
@@ -567,7 +542,7 @@ export interface AgentData {
 }
 
 export async function saveAgent(agent: AgentData): Promise<void> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const path = `${dir}/agents/${agent.name}.md`;
   const content = matter.stringify(agent.systemPrompt, {
     name: agent.name,
@@ -578,7 +553,7 @@ export async function saveAgent(agent: AgentData): Promise<void> {
 }
 
 export async function loadAgent(name: string): Promise<AgentData | null> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const path = `${dir}/agents/${name}.md`;
   if (!(await pathExists(path))) return null;
   const content = await readFile(path);
@@ -592,12 +567,12 @@ export async function loadAgent(name: string): Promise<AgentData | null> {
 }
 
 export async function listAgents(): Promise<string[]> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   return listFiles(`${dir}/agents`, "md");
 }
 
 export async function deleteAgent(name: string): Promise<void> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   await deletePath(`${dir}/agents/${name}.md`);
 }
 
@@ -647,7 +622,7 @@ export interface TaskTreeNode {
 
 // Load entire task tree from disk (flat list of folders)
 export async function loadTaskTree(): Promise<TaskTreeNode[]> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const tasksDir = `${dir}/tasks`;
 
   if (!(await pathExists(tasksDir))) {
@@ -691,7 +666,7 @@ export async function loadTaskTree(): Promise<TaskTreeNode[]> {
 
 // Create a task folder (which is also the backlog)
 export async function createTaskFolder(name: string): Promise<string> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const id = crypto.randomUUID();
   const basePath = `${dir}/tasks/${id}`;
   await createDirectory(basePath);
@@ -766,12 +741,6 @@ export interface ScheduleData {
   updatedAt: string;
 }
 
-// Scheduler folder metadata (stored in _meta.yaml)
-export interface SchedulerFolderMeta {
-  isPinned: boolean;
-  createdAt: string;
-}
-
 // Scheduler tree node (folder or schedule) - mirrors ChatTreeNode
 export interface SchedulerTreeNode {
   type: "folder" | "schedule";
@@ -787,107 +756,55 @@ export interface SchedulerTreeNode {
   updatedAt?: string;
 }
 
+// Parse a file entry as a SchedulerTreeNode
+async function parseScheduleEntry(entry: FileNode): Promise<SchedulerTreeNode | null> {
+  if (entry.name.endsWith(".yaml") && entry.name !== "_meta.yaml") {
+    try {
+      const content = await readFile(entry.path);
+      const schedule: ScheduleData = YAML.parse(content);
+      return {
+        type: "schedule",
+        id: schedule.id,
+        name: schedule.name,
+        path: entry.path,
+        isPinned: false,
+        cron: schedule.cron,
+        enabled: schedule.enabled,
+        hasError: schedule.hasError,
+        updatedAt: schedule.updatedAt,
+      };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 // Load entire scheduler tree from disk (recursive, mirrors chat tree)
 export async function loadSchedulerTree(): Promise<SchedulerTreeNode[]> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const schedulerDir = `${dir}/scheduler`;
 
   if (!(await pathExists(schedulerDir))) {
     return [];
   }
 
-  const result = await loadSchedulerTreeRecursive(schedulerDir, schedulerDir);
-  return result;
+  return loadTreeRecursive<SchedulerTreeNode>(schedulerDir, "folder", parseScheduleEntry);
 }
 
-async function loadSchedulerTreeRecursive(path: string, rootPath: string): Promise<SchedulerTreeNode[]> {
-  const nodes: SchedulerTreeNode[] = [];
-  const entries = await readDirectory(path, 1);
-
-  for (const entry of entries) {
-    if (entry.is_directory) {
-      // It's a folder
-      const meta = await loadSchedulerFolderMeta(entry.path);
-      const children = await loadSchedulerTreeRecursive(entry.path, rootPath);
-      nodes.push({
-        type: "folder",
-        id: entry.name,
-        name: entry.name,
-        path: entry.path,
-        isPinned: meta?.isPinned ?? false,
-        children,
-      });
-    } else if (entry.name.endsWith(".yaml") && entry.name !== "_meta.yaml") {
-      // It's a schedule file
-      try {
-        const content = await readFile(entry.path);
-        const schedule: ScheduleData = YAML.parse(content);
-        nodes.push({
-          type: "schedule",
-          id: schedule.id,
-          name: schedule.name,
-          path: entry.path,
-          isPinned: false,
-          cron: schedule.cron,
-          enabled: schedule.enabled,
-          hasError: schedule.hasError,
-          updatedAt: schedule.updatedAt,
-        });
-      } catch {
-        // Skip malformed schedule files
-      }
-    }
-  }
-
-  // Sort: pinned first, folders before schedules, then alphabetically
-  nodes.sort((a, b) => {
-    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-    if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
-
-  return nodes;
-}
-
-// Load folder metadata
-export async function loadSchedulerFolderMeta(folderPath: string): Promise<SchedulerFolderMeta | null> {
-  const metaPath = `${folderPath}/_meta.yaml`;
-  if (!(await pathExists(metaPath))) return null;
-  const content = await readFile(metaPath);
-  return YAML.parse(content);
-}
-
-// Save folder metadata
-export async function saveSchedulerFolderMeta(folderPath: string, meta: SchedulerFolderMeta): Promise<void> {
-  await writeFile(`${folderPath}/_meta.yaml`, YAML.stringify(meta));
-}
+// Scheduler folder meta operations delegate to generic versions
+export const loadSchedulerFolderMeta = loadFolderMeta;
+export const saveSchedulerFolderMeta = saveFolderMeta;
 
 // Create a scheduler folder
 export async function createSchedulerFolder(name: string, parentPath?: string): Promise<string> {
-  const dir = await getAppDataDir();
-  const schedulerDir = `${dir}/scheduler`;
-
-  // Ensure base scheduler directory exists before creating subfolder
-  if (!(await pathExists(schedulerDir))) {
-    await createDirectory(schedulerDir);
-  }
-
-  const basePath = parentPath ? `${parentPath}/${name}` : `${schedulerDir}/${name}`;
-  await createDirectory(basePath);
-
-  // Create folder metadata
-  const meta: SchedulerFolderMeta = {
-    isPinned: false,
-    createdAt: new Date().toISOString(),
-  };
-  await writeFile(`${basePath}/_meta.yaml`, YAML.stringify(meta));
-
-  return basePath;
+  const dir = await getAppDataDirCached();
+  return createItemFolder(`${dir}/scheduler`, name, parentPath);
 }
 
 // Save a schedule to an individual file
 export async function saveSchedule(schedule: ScheduleData, folderPath?: string): Promise<string> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const basePath = folderPath || `${dir}/scheduler`;
   const path = `${basePath}/${schedule.id}.yaml`;
   const yaml = YAML.stringify(schedule);
@@ -964,7 +881,7 @@ function getToolboxExtension(
 }
 
 export async function saveToolboxItem(item: ToolboxItemData): Promise<void> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const ext = getToolboxExtension(item.category);
   const path = `${dir}/${item.category}/${item.name}.${ext}`;
   await writeFile(path, item.content);
@@ -974,7 +891,7 @@ export async function loadToolboxItem(
   category: ToolboxItemData["category"],
   name: string
 ): Promise<ToolboxItemData | null> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const ext = getToolboxExtension(category);
   const path = `${dir}/${category}/${name}.${ext}`;
   if (!(await pathExists(path))) return null;
@@ -990,7 +907,7 @@ export async function loadToolboxItem(
 export async function listToolboxItems(
   category: ToolboxItemData["category"]
 ): Promise<string[]> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const ext = getToolboxExtension(category);
   return listFiles(`${dir}/${category}`, ext);
 }
@@ -999,7 +916,7 @@ export async function deleteToolboxItem(
   category: ToolboxItemData["category"],
   name: string
 ): Promise<void> {
-  const dir = await getAppDataDir();
+  const dir = await getAppDataDirCached();
   const ext = getToolboxExtension(category);
   await deletePath(`${dir}/${category}/${name}.${ext}`);
 }

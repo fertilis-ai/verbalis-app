@@ -7,40 +7,10 @@ import { DEFAULT_GUARDRAILS_CONFIG } from "./types";
 
 /**
  * Normal Mode - Safe defaults for regular users
- * - Guardrails ON
- * - Confirm medium, high, critical risk operations
- * - Sandbox enabled
- * - Shell commands require allowlist
- * - Strict rate limits
+ * Identical to DEFAULT_GUARDRAILS_CONFIG (guardrails ON, confirm medium+,
+ * sandbox enabled, shell allowlist, strict rate limits).
  */
-export const NORMAL_MODE_CONFIG: GuardrailsConfig = {
-  ...DEFAULT_GUARDRAILS_CONFIG,
-  enabled: true,
-  categoryConfirmation: {
-    file_system: { low: false, medium: true, high: true, critical: true },
-    web: { low: false, medium: true, high: true, critical: true },
-    system: { low: false, medium: true, high: true, critical: true },
-    integration: { low: false, medium: true, high: true, critical: true },
-    memory: { low: false, medium: false, high: true, critical: true },
-    custom: { low: true, medium: true, high: true, critical: true },
-  },
-  sandbox: {
-    enabled: true,
-    shellCommands: true,
-    networkAccess: true,
-    tempDirectory: "~/.sapio/sandbox",
-  },
-  shellCommands: {
-    ...DEFAULT_GUARDRAILS_CONFIG.shellCommands,
-    defaultPolicy: "deny",
-  },
-  rateLimits: {
-    toolCallsPerMinute: 30,
-    toolCallsPerHour: 500,
-    apiCallsPerMinute: 10,
-    shellCommandsPerMinute: 5,
-  },
-};
+export const NORMAL_MODE_CONFIG: GuardrailsConfig = DEFAULT_GUARDRAILS_CONFIG;
 
 /**
  * Advanced Mode - More freedom for power users

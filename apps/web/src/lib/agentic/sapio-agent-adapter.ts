@@ -22,11 +22,8 @@ import {
 } from "@mariozechner/pi-agent-core";
 import {
   type Message as PiMessage,
-  type AssistantMessage as PiAssistantMessage,
-  type ToolResultMessage as PiToolResultMessage,
   type Model,
   type Api,
-  type Usage,
   type Tool,
   type ToolCall,
 } from "@mariozechner/pi-ai";
@@ -45,7 +42,8 @@ import {
   type ToolCallState,
   type ToolCallStatus,
 } from "@/lib/tools";
-import type { Message, Conversation } from "@/stores/chat-store";
+import type { Message } from "@/stores/chat-store";
+import { buildEmptyUsage, messagesToPiMessages } from "@/lib/message-conversion";
 import type {
   AgentLoopEvent,
   AgentLoopStatus,
@@ -91,98 +89,6 @@ export interface SapioAdapterConfig {
 // Helper Functions
 // ============================================================================
 
-function buildEmptyUsage(): Usage {
-  return {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    totalTokens: 0,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-  };
-}
-
-/**
- * Convert Sapio Message[] to pi-ai Message[] for LLM context.
- * This handles both user and assistant messages including tool calls.
- */
-function toSapioPiMessages(
-  messages: Message[],
-  api: Api,
-  provider: string,
-  model: string
-): PiMessage[] {
-  const result: PiMessage[] = [];
-
-  for (const message of messages) {
-    if (message.role === "user") {
-      result.push({
-        role: "user",
-        content: message.content,
-        timestamp: message.createdAt.getTime(),
-      });
-      continue;
-    }
-
-    // Build assistant message content array
-    const content: PiAssistantMessage["content"] = [];
-
-    const trimmed = message.content.trim();
-    if (trimmed) {
-      content.push({ type: "text", text: trimmed });
-    }
-
-    // Include tool calls if any
-    if (message.toolCalls) {
-      for (const tc of message.toolCalls) {
-        if (tc.status === "success" || tc.status === "error") {
-          content.push({
-            type: "toolCall",
-            id: tc.id,
-            name: tc.name,
-            arguments: tc.arguments as Record<string, unknown>,
-          });
-        }
-      }
-    }
-
-    // Skip empty assistant messages
-    if (content.length === 0) continue;
-
-    const assistantMessage: PiAssistantMessage = {
-      role: "assistant",
-      content,
-      api,
-      provider,
-      model,
-      usage: buildEmptyUsage(),
-      stopReason: message.toolCalls?.some(tc => tc.status === "success" || tc.status === "error")
-        ? "toolUse"
-        : "stop",
-      timestamp: message.createdAt.getTime(),
-    };
-    result.push(assistantMessage);
-
-    // Add tool result messages for completed tool calls
-    if (message.toolCalls) {
-      for (const tc of message.toolCalls) {
-        if (tc.status === "success" || tc.status === "error") {
-          const toolResultMessage: PiToolResultMessage = {
-            role: "toolResult",
-            toolCallId: tc.id,
-            toolName: tc.name,
-            content: [{ type: "text", text: tc.result || tc.error || "" }],
-            isError: tc.status === "error",
-            timestamp: message.createdAt.getTime(),
-          };
-          result.push(toolResultMessage);
-        }
-      }
-    }
-  }
-
-  return result;
-}
 
 function toolCallToState(toolCall: ToolCall): ToolCallState {
   return {
@@ -224,16 +130,6 @@ export class SapioAgentAdapter {
 
   setMessageProvider(getMessages: () => Message[]): void {
     this.getMessagesCallback = getMessages;
-  }
-
-  updateGuardrailsConfig(config: GuardrailsConfig): void {
-    if (this.config) {
-      this.config.guardrailsConfig = config;
-    }
-  }
-
-  updateConfig(config: Partial<SapioLoopConfig>): void {
-    this.loopContext.config = { ...this.loopContext.config, ...config };
   }
 
   // ============================================================================
@@ -377,22 +273,6 @@ export class SapioAgentAdapter {
     return { ...this.loopContext };
   }
 
-  getCurrentIteration(): LoopIteration | null {
-    return this.loopContext.currentIteration;
-  }
-
-  isRunning(): boolean {
-    return (
-      this.loopContext.status === "thinking" ||
-      this.loopContext.status === "tool_executing" ||
-      this.loopContext.status === "tool_pending"
-    );
-  }
-
-  isPaused(): boolean {
-    return this.loopContext.status === "paused";
-  }
-
   // ============================================================================
   // Event Handling
   // ============================================================================
@@ -464,7 +344,7 @@ export class SapioAgentAdapter {
     const wrappedTools = this.buildWrappedTools();
 
     // Convert Sapio messages to pi-ai messages for the initial context
-    const initialPiMessages = toSapioPiMessages(
+    const initialPiMessages = messagesToPiMessages(
       messages,
       config.model.api,
       config.model.provider,
@@ -539,8 +419,7 @@ export class SapioAgentAdapter {
       this.emit({ type: "iteration_completed", iteration });
 
       // Determine completion reason
-      const hasToolCalls = toolCallsInIteration.length > 0;
-      const stopReason: StopReason = hasToolCalls ? "natural_completion" : "natural_completion";
+      const stopReason: StopReason = "natural_completion";
 
       this.loopContext.status = "completed";
       this.loopContext.completedAt = new Date();
@@ -635,11 +514,6 @@ export class SapioAgentAdapter {
         const messageToolCalls = this.extractToolCallsFromMessage(event.message);
         const toolCallStates = messageToolCalls.map(tc => toolCallToState(tc));
 
-        // Diagnostic: log what we extracted
-        const contentTypes = ("content" in event.message && Array.isArray(event.message.content))
-          ? (event.message.content as Array<{ type: string }>).map(b => b.type)
-          : [];
-        console.log(`[SapioAgentAdapter] message_end: extracted ${messageToolCalls.length} toolCalls, content block types:`, contentTypes);
         toolCalls.push(...toolCallStates);
         iteration.toolCalls = toolCalls;
 
@@ -698,24 +572,14 @@ export class SapioAgentAdapter {
   }
 
   private extractToolCallsFromMessage(message: AgentMessage): ToolCall[] {
-    if (!("role" in message)) {
-      console.warn("[SapioAgentAdapter] extractToolCallsFromMessage: message has no 'role' property");
-      return [];
-    }
-    if (message.role !== "assistant") {
-      console.warn(`[SapioAgentAdapter] extractToolCallsFromMessage: message role is '${message.role}', not 'assistant'`);
-      return [];
-    }
-    if (!("content" in message)) {
-      console.warn("[SapioAgentAdapter] extractToolCallsFromMessage: assistant message has no 'content' property");
+    if (!("role" in message) || message.role !== "assistant" || !("content" in message)) {
       return [];
     }
     const content = message.content;
     if (!Array.isArray(content)) {
-      console.warn("[SapioAgentAdapter] extractToolCallsFromMessage: content is not an array:", typeof content);
       return [];
     }
-    const toolCalls = content
+    return content
       .filter((block): block is ToolCall => block.type === "toolCall")
       .map(block => ({
         type: "toolCall" as const,
@@ -723,8 +587,6 @@ export class SapioAgentAdapter {
         name: block.name,
         arguments: block.arguments as Record<string, unknown>,
       }));
-    console.log(`[SapioAgentAdapter] extractToolCallsFromMessage: found ${toolCalls.length} toolCalls out of ${content.length} content blocks`);
-    return toolCalls;
   }
 
   // ============================================================================
@@ -733,12 +595,10 @@ export class SapioAgentAdapter {
 
   private buildWrappedTools(): AgentTool<TSchema>[] {
     if (!isTauri()) {
-      console.log("[SapioAgentAdapter] buildWrappedTools: not Tauri, returning 0 tools");
       return []; // No tools in web-only mode
     }
 
     const piTools = getToolsForContext();
-    console.log(`[SapioAgentAdapter] buildWrappedTools: returning ${piTools.length} tools`, piTools.map(t => t.name));
 
     return piTools.map((tool): AgentTool<TSchema> => ({
       name: tool.name,
@@ -756,7 +616,6 @@ export class SapioAgentAdapter {
       signal?: AbortSignal,
       onUpdate?: AgentToolUpdateCallback
     ): Promise<AgentToolResult<unknown>> => {
-      console.log(`[SapioAgentAdapter] createWrappedExecute: tool '${tool.name}' called with id '${toolCallId}'`);
       const config = this.config!;
       const evaluator = getGuardrailsEvaluator(config.guardrailsConfig);
       const tracker = getExecutionTracker();

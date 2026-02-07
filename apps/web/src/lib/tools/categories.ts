@@ -1,4 +1,6 @@
 import type { TSchema } from "@sinclair/typebox";
+import { WEB_TOOL_DEFINITIONS } from "./web-tools";
+import { SYSTEM_TOOL_DEFINITIONS } from "./system-tools";
 
 // ============================================================================
 // Tool Categories
@@ -140,18 +142,21 @@ export const FILE_SYSTEM_TOOLS: ToolInventoryItem[] = [
   { name: "rename_path", category: "file_system", riskLevel: "medium", supportsUndo: true, description: "Rename/move file or directory" },
 ];
 
-export const WEB_TOOLS: ToolInventoryItem[] = [
-  { name: "http_fetch", category: "web", riskLevel: "medium", supportsUndo: false, description: "Make HTTP request" },
-  { name: "web_search", category: "web", riskLevel: "low", supportsUndo: false, description: "Search the web" },
-  { name: "scrape_webpage", category: "web", riskLevel: "low", supportsUndo: false, description: "Extract text from URL" },
-];
+function toInventoryItem(def: ToolDefinitionV2): ToolInventoryItem {
+  return {
+    name: def.name,
+    category: def.category,
+    riskLevel: def.riskLevel,
+    supportsUndo: def.supportsUndo,
+    description: def.description,
+  };
+}
 
-export const SYSTEM_TOOLS: ToolInventoryItem[] = [
-  { name: "shell_execute", category: "system", riskLevel: "critical", supportsUndo: false, description: "Execute shell command" },
-  { name: "clipboard_read", category: "system", riskLevel: "low", supportsUndo: false, description: "Read clipboard" },
-  { name: "clipboard_write", category: "system", riskLevel: "medium", supportsUndo: true, description: "Write to clipboard" },
-  { name: "notification_send", category: "system", riskLevel: "low", supportsUndo: false, description: "Send system notification" },
-];
+export const WEB_TOOLS: ToolInventoryItem[] =
+  Object.values(WEB_TOOL_DEFINITIONS).map(toInventoryItem);
+
+export const SYSTEM_TOOLS: ToolInventoryItem[] =
+  Object.values(SYSTEM_TOOL_DEFINITIONS).map(toInventoryItem);
 
 export const ALL_TOOLS: ToolInventoryItem[] = [
   ...FILE_SYSTEM_TOOLS,
@@ -163,32 +168,20 @@ export const ALL_TOOLS: ToolInventoryItem[] = [
 // Helper Functions
 // ============================================================================
 
+const TOOL_LOOKUP: Map<string, ToolInventoryItem> = new Map(
+  ALL_TOOLS.map(t => [t.name, t])
+);
+
 export function getToolCategory(toolName: string): ToolCategory {
-  const tool = ALL_TOOLS.find(t => t.name === toolName);
-  return tool?.category ?? "custom";
+  return TOOL_LOOKUP.get(toolName)?.category ?? "custom";
 }
 
 export function getToolRiskLevel(toolName: string): RiskLevel {
-  const tool = ALL_TOOLS.find(t => t.name === toolName);
-  return tool?.riskLevel ?? "high"; // Default to high for unknown tools
+  return TOOL_LOOKUP.get(toolName)?.riskLevel ?? "high"; // Default to high for unknown tools
 }
 
 export function getToolSupportsUndo(toolName: string): boolean {
-  const tool = ALL_TOOLS.find(t => t.name === toolName);
-  return tool?.supportsUndo ?? false;
-}
-
-export function getToolsByCategory(category: ToolCategory): ToolInventoryItem[] {
-  return ALL_TOOLS.filter(t => t.category === category);
-}
-
-export function getToolsByRiskLevel(riskLevel: RiskLevel): ToolInventoryItem[] {
-  return ALL_TOOLS.filter(t => t.riskLevel === riskLevel);
-}
-
-export function isRiskLevelAtLeast(level: RiskLevel, threshold: RiskLevel): boolean {
-  const order: RiskLevel[] = ["low", "medium", "high", "critical"];
-  return order.indexOf(level) >= order.indexOf(threshold);
+  return TOOL_LOOKUP.get(toolName)?.supportsUndo ?? false;
 }
 
 export function compareRiskLevels(a: RiskLevel, b: RiskLevel): number {

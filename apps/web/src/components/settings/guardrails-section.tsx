@@ -293,13 +293,12 @@ export function GuardrailsSection() {
         <div
           className={cn(
             "px-3 py-1 rounded-full text-xs font-medium",
-            currentPreset === "yolo"
-              ? "bg-red-500/20 text-red-500"
-              : currentPreset === "advanced"
-              ? "bg-yellow-500/20 text-yellow-500"
-              : currentPreset === "normal"
-              ? "bg-green-500/20 text-green-500"
-              : "bg-muted text-muted-foreground"
+            ({
+              yolo: "bg-red-500/20 text-red-500",
+              advanced: "bg-yellow-500/20 text-yellow-500",
+              normal: "bg-green-500/20 text-green-500",
+              custom: "bg-muted text-muted-foreground",
+            } as const)[currentPreset]
           )}
         >
           {currentPreset === "custom" ? "Custom" : PRESET_LABELS[currentPreset as UserModePreset].label}
@@ -439,86 +438,33 @@ export function GuardrailsSection() {
           <h3 className="text-sm font-medium">Rate Limits</h3>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-muted-foreground">
-                Tools/min
-              </label>
-              <Input
-                type="number"
-                value={guardrailsConfig.rateLimits.toolCallsPerMinute}
-                onChange={(e) =>
-                  setGuardrailsConfig({
-                    rateLimits: {
-                      ...guardrailsConfig.rateLimits,
-                      toolCallsPerMinute: parseInt(e.target.value) || 30,
-                    },
-                  })
-                }
-                min={1}
-                max={1000}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">
-                Tools/hour
-              </label>
-              <Input
-                type="number"
-                value={guardrailsConfig.rateLimits.toolCallsPerHour}
-                onChange={(e) =>
-                  setGuardrailsConfig({
-                    rateLimits: {
-                      ...guardrailsConfig.rateLimits,
-                      toolCallsPerHour: parseInt(e.target.value) || 500,
-                    },
-                  })
-                }
-                min={1}
-                max={10000}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">
-                API calls/min
-              </label>
-              <Input
-                type="number"
-                value={guardrailsConfig.rateLimits.apiCallsPerMinute}
-                onChange={(e) =>
-                  setGuardrailsConfig({
-                    rateLimits: {
-                      ...guardrailsConfig.rateLimits,
-                      apiCallsPerMinute: parseInt(e.target.value) || 10,
-                    },
-                  })
-                }
-                min={1}
-                max={100}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">
-                Shell/min
-              </label>
-              <Input
-                type="number"
-                value={guardrailsConfig.rateLimits.shellCommandsPerMinute}
-                onChange={(e) =>
-                  setGuardrailsConfig({
-                    rateLimits: {
-                      ...guardrailsConfig.rateLimits,
-                      shellCommandsPerMinute: parseInt(e.target.value) || 5,
-                    },
-                  })
-                }
-                min={1}
-                max={100}
-                className="mt-1"
-              />
-            </div>
+            {([
+              { label: "Tools/min", key: "toolCallsPerMinute", fallback: 30, min: 1, max: 1000 },
+              { label: "Tools/hour", key: "toolCallsPerHour", fallback: 500, min: 1, max: 10000 },
+              { label: "API calls/min", key: "apiCallsPerMinute", fallback: 10, min: 1, max: 100 },
+              { label: "Shell/min", key: "shellCommandsPerMinute", fallback: 5, min: 1, max: 100 },
+            ] as const).map(({ label, key, fallback, min, max }) => (
+              <div key={key}>
+                <label className="text-xs text-muted-foreground">
+                  {label}
+                </label>
+                <Input
+                  type="number"
+                  value={guardrailsConfig.rateLimits[key]}
+                  onChange={(e) =>
+                    setGuardrailsConfig({
+                      rateLimits: {
+                        ...guardrailsConfig.rateLimits,
+                        [key]: parseInt(e.target.value) || fallback,
+                      },
+                    })
+                  }
+                  min={min}
+                  max={max}
+                  className="mt-1"
+                />
+              </div>
+            ))}
           </div>
         </div>
       )}

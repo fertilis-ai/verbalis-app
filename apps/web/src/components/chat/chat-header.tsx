@@ -6,11 +6,11 @@ import { useChatStore } from "@/stores/chat-store";
 
 export function ChatHeader() {
   const {
-    currentConversation,
     isGhostMode,
     startGhostSession,
     exitGhostSession,
   } = useChatStore();
+  const currentConversation = useChatStore((s) => s.getCurrentConversation());
 
   const handleGhostToggle = () => {
     if (isGhostMode) {

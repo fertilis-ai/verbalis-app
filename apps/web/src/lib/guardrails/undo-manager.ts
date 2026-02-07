@@ -9,6 +9,7 @@ import type {
   ClipboardWriteUndoData,
 } from "./types";
 import { isTauri, getAppDataDir } from "@/lib/storage";
+import { createSingleton } from "@/lib/utils";
 
 // ============================================================================
 // Undo Manager
@@ -66,7 +67,7 @@ class UndoManager {
    * Prepare undo data for a file write operation
    */
   async prepareFileWriteUndo(path: string): Promise<FileWriteUndoData> {
-    if (!isTauri()) {
+    if (!this.requireTauri()) {
       return { path, originalContent: null };
     }
 
@@ -89,7 +90,7 @@ class UndoManager {
    * Prepare undo data for a file delete operation (move to trash)
    */
   async prepareFileDeleteUndo(path: string): Promise<FileDeleteUndoData | null> {
-    if (!isTauri()) {
+    if (!this.requireTauri()) {
       return null;
     }
 
@@ -130,7 +131,7 @@ class UndoManager {
    * Prepare undo data for a directory create operation
    */
   async prepareDirectoryCreateUndo(path: string): Promise<DirectoryCreateUndoData | null> {
-    if (!isTauri()) {
+    if (!this.requireTauri()) {
       return null;
     }
 
@@ -153,7 +154,7 @@ class UndoManager {
    * Prepare undo data for clipboard write
    */
   async prepareClipboardWriteUndo(): Promise<ClipboardWriteUndoData | null> {
-    if (!isTauri()) {
+    if (!this.requireTauri()) {
       return null;
     }
 
@@ -189,7 +190,7 @@ class UndoManager {
       return false;
     }
 
-    if (!isTauri()) {
+    if (!this.requireTauri()) {
       console.error("[UndoManager] Undo only available in Tauri");
       return false;
     }
@@ -340,7 +341,7 @@ class UndoManager {
   }
 
   private async cleanupTrash() {
-    if (!isTauri()) return;
+    if (!this.requireTauri()) return;
 
     try {
       const appDir = await getAppDataDir();
@@ -370,6 +371,10 @@ class UndoManager {
   // ============================================================================
   // Helpers
   // ============================================================================
+
+  private requireTauri(): boolean {
+    return isTauri();
+  }
 
   private async isDirectory(path: string): Promise<boolean> {
     try {
@@ -403,21 +408,11 @@ class UndoManager {
 // Singleton Instance
 // ============================================================================
 
-let undoManagerInstance: UndoManager | null = null;
+const undoManagerSingleton = createSingleton(
+  () => new UndoManager(),
+  (instance) => instance.clear(),
+);
 
-export function getUndoManager(): UndoManager {
-  if (!undoManagerInstance) {
-    undoManagerInstance = new UndoManager();
-  }
-  return undoManagerInstance;
-}
+export const getUndoManager = undoManagerSingleton.get;
+export const resetUndoManager = undoManagerSingleton.reset;
 
-export function resetUndoManager() {
-  if (undoManagerInstance) {
-    undoManagerInstance.clear();
-  }
-  undoManagerInstance = null;
-}
-
-// Export types
-export type { UndoManager };

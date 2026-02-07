@@ -5,12 +5,12 @@ import type {
   LoopContext,
   LoopIteration,
   AgentLoopEvent,
-  StopReason,
 } from "@/lib/agentic/types";
 import { DEFAULT_LOOP_CONFIG, createInitialLoopContext } from "@/lib/agentic/types";
 import { SapioAgentAdapter, createSapioAdapter } from "@/lib/agentic/sapio-agent-adapter";
 import { useSettingsStore } from "./settings-store";
 import type { ToolCallState } from "@/lib/tools";
+import { useChatStore } from "./chat-store";
 
 // ============================================================================
 // State Types
@@ -57,9 +57,6 @@ interface AgenticLoopState {
   successfulToolCalls: number;
   failedToolCalls: number;
 
-  // Event history (last 100 events)
-  eventHistory: AgentLoopEvent[];
-
   // Configuration
   defaultConfig: AgentLoopConfig;
 
@@ -70,19 +67,13 @@ interface AgenticLoopState {
   setCurrentLoop: (conversationId: string | null) => void;
 
   // Actions - Loop Control (delegates to adapter)
-  pauseLoop: (conversationId: string) => void;
-  resumeLoop: (conversationId: string) => void;
   stopLoop: (conversationId: string) => void;
-  abortLoop: (conversationId: string) => void;
 
   // Actions - Tool Approval
   confirmTool: (conversationId: string, toolCallId: string) => Promise<void>;
   confirmAllPending: (conversationId: string) => Promise<void>;
   rejectTool: (conversationId: string, toolCallId: string, reason?: string) => void;
   rejectAllPending: (conversationId: string, reason?: string) => void;
-
-  // Actions - Configuration
-  setDefaultConfig: (config: Partial<AgentLoopConfig>) => void;
 
   // Internal - Event Handling
   handleLoopEvent: (conversationId: string, event: AgentLoopEvent) => void;
@@ -106,7 +97,6 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
   totalToolCalls: 0,
   successfulToolCalls: 0,
   failedToolCalls: 0,
-  eventHistory: [],
   defaultConfig: DEFAULT_LOOP_CONFIG,
 
   // ============================================================================
@@ -214,31 +204,10 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
   // Loop Control
   // ============================================================================
 
-  pauseLoop: (conversationId) => {
-    const adapter = get().getAdapter(conversationId);
-    if (adapter) {
-      adapter.pause();
-    }
-  },
-
-  resumeLoop: (conversationId) => {
-    const adapter = get().getAdapter(conversationId);
-    if (adapter) {
-      adapter.resume();
-    }
-  },
-
   stopLoop: (conversationId) => {
     const adapter = get().getAdapter(conversationId);
     if (adapter) {
       adapter.stop();
-    }
-  },
-
-  abortLoop: (conversationId) => {
-    const adapter = get().getAdapter(conversationId);
-    if (adapter) {
-      adapter.abort();
     }
   },
 
@@ -275,26 +244,12 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
   },
 
   // ============================================================================
-  // Configuration
-  // ============================================================================
-
-  setDefaultConfig: (config) => {
-    set((state) => ({
-      defaultConfig: { ...state.defaultConfig, ...config },
-    }));
-  },
-
-  // ============================================================================
   // Event Handling
   // ============================================================================
 
   handleLoopEvent: (conversationId, event) => {
-    const { currentLoopId, eventHistory } = get();
+    const { currentLoopId } = get();
     const isCurrentLoop = conversationId === currentLoopId;
-
-    // Add to event history (keep last 100)
-    const newHistory = [event, ...eventHistory].slice(0, 100);
-    set({ eventHistory: newHistory });
 
     // Update state based on event
     switch (event.type) {
@@ -444,6 +399,8 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
             pendingToolCalls: [],
           });
         }
+        // Mark in-flight tool calls as "stopped" in conversation messages
+        useChatStore.getState().markToolCallsStopped(conversationId);
         break;
     }
   },
@@ -456,40 +413,3 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
     });
   },
 }));
-
-// ============================================================================
-// Selectors
-// ============================================================================
-
-export const selectCurrentAdapter = (state: AgenticLoopState) => {
-  if (!state.currentLoopId) return null;
-  return state.activeAdapters.get(state.currentLoopId) || null;
-};
-
-export const selectCurrentContext = (state: AgenticLoopState) => {
-  if (!state.currentLoopId) return null;
-  return state.activeContexts.get(state.currentLoopId) || null;
-};
-
-export const selectIsLoopActive = (state: AgenticLoopState) => {
-  return (
-    state.currentStatus === "thinking" ||
-    state.currentStatus === "tool_executing" ||
-    state.currentStatus === "tool_pending"
-  );
-};
-
-export const selectHasPendingTools = (state: AgenticLoopState) => {
-  return state.pendingToolCalls.length > 0;
-};
-
-export const selectProgress = (state: AgenticLoopState) => {
-  const context = selectCurrentContext(state);
-  if (!context) return { current: 0, max: 25, percentage: 0 };
-
-  const current = context.iterations.length;
-  const max = context.config.maxIterations;
-  const percentage = Math.round((current / max) * 100);
-
-  return { current, max, percentage };
-};
