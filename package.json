@@ -19,7 +19,8 @@
     "build:sidecar": "node packages/pi-sidecar/scripts/build-sidecar.mjs",
     "check-types": "turbo check-types",
     "dev:native": "turbo -F native dev",
-    "dev:web": "turbo -F web dev"
+    "dev:web": "turbo -F web dev",
+    "quick_test": "bun run scripts/quick-test.ts"
   },
   "dependencies": {
     "@sapio-app/env": "workspace:*",

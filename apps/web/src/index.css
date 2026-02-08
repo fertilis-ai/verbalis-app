@@ -124,19 +124,35 @@
   text-decoration: var(--shiki-dark-text-decoration) !important;
 }
 
-/* Streamdown code block styling */
-.sd-code-block {
-  border-radius: 0.375rem;
-  border: 1px solid var(--border);
-  margin: 0.5rem 0;
-  overflow: hidden;
+/* Match chat code blocks to Workspace & Toolbox editor styling */
+[data-streamdown="code-block"] {
+  border-radius: var(--radius-lg);
 }
-.sd-code-block pre {
-  padding: 0.75rem 1rem;
-  margin: 0;
-  overflow-x: auto;
-  font-size: 0.8125rem;
-  line-height: 1.5;
+
+[data-streamdown="code-block-header"] {
+  background-color: var(--color-sidebar);
+}
+
+[data-streamdown="code-block-body"] {
+  background-color: var(--color-sidebar) !important;
+  color: var(--color-foreground);
+}
+
+[data-streamdown="code-block-body"] span {
+  background-color: transparent !important;
+}
+
+.dark [data-streamdown="code-block-body"] span {
+  color: var(--shiki-dark) !important;
+}
+
+[data-streamdown="code-block-body"] span::before {
+  color: var(--color-muted-foreground);
+  opacity: 1;
+}
+
+[data-streamdown="code-block-body"] code {
+  line-height: 1.25rem;
 }
 
 .scrollbar-hidden::-webkit-scrollbar {

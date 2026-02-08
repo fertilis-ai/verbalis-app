@@ -1,9 +1,8 @@
 import * as React from "react";
-import { RefreshCw, Loader2, ChevronRight, ChevronDown, ChevronsRight, ChevronsLeft, ChevronRightIcon, ChevronLeftIcon } from "lucide-react";
+import { ChevronRight, ChevronDown, ChevronsRight, ChevronsLeft, ChevronRightIcon, ChevronLeftIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
-import { isTauri } from "@/lib/storage";
 import type { ProviderModel } from "@/lib/models";
 
 const providerDisplayName: Record<string, string> = {
@@ -31,9 +30,6 @@ export function ModelPicker() {
   const {
     availableModels,
     selectedModels,
-    modelFetchStatus,
-    modelFetchError,
-    fetchModels,
     addSelectedModels,
     removeSelectedModels,
     setSelectedModels,
@@ -44,9 +40,6 @@ export function ModelPicker() {
   const [leftSelected, setLeftSelected] = React.useState<Set<string>>(new Set());
   const [rightSelected, setRightSelected] = React.useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(new Set());
-
-  const canFetch = isTauri();
-  const isFetching = modelFetchStatus === "fetching";
 
   // Available = fetched minus already selected
   const selectedIds = React.useMemo(() => new Set(selectedModels.map((m) => m.id)), [selectedModels]);
@@ -135,31 +128,6 @@ export function ModelPicker() {
 
   return (
     <div className="space-y-3">
-      {/* Refresh button */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => fetchModels()}
-          disabled={!canFetch || isFetching}
-          title={!canFetch ? "Model fetching requires the desktop app" : undefined}
-          className="gap-2"
-        >
-          {isFetching ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3.5 w-3.5" />
-          )}
-          Refresh Models
-        </Button>
-        {!canFetch && (
-          <span className="text-xs text-muted-foreground">Desktop app required</span>
-        )}
-        {modelFetchError && (
-          <span className="text-xs text-destructive">{modelFetchError}</span>
-        )}
-      </div>
-
       {/* Dual listbox */}
       <div className="flex w-full gap-2 items-stretch">
         {/* Left panel — available */}

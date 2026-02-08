@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
+import { CODE_HIGHLIGHT_THEMES } from "@/lib/code-theme";
 
 const plugins = { code };
 
@@ -59,9 +60,6 @@ const components = {
     <td className="border border-border px-2 py-1">{children}</td>
   ),
   hr: () => <hr className="my-3 border-border" />,
-  code: ({ children }: { children?: React.ReactNode }) => (
-    <code className="rounded bg-muted px-1 py-0.5 text-xs">{children}</code>
-  ),
   strong: ({ children }: { children?: React.ReactNode }) => (
     <strong className="font-semibold">{children}</strong>
   ),
@@ -79,7 +77,7 @@ export const MarkdownContent = React.memo(function MarkdownContent({
       plugins={plugins}
       components={components}
       isAnimating={isStreaming}
-      shikiTheme={["github-light", "github-dark"]}
+      shikiTheme={CODE_HIGHLIGHT_THEMES.list}
       className="text-sm leading-relaxed"
     >
       {content}

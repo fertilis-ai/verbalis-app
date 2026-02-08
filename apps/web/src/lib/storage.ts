@@ -417,6 +417,7 @@ interface TreeNodeBase {
   path: string;
   isPinned: boolean;
   children?: TreeNodeBase[];
+  updatedAt?: string;
 }
 
 async function loadTreeRecursive<TNode extends TreeNodeBase>(
@@ -431,6 +432,9 @@ async function loadTreeRecursive<TNode extends TreeNodeBase>(
     if (entry.is_directory) {
       const meta = await loadFolderMeta(entry.path);
       const children = await loadTreeRecursive<TNode>(entry.path, folderType, parseLeafEntry);
+      const maxChildUpdated = children.reduce((max, c) => {
+        return c.updatedAt && c.updatedAt > (max ?? "") ? c.updatedAt : max;
+      }, undefined as string | undefined);
       nodes.push({
         type: folderType,
         id: entry.name,
@@ -438,6 +442,7 @@ async function loadTreeRecursive<TNode extends TreeNodeBase>(
         path: entry.path,
         isPinned: meta?.isPinned ?? false,
         children,
+        updatedAt: maxChildUpdated,
       } as unknown as TNode);
     } else {
       const leaf = await parseLeafEntry(entry);
@@ -445,10 +450,13 @@ async function loadTreeRecursive<TNode extends TreeNodeBase>(
     }
   }
 
-  // Sort: pinned first, folders before leaves, then alphabetically
+  // Sort: pinned first, folders before leaves, then most recent first
   nodes.sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
     if (a.type !== b.type) return a.type === folderType ? -1 : 1;
+    if (a.updatedAt || b.updatedAt) {
+      return (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "");
+    }
     return a.name.localeCompare(b.name);
   });
 
@@ -655,10 +663,10 @@ export async function loadTaskTree(): Promise<TaskTreeNode[]> {
     }
   }
 
-  // Sort: pinned first, then alphabetically
+  // Sort: pinned first, then most recent first
   nodes.sort((a, b) => {
     if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-    return a.name.localeCompare(b.name);
+    return (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "");
   });
 
   return nodes;

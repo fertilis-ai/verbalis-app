@@ -1,4 +1,4 @@
-import { Play, Square, RotateCcw } from "lucide-react";
+import { Play, Square, RotateCcw, KanbanSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTaskStore } from "@/stores/task-store";
 import { KanbanColumn } from "./kanban-column";
@@ -114,7 +114,13 @@ export function KanbanBoard() {
 
       {!selectedFolderId ? (
         <div className="flex flex-1 items-center justify-center">
-          <p className="text-muted-foreground">Select a folder to view tasks</p>
+          <div className="text-center">
+            <KanbanSquare className="mx-auto h-12 w-12 text-muted-foreground" />
+            <h2 className="mt-4 text-lg font-medium">No folder selected</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Select a folder from the sidebar or create a new one
+            </p>
+          </div>
         </div>
       ) : (
         <div className="flex flex-1 gap-4 overflow-auto p-4">

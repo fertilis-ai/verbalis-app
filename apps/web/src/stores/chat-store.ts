@@ -879,7 +879,11 @@ export const useChatStore = create<ChatState>((set, get) => {
     }
 
     const conversation = get().conversations.find((c) => c.id === id) ?? null;
-    set({ currentConversationId: id, contextFiles: [] });
+    set({
+      currentConversationId: id,
+      contextFiles: [],
+      ...(isGhostMode && { isGhostMode: false, ghostConversation: null }),
+    });
 
     if (!conversation || !conversation.path) return;
     if (conversation.messages.length > 0) return;

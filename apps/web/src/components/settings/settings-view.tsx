@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Moon, Sun, Monitor, Eye, EyeOff, FolderOpen, Palette, FolderCog, Shield, Key, Cpu, Server, Bug, Info } from "lucide-react";
+import { Moon, Sun, Monitor, Eye, EyeOff, FolderOpen, Palette, FolderCog, Shield, Key, Cpu, Server, Bug, Info, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -345,7 +345,7 @@ function LocalLlmSection() {
 }
 
 function ModelsSection() {
-  const { defaultModel, setDefaultModel, localLLM, selectedModels } = useSettingsStore();
+  const { defaultModel, setDefaultModel, localLLM, selectedModels, modelFetchStatus, modelFetchError, fetchModels } = useSettingsStore();
   const activeModels = getActiveModels(selectedModels);
   const localProviderLabel = localLLM.provider === "lmstudio" ? "LM Studio" : "Ollama";
   const localModelLabel = localLLM.model.trim() || `${localProviderLabel} (default)`;
@@ -357,6 +357,9 @@ function ModelsSection() {
     })),
     { value: LOCAL_MODEL_ID, label: localOptionLabel },
   ];
+
+  const canFetch = isTauri();
+  const isFetching = modelFetchStatus === "fetching";
 
   return (
     <section id="section-models" className="border-b border-border pb-8">
@@ -383,7 +386,30 @@ function ModelsSection() {
         </div>
 
         <div>
-          <label className="text-sm font-medium">Model Discovery</label>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Model Discovery</label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchModels()}
+              disabled={!canFetch || isFetching}
+              title={!canFetch ? "Model fetching requires the desktop app" : undefined}
+              className="gap-2 h-6 text-xs"
+            >
+              {isFetching ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              Refresh
+            </Button>
+            {!canFetch && (
+              <span className="text-xs text-muted-foreground">Desktop app required</span>
+            )}
+            {modelFetchError && (
+              <span className="text-xs text-destructive">{modelFetchError}</span>
+            )}
+          </div>
           <div className="mt-2">
             <ModelPicker />
           </div>

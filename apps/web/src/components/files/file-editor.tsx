@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useFileStore } from "@/stores/file-store";
 import { createHighlighter, type Highlighter } from "shiki";
+import { CODE_HIGHLIGHT_THEMES } from "@/lib/code-theme";
 
 export function FileEditor() {
   const { activeFilePath, openFiles, updateFileContent } = useFileStore();
@@ -23,7 +24,7 @@ export function FileEditor() {
 
     async function initHighlighter() {
       const h = await createHighlighter({
-        themes: ["github-dark", "github-light"],
+        themes: CODE_HIGHLIGHT_THEMES.list,
         langs: [
           "typescript", "tsx", "javascript", "jsx",
           "python", "rust", "go", "markdown",
@@ -59,8 +60,8 @@ export function FileEditor() {
       const html = highlighter.codeToHtml(content, {
         lang,
         themes: {
-          dark: "github-dark",
-          light: "github-light",
+          dark: CODE_HIGHLIGHT_THEMES.dark,
+          light: CODE_HIGHLIGHT_THEMES.light,
         },
       });
       setHighlightedHtml(html);
@@ -133,11 +134,11 @@ export function FileEditor() {
       {/* Editor area with overlay */}
       <div className="relative flex-1 overflow-hidden">
         {/* Syntax highlighted overlay */}
-        <div
-          ref={highlightRef}
-          className="absolute inset-0 overflow-hidden pointer-events-none p-4 [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:p-0 [&_span]:!bg-transparent [&_code]:leading-6 [&_code]:whitespace-pre"
-          dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-        />
+            <div
+              ref={highlightRef}
+              className="absolute inset-0 overflow-hidden pointer-events-none p-4 [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:p-0 [&_span]:!bg-transparent [&_code]:leading-5 [&_code]:whitespace-pre"
+              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+            />
 
         {/* Transparent textarea for input */}
         <textarea
@@ -147,7 +148,7 @@ export function FileEditor() {
           onScroll={handleScroll}
           onKeyDown={handleKeyDown}
           wrap="off"
-          className="relative z-10 h-full w-full resize-none bg-transparent p-4 focus:outline-none leading-6 caret-foreground text-transparent selection:bg-primary/30 font-mono text-sm overflow-x-auto"
+          className="relative z-10 h-full w-full resize-none bg-transparent p-4 focus:outline-none leading-5 caret-foreground text-transparent selection:bg-primary/30 font-mono text-sm overflow-x-auto"
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"

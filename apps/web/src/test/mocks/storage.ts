@@ -1,0 +1,52 @@
+import { vi } from "vitest";
+
+// Shared mock for @/lib/storage
+// Usage: vi.mock("@/lib/storage", () => import("@/test/mocks/storage"))
+
+export const isTauri = vi.fn(() => false);
+export const getAppDataDir = vi.fn().mockResolvedValue("/mock-data");
+export const initAppDataDir = vi.fn().mockResolvedValue(undefined);
+export const readDirectory = vi.fn().mockResolvedValue([]);
+export const readFile = vi.fn().mockResolvedValue("");
+export const writeFile = vi.fn().mockResolvedValue(undefined);
+export const deletePath = vi.fn().mockResolvedValue(undefined);
+export const createDirectory = vi.fn().mockResolvedValue(undefined);
+export const pathExists = vi.fn().mockResolvedValue(false);
+export const listFiles = vi.fn().mockResolvedValue([]);
+export const renamePath = vi.fn().mockResolvedValue(undefined);
+export const loadChatByPath = vi.fn().mockResolvedValue(null);
+export const createChatFolder = vi.fn().mockResolvedValue("/mock-data/chats/folder");
+export const saveFolderMeta = vi.fn().mockResolvedValue(undefined);
+export const loadFolderMeta = vi.fn().mockResolvedValue(null);
+export const saveChatToFolder = vi.fn().mockResolvedValue(undefined);
+export const loadChatTree = vi.fn().mockResolvedValue([]);
+export const deleteChatByPath = vi.fn().mockResolvedValue(undefined);
+export const deleteChatFolder = vi.fn().mockResolvedValue(undefined);
+export const renameChat = vi.fn().mockResolvedValue("/mock-data/chats/new.json");
+export const renameChatFolder = vi.fn().mockResolvedValue("/mock-data/chats/new-folder");
+export const saveAgent = vi.fn().mockResolvedValue(undefined);
+export const loadAgent = vi.fn().mockResolvedValue(null);
+export const listAgents = vi.fn().mockResolvedValue([]);
+export const deleteAgent = vi.fn().mockResolvedValue(undefined);
+export const loadTaskTree = vi.fn().mockResolvedValue([]);
+export const createTaskFolder = vi.fn().mockResolvedValue("/mock-data/tasks/folder");
+export const saveTaskFolder = vi.fn().mockResolvedValue(undefined);
+export const loadTaskFolder = vi.fn().mockResolvedValue(null);
+export const deleteTaskFolder = vi.fn().mockResolvedValue(undefined);
+export const renameTaskFolder = vi.fn().mockResolvedValue(undefined);
+export const toggleTaskFolderPin = vi.fn().mockResolvedValue(undefined);
+export const loadSchedulerTree = vi.fn().mockResolvedValue([]);
+export const createSchedulerFolder = vi.fn().mockResolvedValue("/mock-data/scheduler/folder");
+export const saveSchedule = vi.fn().mockResolvedValue("/mock-data/scheduler/id.yaml");
+export const loadSchedule = vi.fn().mockResolvedValue(null);
+export const deleteScheduleByPath = vi.fn().mockResolvedValue(undefined);
+export const deleteSchedulerFolder = vi.fn().mockResolvedValue(undefined);
+export const renameSchedulerFolder = vi.fn().mockResolvedValue("/mock-data/scheduler/new-folder");
+export const toggleSchedulerFolderPin = vi.fn().mockResolvedValue(undefined);
+export const loadSchedulerFolderMeta = vi.fn().mockResolvedValue(null);
+export const saveSchedulerFolderMeta = vi.fn().mockResolvedValue(undefined);
+export const saveToolboxItem = vi.fn().mockResolvedValue(undefined);
+export const loadToolboxItem = vi.fn().mockResolvedValue(null);
+export const listToolboxItems = vi.fn().mockResolvedValue([]);
+export const deleteToolboxItem = vi.fn().mockResolvedValue(undefined);
+export const renameToolboxItem = vi.fn().mockResolvedValue(undefined);
