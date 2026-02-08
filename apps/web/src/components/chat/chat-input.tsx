@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Send, Square, Plus, ChevronDown } from "lucide-react";
+import { Send, Square, Plus, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,36 +10,41 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { useChatStore } from "@/stores/chat-store";
+import { getActiveModels } from "@/lib/models";
+import { useChatStore, type ContextFile } from "@/stores/chat-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
-const MODELS = [
-  { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", shortName: "Claude 4", provider: "anthropic" },
-  { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", shortName: "Claude 3.5", provider: "anthropic" },
-  { id: "gpt-4o", name: "GPT-4o", shortName: "GPT-4o", provider: "openai" },
-  { id: "gpt-4o-mini", name: "GPT-4o Mini", shortName: "GPT-4o Mini", provider: "openai" },
-  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", shortName: "Gemini 1.5", provider: "google" },
-] as const;
+const providerDisplayName: Record<string, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+  openrouter: "OpenRouter",
+};
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   disabled?: boolean;
   isLoopActive?: boolean;
   onStop?: () => void;
+  contextFiles?: ContextFile[];
+  onAddFiles?: () => void;
+  onRemoveFile?: (path: string) => void;
 }
 
-export function ChatInput({ onSend, disabled, isLoopActive, onStop }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles = [], onAddFiles, onRemoveFile }: ChatInputProps) {
   const { model, setModel } = useChatStore();
-  const { localLLM } = useSettingsStore();
+  const { localLLM, selectedModels } = useSettingsStore();
+  const activeModels = getActiveModels(selectedModels);
   const [input, setInput] = React.useState("");
+  const [modelMenuOpen, setModelMenuOpen] = React.useState(false);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
-  const selectedModel = MODELS.find((m) => m.id === model) ?? MODELS[0];
+  const selectedModel = activeModels.find((m) => m.id === model) ?? activeModels[0];
   const localProviderLabel = localLLM.provider === "lmstudio" ? "LM Studio" : "Ollama";
   const localModelLabel = localLLM.model.trim() || `${localProviderLabel} (default)`;
   const selectedLocalLabel = localLLM.enabled ? localModelLabel : "Local LLM (disabled)";
   const selectedModelLabel =
-    model === "local" ? selectedLocalLabel : (selectedModel?.shortName ?? model);
+    model === "local" ? selectedLocalLabel : (selectedModel?.name ?? model);
 
   const adjustHeight = React.useCallback(() => {
     const textarea = textareaRef.current;
@@ -96,6 +101,29 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop }: ChatInputP
           />
         </div>
 
+        {/* Context file chips */}
+        {contextFiles.length > 0 && (
+          <div className="flex flex-wrap gap-1 px-4 pb-1">
+            {contextFiles.map((f) => (
+              <span
+                key={f.path}
+                className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs"
+              >
+                {f.name}
+                {onRemoveFile && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveFile(f.path)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Bottom toolbar */}
         <div className="flex items-center justify-between border-t border-border/50 px-2 py-1">
           {/* Left: Plus button + Model selector */}
@@ -104,13 +132,14 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop }: ChatInputP
               variant="ghost"
               size="icon"
               className="h-7 w-7 rounded-lg"
-              disabled={disabled}
+              disabled={disabled || !onAddFiles}
+              onClick={onAddFiles}
             >
               <Plus className="h-4 w-4" />
             </Button>
 
             {/* Compact Model Selector */}
-            <DropdownMenu>
+            <DropdownMenu open={modelMenuOpen} onOpenChange={setModelMenuOpen}>
               <DropdownMenuTrigger
                 render={
                   <Button
@@ -124,17 +153,17 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop }: ChatInputP
                 <span>{selectedModelLabel}</span>
                 <ChevronDown className="ml-1 h-3 w-3" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[200px]">
-                <DropdownMenuRadioGroup value={model} onValueChange={setModel}>
-                  {MODELS.map((m) => (
+              <DropdownMenuContent align="start" className="w-auto">
+                <DropdownMenuRadioGroup value={model} onValueChange={(v) => { setModel(v); setModelMenuOpen(false); }}>
+                  {activeModels.map((m) => (
                     <DropdownMenuRadioItem key={m.id} value={m.id} className="whitespace-nowrap">
                       <span>{m.name}</span>
-                      <span className="ml-2 text-muted-foreground">({m.provider})</span>
+                      <span className="ml-2 text-muted-foreground">({providerDisplayName[m.provider] ?? m.provider})</span>
                     </DropdownMenuRadioItem>
                   ))}
                 </DropdownMenuRadioGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup value={model} onValueChange={setModel}>
+                <DropdownMenuRadioGroup value={model} onValueChange={(v) => { setModel(v); setModelMenuOpen(false); }}>
                   <DropdownMenuRadioItem
                     value="local"
                     disabled={!localLLM.enabled}

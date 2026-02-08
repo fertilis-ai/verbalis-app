@@ -1,4 +1,5 @@
 import { Type, type Static } from "@sinclair/typebox";
+import { StringEnum } from "@mariozechner/pi-ai";
 import { invoke } from "@tauri-apps/api/core";
 import type { ToolDefinitionV2 } from "./categories";
 import { isTauri } from "@/lib/storage";
@@ -11,16 +12,15 @@ import { truncateText } from "@/lib/utils";
 export const HttpFetchParams = Type.Object({
   url: Type.String({ description: "URL to fetch" }),
   method: Type.Optional(
-    Type.Union([
-      Type.Literal("GET"),
-      Type.Literal("POST"),
-      Type.Literal("PUT"),
-      Type.Literal("DELETE"),
-      Type.Literal("PATCH"),
-    ], { description: "HTTP method (default: GET)" })
+    StringEnum(["GET", "POST", "PUT", "DELETE", "PATCH"] as const, {
+      description: "HTTP method (default: GET)",
+    })
   ),
   headers: Type.Optional(
-    Type.Record(Type.String(), Type.String(), { description: "Request headers" })
+    Type.Object({}, {
+      description: "Request headers as key-value pairs",
+      additionalProperties: Type.String(),
+    })
   ),
   body: Type.Optional(Type.String({ description: "Request body (for POST/PUT/PATCH)" })),
   timeout_ms: Type.Optional(Type.Number({ description: "Request timeout in milliseconds" })),
@@ -29,10 +29,9 @@ export const HttpFetchParams = Type.Object({
 export const WebSearchParams = Type.Object({
   query: Type.String({ description: "Search query" }),
   provider: Type.Optional(
-    Type.Union([
-      Type.Literal("duckduckgo"),
-      Type.Literal("google"),
-    ], { description: "Search provider (default: duckduckgo)" })
+    StringEnum(["duckduckgo", "google"] as const, {
+      description: "Search provider (default: duckduckgo)",
+    })
   ),
   max_results: Type.Optional(Type.Number({ description: "Maximum number of results (default: 5)" })),
 });

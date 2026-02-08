@@ -1,10 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { DEFAULT_MODEL_ID, type ChatModelId } from "@/lib/models";
+import { DEFAULT_MODEL_ID, type ChatModelId, type ProviderModel } from "@/lib/models";
+import { fetchAllProviderModels } from "@/lib/provider-models";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import { DEFAULT_GUARDRAILS_CONFIG } from "@/lib/guardrails/types";
 import { getPresetConfig, type UserModePreset } from "@/lib/guardrails/presets";
 import { setLoggingEnabled } from "@/lib/logger";
+import { storeApiKey } from "@/lib/keychain";
+import { isTauri } from "@tauri-apps/api/core";
 import type { HueId } from "@/lib/hue-presets";
 
 export type Theme = "system" | "light" | "dark";
@@ -25,6 +28,7 @@ interface SettingsState {
     anthropic: string;
     openai: string;
     google: string;
+    openrouter: string;
   };
   localLLM: {
     enabled: boolean;
@@ -33,6 +37,12 @@ interface SettingsState {
     model: string;
   };
   defaultModel: ChatModelId;
+
+  // Model discovery
+  availableModels: ProviderModel[];
+  selectedModels: ProviderModel[];
+  modelFetchStatus: "idle" | "fetching" | "done" | "error";
+  modelFetchError: string | null;
 
   // Enhanced guardrails configuration
   guardrailsConfig: GuardrailsConfig;
@@ -49,10 +59,17 @@ interface SettingsState {
   setYolo: (yolo: boolean) => void;
   setSandboxed: (sandboxed: boolean) => void;
   setGuardrails: (guardrails: boolean) => void;
-  setApiKey: (provider: "anthropic" | "openai" | "google", key: string) => void;
+  setApiKey: (provider: "anthropic" | "openai" | "google" | "openrouter", key: string) => void;
   setLocalLLM: (updates: Partial<SettingsState["localLLM"]>) => void;
   setDefaultModel: (model: ChatModelId) => void;
   setAgentDebugLogging: (enabled: boolean) => void;
+
+  // Model discovery actions
+  setAvailableModels: (models: ProviderModel[]) => void;
+  setSelectedModels: (models: ProviderModel[]) => void;
+  addSelectedModels: (models: ProviderModel[]) => void;
+  removeSelectedModels: (modelIds: string[]) => void;
+  fetchModels: () => Promise<void>;
 
   // Guardrails config actions
   setGuardrailsConfig: (config: Partial<GuardrailsConfig>) => void;
@@ -78,6 +95,7 @@ export const useSettingsStore = create<SettingsState>()(
         anthropic: "",
         openai: "",
         google: "",
+        openrouter: "",
       },
       localLLM: {
         enabled: false,
@@ -86,6 +104,10 @@ export const useSettingsStore = create<SettingsState>()(
         model: "",
       },
       defaultModel: DEFAULT_MODEL_ID,
+      availableModels: [],
+      selectedModels: [],
+      modelFetchStatus: "idle" as const,
+      modelFetchError: null,
       guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
       agentDebugLogging: false,
 
@@ -121,10 +143,14 @@ export const useSettingsStore = create<SettingsState>()(
           guardrailsConfig: { ...state.guardrailsConfig, enabled: guardrails },
         }));
       },
-      setApiKey: (provider, key) =>
+      setApiKey: (provider, key) => {
         set((state) => ({
           apiKeys: { ...state.apiKeys, [provider]: key },
-        })),
+        }));
+        storeApiKey(provider, key).catch((err) => {
+          console.warn("[settings] Failed to store key in keychain:", err);
+        });
+      },
       setLocalLLM: (updates) =>
         set((state) => ({
           localLLM: { ...state.localLLM, ...updates },
@@ -133,6 +159,44 @@ export const useSettingsStore = create<SettingsState>()(
       setAgentDebugLogging: (agentDebugLogging) => {
         set({ agentDebugLogging });
         setLoggingEnabled(agentDebugLogging);
+      },
+
+      // Model discovery actions
+      setAvailableModels: (availableModels) => set({ availableModels }),
+      setSelectedModels: (selectedModels) => set({ selectedModels }),
+      addSelectedModels: (models) =>
+        set((state) => {
+          const existingIds = new Set(state.selectedModels.map((m) => m.id));
+          const newModels = models.filter((m) => !existingIds.has(m.id));
+          return { selectedModels: [...state.selectedModels, ...newModels] };
+        }),
+      removeSelectedModels: (modelIds) =>
+        set((state) => {
+          const removeSet = new Set(modelIds);
+          const remaining = state.selectedModels.filter((m) => !removeSet.has(m.id));
+          // If the default model is being removed, reset to first remaining or seed default
+          const defaultModel =
+            removeSet.has(state.defaultModel) ? (remaining[0]?.id ?? DEFAULT_MODEL_ID) : state.defaultModel;
+          return { selectedModels: remaining, defaultModel };
+        }),
+      fetchModels: async () => {
+        set({ modelFetchStatus: "fetching", modelFetchError: null });
+        try {
+          const results = await fetchAllProviderModels(get().apiKeys);
+          const allModels: ProviderModel[] = [];
+          const errors: string[] = [];
+          for (const r of results) {
+            allModels.push(...r.models);
+            if (r.error) errors.push(`${r.provider}: ${r.error}`);
+          }
+          set({
+            availableModels: allModels,
+            modelFetchStatus: errors.length > 0 && allModels.length === 0 ? "error" : "done",
+            modelFetchError: errors.length > 0 ? errors.join("; ") : null,
+          });
+        } catch (e) {
+          set({ modelFetchStatus: "error", modelFetchError: String(e) });
+        }
       },
 
       // Guardrails config actions
@@ -194,9 +258,12 @@ export const useSettingsStore = create<SettingsState>()(
         workingDirectory: state.workingDirectory,
         settingsDirectory: state.settingsDirectory,
         userMode: state.userMode,
-        apiKeys: state.apiKeys,
+        // In Tauri mode, apiKeys are stored in the OS keychain — not localStorage
+        ...(isTauri() ? {} : { apiKeys: state.apiKeys }),
         localLLM: state.localLLM,
         defaultModel: state.defaultModel,
+        availableModels: state.availableModels,
+        selectedModels: state.selectedModels,
         guardrailsConfig: state.guardrailsConfig,
         agentDebugLogging: state.agentDebugLogging,
       }),

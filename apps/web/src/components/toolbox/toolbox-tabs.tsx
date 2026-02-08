@@ -1,42 +1,44 @@
 import * as React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useFileStore } from "@/stores/file-store";
+import { useToolboxStore, itemKey } from "@/stores/toolbox-store";
 
-export function FileTabs() {
-  const { openFiles, activeFilePath, setActiveFile, closeFile } = useFileStore();
+export function ToolboxTabs() {
+  const { openItems, activeItemKey, setActiveItem, closeItem } = useToolboxStore();
 
-  if (openFiles.length === 0) {
+  if (openItems.length === 0) {
     return null;
   }
 
   return (
     <div className="flex h-10 items-center border-b border-border bg-sidebar overflow-x-auto scrollbar-hidden">
-      {openFiles.map((file) => (
-        <FileTab
-          key={file.path}
-          path={file.path}
-          isModified={file.isModified}
-          isActive={file.path === activeFilePath}
-          onSelect={() => setActiveFile(file.path)}
-          onClose={() => closeFile(file.path)}
-        />
-      ))}
+      {openItems.map((item) => {
+        const key = itemKey(item.category, item.name);
+        return (
+          <ToolboxTab
+            key={key}
+            name={item.name}
+            isModified={item.isModified}
+            isActive={key === activeItemKey}
+            onSelect={() => setActiveItem(item.category, item.name)}
+            onClose={() => closeItem(item.category, item.name)}
+          />
+        );
+      })}
     </div>
   );
 }
 
-interface FileTabProps {
-  path: string;
+interface ToolboxTabProps {
+  name: string;
   isModified: boolean;
   isActive: boolean;
   onSelect: () => void;
   onClose: () => void;
 }
 
-function FileTab({ path, isModified, isActive, onSelect, onClose }: FileTabProps) {
+function ToolboxTab({ name, isModified, isActive, onSelect, onClose }: ToolboxTabProps) {
   const [isCloseHovered, setIsCloseHovered] = React.useState(false);
-  const fileName = path.split("/").pop() ?? path;
 
   return (
     <div
@@ -48,8 +50,8 @@ function FileTab({ path, isModified, isActive, onSelect, onClose }: FileTabProps
       )}
       onClick={onSelect}
     >
-      <span className="truncate max-w-[120px]" title={path}>
-        {fileName}
+      <span className="truncate max-w-[120px]" title={name}>
+        {name}
       </span>
       <button
         className={cn(

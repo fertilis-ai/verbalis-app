@@ -810,3 +810,77 @@ pub fn clear_log_file(filename: String) -> Result<(), String> {
 
     Ok(())
 }
+
+/// Overwrite a log file with the given content (for debug logging of API requests, etc.)
+#[tauri::command]
+pub fn write_log_file(filename: String, content: String) -> Result<(), String> {
+    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+        return Err("Invalid filename".to_string());
+    }
+
+    let log_path = get_logs_dir()?.join(&filename);
+    fs::write(&log_path, content).map_err(|e| format!("Failed to write log file: {}", e))?;
+
+    Ok(())
+}
+
+// ============================================================================
+// Keychain (OS Secure Storage)
+// ============================================================================
+
+const KEYCHAIN_SERVICE: &str = "com.sapio.app";
+
+/// Store an API key in the OS keychain
+#[tauri::command]
+pub fn store_api_key(provider: String, key: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &provider)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+    entry
+        .set_password(&key)
+        .map_err(|e| format!("Failed to store key in keychain: {}", e))
+}
+
+/// Get an API key from the OS keychain. Returns None if not found.
+#[tauri::command]
+pub fn get_api_key(provider: String) -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &provider)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+    match entry.get_password() {
+        Ok(password) => Ok(Some(password)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(format!("Failed to read key from keychain: {}", e)),
+    }
+}
+
+/// Delete an API key from the OS keychain. Idempotent (no error if missing).
+#[tauri::command]
+pub fn delete_api_key(provider: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &provider)
+        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(e) => Err(format!("Failed to delete key from keychain: {}", e)),
+    }
+}
+
+/// Load all API keys from the OS keychain in one call.
+#[tauri::command]
+pub fn get_all_api_keys() -> Result<HashMap<String, String>, String> {
+    let providers = ["anthropic", "openai", "google", "openrouter"];
+    let mut keys = HashMap::new();
+    for provider in providers {
+        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, provider)
+            .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
+        match entry.get_password() {
+            Ok(password) => {
+                keys.insert(provider.to_string(), password);
+            }
+            Err(keyring::Error::NoEntry) => {}
+            Err(e) => {
+                log::warn!("Failed to read {} key from keychain: {}", provider, e);
+            }
+        }
+    }
+    Ok(keys)
+}

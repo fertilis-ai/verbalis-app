@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Wrench } from "lucide-react";
-import { useToolboxStore, type ToolboxCategory } from "@/stores/toolbox-store";
+import { useToolboxStore, itemKey, type ToolboxCategory } from "@/stores/toolbox-store";
+import { ToolboxTabs } from "./toolbox-tabs";
 import { createHighlighter, type Highlighter } from "shiki";
 
 // Map category to language for syntax highlighting
@@ -22,15 +23,19 @@ function getLanguage(category: ToolboxCategory): string {
 }
 
 export function ToolboxEditor() {
-  const { selectedItem, updateItem } = useToolboxStore();
-  const [content, setContent] = React.useState("");
-  const [isDirty, setIsDirty] = React.useState(false);
+  const { openItems, activeItemKey, updateItem, updateOpenItemContent, markOpenItemSaved } =
+    useToolboxStore();
   const [highlightedHtml, setHighlightedHtml] = React.useState("");
   const [highlighter, setHighlighter] = React.useState<Highlighter | null>(null);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = React.useRef<HTMLDivElement>(null);
   const highlightRef = React.useRef<HTMLDivElement>(null);
+
+  const activeItem = openItems.find(
+    (i) => itemKey(i.category, i.name) === activeItemKey
+  );
+  const hasOpenItems = openItems.length > 0;
 
   // Initialize Shiki highlighter
   React.useEffect(() => {
@@ -53,24 +58,16 @@ export function ToolboxEditor() {
     };
   }, []);
 
-  // Update content when selected item changes
-  React.useEffect(() => {
-    if (selectedItem) {
-      setContent(selectedItem.content);
-      setIsDirty(false);
-    }
-  }, [selectedItem]);
-
   // Update syntax highlighting when content or highlighter changes
   React.useEffect(() => {
-    if (!highlighter || !selectedItem) {
+    if (!highlighter || !activeItem) {
       setHighlightedHtml("");
       return;
     }
 
-    const lang = getLanguage(selectedItem.category);
+    const lang = getLanguage(activeItem.category);
     try {
-      const html = highlighter.codeToHtml(content, {
+      const html = highlighter.codeToHtml(activeItem.currentContent, {
         lang,
         themes: {
           dark: "github-dark",
@@ -80,14 +77,14 @@ export function ToolboxEditor() {
       setHighlightedHtml(html);
     } catch {
       // Fallback if highlighting fails
-      setHighlightedHtml(`<pre><code>${escapeHtml(content)}</code></pre>`);
+      setHighlightedHtml(`<pre><code>${escapeHtml(activeItem.currentContent)}</code></pre>`);
     }
-  }, [content, highlighter, selectedItem]);
+  }, [activeItem?.currentContent, activeItem?.category, highlighter]);
 
   const handleSave = async () => {
-    if (selectedItem) {
-      await updateItem(selectedItem.category, selectedItem.name, content);
-      setIsDirty(false);
+    if (activeItem) {
+      await updateItem(activeItem.category, activeItem.name, activeItem.currentContent);
+      markOpenItemSaved(activeItem.category, activeItem.name, activeItem.currentContent);
     }
   };
 
@@ -105,20 +102,22 @@ export function ToolboxEditor() {
     }
   };
 
+  const content = activeItem?.currentContent ?? "";
   const lineCount = content.split("\n").length;
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex h-10 items-center border-b border-border px-2">
-        <span className="text-sm font-medium">{selectedItem?.name ?? "Toolbox"}</span>
-        {isDirty && (
-          <span className="ml-2 text-xs text-muted-foreground">(unsaved)</span>
-        )}
-      </div>
+      {hasOpenItems ? (
+        <ToolboxTabs />
+      ) : (
+        <div className="flex h-10 items-center border-b border-border px-2 bg-sidebar">
+          <span className="text-sm font-medium">Toolbox</span>
+        </div>
+      )}
 
-      {!selectedItem ? (
+      {!activeItem ? (
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
             <Wrench className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -148,7 +147,7 @@ export function ToolboxEditor() {
             {/* Syntax highlighted overlay */}
             <div
               ref={highlightRef}
-              className="absolute inset-0 overflow-hidden pointer-events-none p-4 [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:p-0 [&_code]:leading-6 [&_code]:whitespace-pre"
+              className="absolute inset-0 overflow-hidden pointer-events-none p-4 [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:p-0 [&_span]:!bg-transparent [&_code]:leading-6 [&_code]:whitespace-pre"
               dangerouslySetInnerHTML={{ __html: highlightedHtml }}
             />
 
@@ -157,8 +156,9 @@ export function ToolboxEditor() {
               ref={textareaRef}
               value={content}
               onChange={(e) => {
-                setContent(e.target.value);
-                setIsDirty(true);
+                if (activeItem) {
+                  updateOpenItemContent(activeItem.category, activeItem.name, e.target.value);
+                }
               }}
               onScroll={handleScroll}
               onKeyDown={(e) => {
@@ -174,8 +174,9 @@ export function ToolboxEditor() {
                   const end = textarea.selectionEnd;
                   const newValue =
                     content.substring(0, start) + "  " + content.substring(end);
-                  setContent(newValue);
-                  setIsDirty(true);
+                  if (activeItem) {
+                    updateOpenItemContent(activeItem.category, activeItem.name, newValue);
+                  }
                   requestAnimationFrame(() => {
                     textarea.selectionStart = textarea.selectionEnd = start + 2;
                   });

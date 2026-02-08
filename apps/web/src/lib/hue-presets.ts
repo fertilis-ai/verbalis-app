@@ -43,9 +43,9 @@ export function getHueCssOverrides(
 
   if (mode === "light") {
     return {
-      "--background": `oklch(1 0.01 ${H})`,
+      "--background": `oklch(0.995 0.012 ${H})`,
       "--foreground": `oklch(0.145 0.02 ${H})`,
-      "--card": `oklch(1 0.01 ${H})`,
+      "--card": `oklch(0.975 0.03 ${H})`,
       "--card-foreground": `oklch(0.145 0.02 ${H})`,
       "--popover": `oklch(1 0.01 ${H})`,
       "--popover-foreground": `oklch(0.145 0.02 ${H})`,
@@ -77,9 +77,9 @@ export function getHueCssOverrides(
   }
 
   return {
-    "--background": `oklch(0.145 0.014 ${H})`,
+    "--background": `oklch(0.145 0.02 ${H})`,
     "--foreground": `oklch(0.985 0.02 ${H})`,
-    "--card": `oklch(0.205 0.015 ${H})`,
+    "--card": `oklch(0.21 0.035 ${H})`,
     "--card-foreground": `oklch(0.985 0.02 ${H})`,
     "--popover": `oklch(0.205 0.015 ${H})`,
     "--popover-foreground": `oklch(0.985 0.02 ${H})`,

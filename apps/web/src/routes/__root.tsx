@@ -6,6 +6,7 @@ import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { initAppDataDir } from "@/lib/storage";
 import { initConfigSync } from "@/lib/config-sync";
+import { initFetchPolyfill } from "@/lib/http";
 import { startSchedulerRunner } from "@/lib/scheduler-runner";
 import { useAgentStore } from "@/stores/agent-store";
 import { useChatStore } from "@/stores/chat-store";
@@ -46,7 +47,8 @@ function RootComponent() {
 
   // Initialize storage directories on app start - must complete before rendering children
   useEffect(() => {
-    initAppDataDir()
+    initFetchPolyfill()
+      .then(() => initAppDataDir())
       .then(() => initConfigSync())
       .then(() => setInitialized(true));
   }, []);

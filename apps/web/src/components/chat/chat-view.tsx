@@ -10,6 +10,7 @@ import { MarkdownContent } from "./markdown-content";
 import { GuardrailConfirmationBar } from "./guardrail-confirmation-bar";
 import { useElapsedTime } from "@/lib/hooks/use-elapsed-time";
 import { getUndoManager } from "@/lib/guardrails/undo-manager";
+import { isTauri } from "@/lib/storage";
 
 export function ChatView() {
   const {
@@ -18,7 +19,10 @@ export function ChatView() {
     isGhostMode,
     confirmToolExecution,
     rejectToolExecution,
+    addContextFiles,
+    removeContextFile,
   } = useChatStore();
+  const contextFiles = useChatStore((s) => s.contextFiles);
   const currentConversation = useChatStore((s) => s.getCurrentConversation());
 
   const currentStatus = useAgenticLoopStore((s) => s.currentStatus);
@@ -56,6 +60,17 @@ export function ChatView() {
       console.error("Failed to undo tool call:", toolCallId);
     }
   };
+
+  const handleAddFiles = isTauri()
+    ? async () => {
+        const { open } = await import("@tauri-apps/plugin-dialog");
+        const selected = await open({ multiple: true, directory: false });
+        if (selected) {
+          const paths = Array.isArray(selected) ? selected : [selected];
+          await addContextFiles(paths);
+        }
+      }
+    : undefined;
 
   const conversationId = currentConversation?.id;
 
@@ -196,6 +211,9 @@ export function ChatView() {
         disabled={isStreaming || isLoopActive}
         isLoopActive={isLoopActive}
         onStop={() => conversationId && useAgenticLoopStore.getState().stopLoop(conversationId)}
+        contextFiles={contextFiles}
+        onAddFiles={handleAddFiles}
+        onRemoveFile={removeContextFile}
       />
     </div>
   );

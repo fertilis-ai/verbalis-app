@@ -9,9 +9,10 @@
 import YAML from "yaml";
 import { isTauri, readFile, writeFile, pathExists, getAppDataDir } from "@/lib/storage";
 import { useSettingsStore } from "@/stores/settings-store";
+import { loadAllApiKeys } from "@/lib/keychain";
 import { setLoggingEnabled } from "@/lib/logger";
 import type { HueId } from "@/lib/hue-presets";
-import type { ChatModelId } from "@/lib/models";
+import type { ChatModelId, ProviderModel } from "@/lib/models";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import type { UserMode, Theme, LocalLlmProvider } from "@/stores/settings-store";
 
@@ -22,11 +23,6 @@ interface ConfigYaml {
   workingDirectory: string;
   settingsDirectory: string;
   userMode: UserMode;
-  apiKeys: {
-    anthropic: string;
-    openai: string;
-    google: string;
-  };
   localLLM: {
     enabled: boolean;
     provider: LocalLlmProvider;
@@ -34,6 +30,8 @@ interface ConfigYaml {
     model: string;
   };
   defaultModel: ChatModelId;
+  availableModels: ProviderModel[];
+  selectedModels: ProviderModel[];
   guardrailsConfig: GuardrailsConfig;
   agentDebugLogging: boolean;
 }
@@ -47,9 +45,10 @@ function extractConfigFromStore(): ConfigYaml {
     workingDirectory: s.workingDirectory,
     settingsDirectory: s.settingsDirectory,
     userMode: s.userMode,
-    apiKeys: { ...s.apiKeys },
     localLLM: { ...s.localLLM },
     defaultModel: s.defaultModel,
+    availableModels: s.availableModels,
+    selectedModels: s.selectedModels,
     guardrailsConfig: s.guardrailsConfig,
     agentDebugLogging: s.agentDebugLogging,
   };
@@ -72,14 +71,21 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastKnownContent: string | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let isPatchingFromFile = false;
+let writeInFlight = false;
 
 function debouncedWriteConfig(): void {
   if (isPatchingFromFile) return;
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
-    writeConfigToFile().catch((err) => {
-      console.warn("[config-sync] Failed to write config.yaml:", err);
-    });
+    debounceTimer = null;
+    writeInFlight = true;
+    writeConfigToFile()
+      .catch((err) => {
+        console.warn("[config-sync] Failed to write config.yaml:", err);
+      })
+      .finally(() => {
+        writeInFlight = false;
+      });
   }, 500);
 }
 
@@ -107,13 +113,10 @@ async function loadConfigFromFile(providedContent?: string): Promise<void> {
       if (parsed.workingDirectory !== undefined) store.setWorkingDirectory(parsed.workingDirectory);
       if (parsed.settingsDirectory !== undefined) store.setSettingsDirectory(parsed.settingsDirectory);
       if (parsed.userMode !== undefined) store.setUserMode(parsed.userMode);
-      if (parsed.apiKeys !== undefined) {
-        if (parsed.apiKeys.anthropic !== undefined) store.setApiKey("anthropic", parsed.apiKeys.anthropic);
-        if (parsed.apiKeys.openai !== undefined) store.setApiKey("openai", parsed.apiKeys.openai);
-        if (parsed.apiKeys.google !== undefined) store.setApiKey("google", parsed.apiKeys.google);
-      }
       if (parsed.localLLM !== undefined) store.setLocalLLM(parsed.localLLM);
       if (parsed.defaultModel !== undefined) store.setDefaultModel(parsed.defaultModel);
+      if (parsed.availableModels !== undefined) store.setAvailableModels(parsed.availableModels);
+      if (parsed.selectedModels !== undefined) store.setSelectedModels(parsed.selectedModels);
       if (parsed.guardrailsConfig !== undefined) {
         store.setGuardrailsConfig(parsed.guardrailsConfig);
         // Re-sync legacy derived fields
@@ -137,6 +140,7 @@ async function loadConfigFromFile(providedContent?: string): Promise<void> {
 }
 
 async function pollForFileChanges(): Promise<void> {
+  if (debounceTimer || writeInFlight) return;
   try {
     const configPath = await getConfigPath();
     if (!(await pathExists(configPath))) return;
@@ -151,6 +155,70 @@ async function pollForFileChanges(): Promise<void> {
 
 let unsubscribe: (() => void) | null = null;
 
+/** Flush any pending debounced write immediately (best-effort before unload) */
+function flushPendingWrite(): void {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+    writeInFlight = true;
+    writeConfigToFile()
+      .catch(() => {})
+      .finally(() => { writeInFlight = false; });
+  }
+}
+
+/** Migrate API keys from config.yaml to OS keychain (one-time, idempotent) */
+async function migrateApiKeysToKeychain(): Promise<void> {
+  try {
+    const configPath = await getConfigPath();
+    if (!(await pathExists(configPath))) return;
+
+    const content = await readFile(configPath);
+    const parsed = YAML.parse(content) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || !("apiKeys" in parsed)) return;
+
+    const apiKeys = parsed.apiKeys as Record<string, string>;
+    const { storeApiKey } = await import("@/lib/keychain");
+    for (const [provider, key] of Object.entries(apiKeys)) {
+      if (key) {
+        await storeApiKey(provider, key);
+      }
+    }
+
+    // Remove apiKeys from config.yaml and rewrite
+    delete parsed.apiKeys;
+    const yaml = YAML.stringify(parsed);
+    await writeFile(configPath, yaml);
+    lastKnownContent = yaml;
+  } catch (err) {
+    console.warn("[config-sync] Migration of API keys to keychain failed (will retry next launch):", err);
+  }
+}
+
+/** Load API keys from OS keychain into the store */
+async function loadKeysFromKeychain(): Promise<void> {
+  try {
+    const keys = await loadAllApiKeys();
+    if (Object.keys(keys).length === 0) return;
+
+    isPatchingFromFile = true;
+    try {
+      useSettingsStore.setState((state) => ({
+        apiKeys: {
+          ...state.apiKeys,
+          ...Object.fromEntries(
+            Object.entries(keys).filter(([, v]) => v),
+          ),
+        },
+      }));
+    } finally {
+      isPatchingFromFile = false;
+    }
+  } catch (err) {
+    console.warn("[config-sync] Failed to load API keys from keychain:", err);
+  }
+}
+
 /**
  * Initialize config sync.
  * - In browser mode: no-op.
@@ -160,9 +228,14 @@ export async function initConfigSync(): Promise<void> {
   if (!isTauri()) return;
 
   await loadConfigFromFile();
+  await migrateApiKeysToKeychain();
+  await loadKeysFromKeychain();
 
   // Subscribe to store changes — write config.yaml on every change (debounced)
   unsubscribe = useSettingsStore.subscribe(debouncedWriteConfig);
+
+  // Flush pending writes before the window closes
+  window.addEventListener("beforeunload", flushPendingWrite);
 
   // Poll for external changes to config.yaml every 2s
   pollTimer = setInterval(() => {
@@ -184,6 +257,8 @@ export function stopConfigSync(): void {
     clearInterval(pollTimer);
     pollTimer = null;
   }
+  window.removeEventListener("beforeunload", flushPendingWrite);
   lastKnownContent = null;
   isPatchingFromFile = false;
+  writeInFlight = false;
 }

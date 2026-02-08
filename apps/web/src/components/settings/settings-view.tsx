@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTheme } from "@/components/theme-provider";
-import { LOCAL_MODEL_ID, MODEL_OPTIONS, type ChatModelId } from "@/lib/models";
+import { LOCAL_MODEL_ID, getActiveModels, type ChatModelId } from "@/lib/models";
+import { ModelPicker } from "./model-picker";
 import { GuardrailsSection } from "./guardrails-section";
 import { isTauri } from "@/lib/storage";
+import { open } from "@tauri-apps/plugin-shell";
 import type { SettingsSection } from "./settings-sidebar";
 import { HUE_PRESETS } from "@/lib/hue-presets";
 
@@ -194,6 +196,7 @@ function ApiKeysSection() {
     { id: "anthropic" as const, name: "Anthropic", placeholder: "sk-ant-..." },
     { id: "openai" as const, name: "OpenAI", placeholder: "sk-..." },
     { id: "google" as const, name: "Google", placeholder: "AIza..." },
+    { id: "openrouter" as const, name: "OpenRouter", placeholder: "sk-or-...", url: "https://openrouter.ai/keys" },
   ];
 
   return (
@@ -202,7 +205,24 @@ function ApiKeysSection() {
       <div className="space-y-4">
         {providers.map((provider) => (
           <div key={provider.id}>
-            <label className="text-sm font-medium">{provider.name}</label>
+            <label className="text-sm font-medium">
+              {provider.name}
+              {provider.url && (
+                <button
+                  type="button"
+                  className="ml-1 text-xs text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+                  onClick={() => {
+                    if (isTauri()) {
+                      open(provider.url!);
+                    } else {
+                      window.open(provider.url, "_blank", "noopener,noreferrer");
+                    }
+                  }}
+                >
+                  (Get key)
+                </button>
+              )}
+            </label>
             <div className="mt-1 flex gap-2">
               <div className="relative flex-1">
                 <Input
@@ -325,12 +345,13 @@ function LocalLlmSection() {
 }
 
 function ModelsSection() {
-  const { defaultModel, setDefaultModel, localLLM } = useSettingsStore();
+  const { defaultModel, setDefaultModel, localLLM, selectedModels } = useSettingsStore();
+  const activeModels = getActiveModels(selectedModels);
   const localProviderLabel = localLLM.provider === "lmstudio" ? "LM Studio" : "Ollama";
   const localModelLabel = localLLM.model.trim() || `${localProviderLabel} (default)`;
   const localOptionLabel = localLLM.enabled ? `Local LLM - ${localModelLabel}` : "Local LLM (disabled)";
   const options: Array<{ value: ChatModelId; label: string }> = [
-    ...MODEL_OPTIONS.map((model) => ({
+    ...activeModels.map((model) => ({
       value: model.id,
       label: `${model.name} (${model.provider})`,
     })),
@@ -340,14 +361,14 @@ function ModelsSection() {
   return (
     <section id="section-models" className="border-b border-border pb-8">
       <h2 className="text-lg font-medium mb-4 flex items-center gap-2"><Cpu className="h-4.5 w-4.5 text-muted-foreground" />Models</h2>
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
           <label className="text-sm font-medium">Default Model</label>
           <div className="mt-2">
             <select
               value={defaultModel}
               onChange={(e) => setDefaultModel(e.target.value as ChatModelId)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground"
+              className="w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm text-foreground"
             >
               {options.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -359,6 +380,13 @@ function ModelsSection() {
           <p className="mt-2 text-xs text-muted-foreground">
             Used when the app starts and for new chats unless you change it in the model selector.
           </p>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">Model Discovery</label>
+          <div className="mt-2">
+            <ModelPicker />
+          </div>
         </div>
       </div>
     </section>

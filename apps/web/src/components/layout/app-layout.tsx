@@ -24,7 +24,7 @@ export function AppLayout({ section, leftPane, children }: AppLayoutProps) {
           {leftPane}
         </ResizablePane>
       )}
-      <div className="flex-1 overflow-auto">{children}</div>
+      <div className="flex-1 overflow-auto bg-sidebar">{children}</div>
     </div>
   );
 }

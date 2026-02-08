@@ -55,6 +55,12 @@ pub fn run() {
             read_log_file,
             clear_log_file,
             append_log_file,
+            write_log_file,
+            // Keychain (secure API key storage)
+            store_api_key,
+            get_api_key,
+            delete_api_key,
+            get_all_api_keys,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

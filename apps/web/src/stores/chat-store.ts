@@ -20,7 +20,7 @@ import { useAgenticLoopStore, subscribeToToolEvents } from "./agentic-loop-store
 import type { AgentLoopEvent } from "@/lib/agentic/types";
 import type { SapioAdapterConfig } from "@/lib/agentic/sapio-agent-adapter";
 import { appFetch } from "@/lib/http";
-import { DEFAULT_MODEL_ID, MODEL_OPTIONS, type ModelId, type ModelProvider, type ChatModelId } from "@/lib/models";
+import { DEFAULT_MODEL_ID, getActiveModels, PROVIDER_API_MAP, PROVIDER_BASE_URL_MAP, type ModelId, type ChatModelId } from "@/lib/models";
 import {
   loadChatTree,
   loadChatByPath,
@@ -34,16 +34,82 @@ import {
   deletePath,
   getAppDataDir,
   isTauri,
+  readFile,
   type ChatTreeNode,
   type ChatFolderMeta,
   type ChatData,
 } from "@/lib/storage";
 import { logAgent } from "@/lib/logger";
 
-// Model configurations with provider info
-const MODEL_CONFIGS: Record<ModelId, { provider: ModelProvider; id: ModelId }> = Object.fromEntries(
-  MODEL_OPTIONS.map((model) => [model.id, { provider: model.provider, id: model.id }])
-) as Record<ModelId, { provider: ModelProvider; id: ModelId }>;
+/** Resolve a model ID to its pi-ai Model object, provider, and API key. */
+function resolveModelObject(
+  modelId: string,
+  apiKeys: Record<string, string>,
+  selectedModels?: import("@/lib/models").ProviderModel[]
+): { modelObj: Model<Api>; provider: string; apiKey: string } | null {
+  const active = getActiveModels(selectedModels);
+  const entry = active.find((m) => m.id === modelId);
+  if (!entry) return null;
+
+  const apiKey = apiKeys[entry.provider as keyof typeof apiKeys];
+  if (!apiKey) return null;
+
+  // Try pi-ai's getModel() first (gives full config with cost/context data)
+  const registryModel = getModel(entry.provider as "anthropic", modelId as "claude-sonnet-4-20250514");
+  if (registryModel) {
+    // OpenRouter needs explicit auth header (Tauri fetch may strip SDK-managed auth on redirect)
+    if (entry.provider === "openrouter") {
+      return {
+        modelObj: {
+          ...registryModel,
+          headers: { ...registryModel.headers, "Authorization": `Bearer ${apiKey}` },
+          compat: {
+            supportsStore: false,
+            supportsDeveloperRole: false,
+          },
+        },
+        provider: entry.provider,
+        apiKey,
+      };
+    }
+    return { modelObj: registryModel, provider: entry.provider, apiKey };
+  }
+
+  const api = PROVIDER_API_MAP[entry.provider];
+  if (!api) return null;
+
+  // Default base URLs for each provider
+  const defaultBaseUrls: Record<string, string> = {
+    anthropic: "https://api.anthropic.com",
+    openai: "https://api.openai.com/v1",
+    google: "https://generativelanguage.googleapis.com/v1beta",
+    openrouter: "https://openrouter.ai/api/v1",
+  };
+  const baseUrl = PROVIDER_BASE_URL_MAP[entry.provider] ?? defaultBaseUrls[entry.provider] ?? "";
+  const modelObj: Model<Api> = {
+    id: modelId,
+    name: entry.name,
+    api: api as Api,
+    provider: entry.provider,
+    baseUrl,
+    reasoning: false,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128000,
+    maxTokens: 8192,
+  };
+
+  // Add explicit auth header for OpenRouter (Tauri fetch may strip SDK-managed auth on redirect)
+  if (entry.provider === "openrouter") {
+    modelObj.headers = { "Authorization": `Bearer ${apiKey}` };
+    modelObj.compat = {
+      supportsStore: false,
+      supportsDeveloperRole: false,
+    };
+  }
+
+  return { modelObj, provider: entry.provider, apiKey };
+}
 
 type LocalProvider = "lmstudio" | "ollama";
 
@@ -145,6 +211,12 @@ export interface Conversation {
   background?: boolean;
 }
 
+export interface ContextFile {
+  path: string;
+  name: string;
+  content: string;
+}
+
 interface ChatState {
   // Conversations (in-memory + synced to disk)
   conversations: Conversation[];
@@ -161,6 +233,9 @@ interface ChatState {
   model: string;
   agentId: string | null;
   isStreaming: boolean;
+
+  // File context attached to conversation
+  contextFiles: ContextFile[];
 
   // Ghost mode (incognito)
   isGhostMode: boolean;
@@ -190,6 +265,11 @@ interface ChatState {
 
   // Actions - chat management
   renameChat: (chatId: string, newTitle: string) => Promise<void>;
+
+  // Actions - context files
+  addContextFiles: (paths: string[]) => Promise<void>;
+  removeContextFile: (path: string) => void;
+  clearContextFiles: () => void;
 
   // Actions - ghost mode
   startGhostSession: () => void;
@@ -445,8 +525,18 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       const model = (modelOverride ?? get().model) as ChatModelId;
       const isLocal = model === "local";
-      const systemPrompt = agent?.systemPrompt ?? "You are a helpful AI assistant.";
+      const baseSystemPrompt = agent?.systemPrompt ?? "You are a helpful AI assistant.";
       const temperature = agent?.temperature ?? 0.7;
+
+      // Inject file context into system prompt
+      const contextFiles = get().contextFiles;
+      let systemPrompt = baseSystemPrompt;
+      if (contextFiles.length > 0) {
+        const fileContext = contextFiles
+          .map((f) => `### ${f.name}\n\`\`\`\n${f.content}\n\`\`\``)
+          .join("\n\n");
+        systemPrompt = `${baseSystemPrompt}\n\n## File Context\nThe user has attached the following files for reference:\n\n${fileContext}`;
+      }
 
       // Helper: run a model through the SapioAgentAdapter (Tauri only)
       // Shared by both local and cloud models for consistent tool execution,
@@ -664,33 +754,24 @@ export const useChatStore = create<ChatState>((set, get) => {
           }
         }
       } else {
-        const modelKey = model as keyof typeof MODEL_CONFIGS;
-        const modelConfig = MODEL_CONFIGS[modelKey];
-        if (!modelConfig) {
-          throw new Error(`Unknown model: ${model}`);
-        }
-
-        const apiKey = settings.apiKeys[modelConfig.provider];
-
-        if (!apiKey) {
+        const resolved = resolveModelObject(model, settings.apiKeys, settings.selectedModels);
+        if (!resolved) {
+          const active = getActiveModels(settings.selectedModels);
+          const entry = active.find((m) => m.id === model);
+          const providerName = entry?.provider ?? "the appropriate";
           updateConversation((c) => ({
             ...c,
             messages: updateLastAssistantMessage(c.messages, {
-              content: `Please configure a ${modelConfig.provider} API key in Settings to use the chat.`,
+              content: entry
+                ? `Please configure a ${providerName} API key in Settings to use the chat.`
+                : `Unknown model: ${model}. Please select a valid model in Settings.`,
             }),
             updatedAt: new Date(),
           }));
           return;
         }
 
-        let modelObj: Model<Api>;
-        if (modelConfig.provider === "anthropic") {
-          modelObj = getModel("anthropic", modelConfig.id as "claude-sonnet-4-20250514");
-        } else if (modelConfig.provider === "openai") {
-          modelObj = getModel("openai", modelConfig.id as "gpt-4o");
-        } else {
-          modelObj = getModel("google", modelConfig.id as "gemini-1.5-pro");
-        }
+        const { modelObj, apiKey } = resolved;
 
         // Use SapioAgentAdapter for tool handling in desktop environment
         if (isTauri()) {
@@ -772,9 +853,11 @@ export const useChatStore = create<ChatState>((set, get) => {
     model: useSettingsStore.getState().defaultModel ?? DEFAULT_MODEL_ID,
     agentId: null,
     isStreaming: false,
+    contextFiles: [],
     isGhostMode: false,
     ghostConversation: null,
     createConversation: async (folderId?: string) => {
+    set({ contextFiles: [] });
     await createConversationInternal({ folderId, select: true });
   },
 
@@ -791,12 +874,12 @@ export const useChatStore = create<ChatState>((set, get) => {
     // Check if it's the ghost conversation
     const { ghostConversation, isGhostMode } = get();
     if (isGhostMode && ghostConversation?.id === id) {
-      set({ currentConversationId: id });
+      set({ currentConversationId: id, contextFiles: [] });
       return;
     }
 
     const conversation = get().conversations.find((c) => c.id === id) ?? null;
-    set({ currentConversationId: id });
+    set({ currentConversationId: id, contextFiles: [] });
 
     if (!conversation || !conversation.path) return;
     if (conversation.messages.length > 0) return;
@@ -1068,6 +1151,39 @@ export const useChatStore = create<ChatState>((set, get) => {
     }
   },
 
+  // Context files
+  addContextFiles: async (paths: string[]) => {
+    const existing = new Set(get().contextFiles.map((f) => f.path));
+    const newPaths = paths.filter((p) => !existing.has(p));
+    if (newPaths.length === 0) return;
+
+    const MAX_CONTENT_LENGTH = 50_000;
+    const files: ContextFile[] = [];
+    for (const filePath of newPaths) {
+      try {
+        let content = await readFile(filePath);
+        if (content.length > MAX_CONTENT_LENGTH) {
+          content = content.slice(0, MAX_CONTENT_LENGTH) + "\n... (truncated)";
+        }
+        const name = filePath.split("/").pop() ?? filePath;
+        files.push({ path: filePath, name, content });
+      } catch (error) {
+        console.error(`[chat-store] Failed to read file: ${filePath}`, error);
+      }
+    }
+    if (files.length > 0) {
+      set((state) => ({ contextFiles: [...state.contextFiles, ...files] }));
+    }
+  },
+
+  removeContextFile: (path: string) => {
+    set((state) => ({ contextFiles: state.contextFiles.filter((f) => f.path !== path) }));
+  },
+
+  clearContextFiles: () => {
+    set({ contextFiles: [] });
+  },
+
   // Ghost mode
   startGhostSession: () => {
     set({
@@ -1209,5 +1325,24 @@ subscribeToToolEvents((conversationId, toolCall) => {
         c.id === conversationId ? updateFn(c) : c
       ),
     }));
+  }
+});
+
+// ============================================================================
+// Settings → Chat Model Sync
+// ============================================================================
+
+// When selectedModels or defaultModel change in settings, ensure the chat model
+// is still valid. If it was removed from the active list, fall back gracefully.
+useSettingsStore.subscribe((state, prevState) => {
+  if (state.selectedModels === prevState.selectedModels && state.defaultModel === prevState.defaultModel) return;
+  const chatModel = useChatStore.getState().model;
+  if (chatModel === "local") return; // local model handled separately
+  const active = getActiveModels(state.selectedModels);
+  if (!active.some((m) => m.id === chatModel)) {
+    const fallback = active.some((m) => m.id === state.defaultModel)
+      ? state.defaultModel
+      : active[0]?.id ?? DEFAULT_MODEL_ID;
+    useChatStore.setState({ model: fallback });
   }
 });

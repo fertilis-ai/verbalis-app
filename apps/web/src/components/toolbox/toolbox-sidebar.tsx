@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { useToolboxStore, type ToolboxCategory, type ToolboxItem } from "@/stores/toolbox-store";
+import { useToolboxStore, itemKey as makeItemKey, type ToolboxCategory, type ToolboxItem } from "@/stores/toolbox-store";
 
 const CATEGORIES: { id: ToolboxCategory; label: string; icon: LucideIcon }[] = [
   { id: "agents", label: "Agents", icon: Bot },
@@ -34,10 +34,10 @@ const CATEGORIES: { id: ToolboxCategory; label: string; icon: LucideIcon }[] = [
 export function ToolboxSidebar() {
   const {
     items,
-    selectedItem,
+    activeItemKey,
     expandedFolders,
     toggleFolderExpansion,
-    selectItem,
+    openItem,
     createItem,
     deleteItem,
     renameItem,
@@ -183,8 +183,7 @@ export function ToolboxSidebar() {
                       const itemKey = `${item.category}-${item.name}`;
                       const isEditing = editingId === itemKey;
                       const isSelected =
-                        selectedItem?.name === item.name &&
-                        selectedItem?.category === item.category;
+                        activeItemKey === makeItemKey(item.category, item.name);
 
                       return (
                         <div
@@ -194,7 +193,7 @@ export function ToolboxSidebar() {
                             isSelected && "bg-muted"
                           )}
                           style={{ paddingLeft: "32px" }}
-                          onClick={() => selectItem(item.category, item.name)}
+                          onClick={() => openItem(item.category, item.name)}
                         >
                           <ItemIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
                           {isEditing ? (

@@ -3,7 +3,7 @@ import { Clock, Play, Square, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSchedulerStore, describeCron, type ScheduleData } from "@/stores/scheduler-store";
-import { useAgentStore } from "@/stores/agent-store";
+import { useToolboxStore } from "@/stores/toolbox-store";
 import { CronBuilder } from "./cron-builder";
 import { useDebouncedCallback } from "use-debounce";
 
@@ -17,7 +17,8 @@ export function SchedulerView() {
     schedulerLog,
     schedulerLogScheduleId,
   } = useSchedulerStore();
-  const { agents } = useAgentStore();
+  const toolboxItems = useToolboxStore((s) => s.items);
+  const agents = toolboxItems.filter((i) => i.category === "agents");
 
   const selectedSchedule = getSelectedSchedule();
 
@@ -166,9 +167,8 @@ export function SchedulerView() {
             <select
               value={selectedSchedule.agentId}
               onChange={(e) => handleImmediateUpdate({ agentId: e.target.value })}
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="mt-1 w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              <option value="Assistant">Assistant</option>
               {agents.map((agent) => (
                 <option key={agent.name} value={agent.name}>
                   {agent.name}
@@ -187,7 +187,7 @@ export function SchedulerView() {
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="mt-1 w-full rounded-md border border-input bg-transparent dark:bg-input/30 px-2.5 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               rows={6}
               placeholder="What should the agent do when this schedule runs?"
             />

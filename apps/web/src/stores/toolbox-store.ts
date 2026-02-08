@@ -17,11 +17,25 @@ export interface ToolboxItem {
   updatedAt: Date;
 }
 
+export interface OpenToolboxItem {
+  category: ToolboxCategory;
+  name: string;
+  originalContent: string;
+  currentContent: string;
+  isModified: boolean;
+}
+
+export function itemKey(category: ToolboxCategory, name: string): string {
+  return `${category}/${name}`;
+}
+
 interface ToolboxState {
   items: ToolboxItem[];
   selectedItem: ToolboxItem | null;
   expandedFolders: Set<ToolboxCategory>;
   isLoading: boolean;
+  openItems: OpenToolboxItem[];
+  activeItemKey: string | null;
 
   setItems: (items: ToolboxItem[]) => void;
   selectItem: (category: ToolboxCategory, name: string | null) => void;
@@ -31,6 +45,11 @@ interface ToolboxState {
   updateItem: (category: ToolboxCategory, name: string, content: string) => Promise<void>;
   deleteItem: (category: ToolboxCategory, name: string) => Promise<void>;
   renameItem: (category: ToolboxCategory, oldName: string, newName: string) => Promise<void>;
+  openItem: (category: ToolboxCategory, name: string) => void;
+  closeItem: (category: ToolboxCategory, name: string) => void;
+  setActiveItem: (category: ToolboxCategory, name: string) => void;
+  updateOpenItemContent: (category: ToolboxCategory, name: string, content: string) => void;
+  markOpenItemSaved: (category: ToolboxCategory, name: string, savedContent: string) => void;
 }
 
 const CATEGORIES: ToolboxCategory[] = ["prompts", "memories", "agents", "skills", "workflows"];
@@ -40,14 +59,17 @@ export const useToolboxStore = create<ToolboxState>((set, get) => ({
   selectedItem: null,
   expandedFolders: new Set<ToolboxCategory>(["agents"]), // Default expanded
   isLoading: false,
+  openItems: [],
+  activeItemKey: null,
 
   setItems: (items) => set({ items }),
 
   selectItem: (category, name) => {
-    const item = name
-      ? get().items.find((i) => i.name === name && i.category === category) ?? null
-      : null;
-    set({ selectedItem: item });
+    if (name) {
+      get().openItem(category, name);
+    } else {
+      set({ selectedItem: null });
+    }
   },
 
   toggleFolderExpansion: (category) => {
@@ -111,6 +133,9 @@ export const useToolboxStore = create<ToolboxState>((set, get) => ({
       items: [...state.items, item],
       selectedItem: item,
     }));
+
+    // Open as tab
+    get().openItem(category, name);
   },
 
   updateItem: async (category, name, content) => {
@@ -140,6 +165,13 @@ export const useToolboxStore = create<ToolboxState>((set, get) => ({
   },
 
   deleteItem: async (category, name) => {
+    // Close tab if open
+    const { openItems } = get();
+    const key = itemKey(category, name);
+    if (openItems.some((i) => itemKey(i.category, i.name) === key)) {
+      get().closeItem(category, name);
+    }
+
     // Delete from disk
     await deleteToolboxItem(category, name);
 
@@ -158,16 +190,118 @@ export const useToolboxStore = create<ToolboxState>((set, get) => ({
     // Rename on disk
     await renameToolboxItem(category, oldName, newName);
 
+    set((state) => {
+      const oldKey = itemKey(category, oldName);
+      const newKey = itemKey(category, newName);
+
+      return {
+        items: state.items.map((i) =>
+          i.name === oldName && i.category === category
+            ? { ...i, name: newName, updatedAt: new Date() }
+            : i
+        ),
+        selectedItem:
+          state.selectedItem?.name === oldName && state.selectedItem?.category === category
+            ? { ...state.selectedItem, name: newName, updatedAt: new Date() }
+            : state.selectedItem,
+        openItems: state.openItems.map((i) =>
+          itemKey(i.category, i.name) === oldKey
+            ? { ...i, name: newName }
+            : i
+        ),
+        activeItemKey: state.activeItemKey === oldKey ? newKey : state.activeItemKey,
+      };
+    });
+  },
+
+  openItem: (category, name) => {
+    const { items, openItems } = get();
+    const key = itemKey(category, name);
+    const alreadyOpen = openItems.some((i) => itemKey(i.category, i.name) === key);
+
+    if (alreadyOpen) {
+      const item = items.find((i) => i.name === name && i.category === category) ?? null;
+      set({ activeItemKey: key, selectedItem: item });
+      return;
+    }
+
+    const sourceItem = items.find((i) => i.name === name && i.category === category);
+    if (!sourceItem) return;
+
+    const openItem: OpenToolboxItem = {
+      category,
+      name,
+      originalContent: sourceItem.content,
+      currentContent: sourceItem.content,
+      isModified: false,
+    };
+
+    set({
+      openItems: [...openItems, openItem],
+      activeItemKey: key,
+      selectedItem: sourceItem,
+    });
+  },
+
+  closeItem: (category, name) => {
+    const { openItems, activeItemKey } = get();
+    const key = itemKey(category, name);
+    const closedIndex = openItems.findIndex((i) => itemKey(i.category, i.name) === key);
+    const newOpenItems = openItems.filter((i) => itemKey(i.category, i.name) !== key);
+
+    let newActiveKey = activeItemKey;
+    if (activeItemKey === key) {
+      if (newOpenItems.length > 0) {
+        const nextItem = newOpenItems[Math.min(closedIndex, newOpenItems.length - 1)];
+        newActiveKey = itemKey(nextItem.category, nextItem.name);
+      } else {
+        newActiveKey = null;
+      }
+    }
+
+    // Update selectedItem to match new active tab
+    let newSelectedItem = null;
+    if (newActiveKey) {
+      const activeOpen = newOpenItems.find((i) => itemKey(i.category, i.name) === newActiveKey);
+      if (activeOpen) {
+        newSelectedItem = get().items.find(
+          (i) => i.name === activeOpen.name && i.category === activeOpen.category
+        ) ?? null;
+      }
+    }
+
+    set({
+      openItems: newOpenItems,
+      activeItemKey: newActiveKey,
+      selectedItem: newSelectedItem,
+    });
+  },
+
+  setActiveItem: (category, name) => {
+    const key = itemKey(category, name);
+    const item = get().items.find((i) => i.name === name && i.category === category) ?? null;
+    set({ activeItemKey: key, selectedItem: item });
+  },
+
+  updateOpenItemContent: (category, name, content) => {
+    const key = itemKey(category, name);
     set((state) => ({
-      items: state.items.map((i) =>
-        i.name === oldName && i.category === category
-          ? { ...i, name: newName, updatedAt: new Date() }
+      openItems: state.openItems.map((i) =>
+        itemKey(i.category, i.name) === key
+          ? { ...i, currentContent: content, isModified: content !== i.originalContent }
           : i
       ),
-      selectedItem:
-        state.selectedItem?.name === oldName && state.selectedItem?.category === category
-          ? { ...state.selectedItem, name: newName, updatedAt: new Date() }
-          : state.selectedItem,
+    }));
+  },
+
+  markOpenItemSaved: (category, name, savedContent) => {
+    const key = itemKey(category, name);
+    set((state) => ({
+      openItems: state.openItems.map((i) =>
+        itemKey(i.category, i.name) === key
+          ? { ...i, originalContent: savedContent, currentContent: savedContent, isModified: false }
+          : i
+      ),
     }));
   },
 }));

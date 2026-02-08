@@ -41,7 +41,7 @@ export function FileViewer() {
       {hasOpenFiles ? (
         <FileTabs />
       ) : (
-        <div className="flex h-10 items-center border-b border-border px-2">
+        <div className="flex h-10 items-center border-b border-border px-2 bg-sidebar">
           <span className="text-sm font-medium">Workspace</span>
         </div>
       )}

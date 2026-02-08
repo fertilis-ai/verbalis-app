@@ -23,7 +23,7 @@ export function FileEditor() {
 
     async function initHighlighter() {
       const h = await createHighlighter({
-        themes: ["tokyo-night", "github-light"],
+        themes: ["github-dark", "github-light"],
         langs: [
           "typescript", "tsx", "javascript", "jsx",
           "python", "rust", "go", "markdown",
@@ -59,7 +59,7 @@ export function FileEditor() {
       const html = highlighter.codeToHtml(content, {
         lang,
         themes: {
-          dark: "tokyo-night",
+          dark: "github-dark",
           light: "github-light",
         },
       });
@@ -135,7 +135,7 @@ export function FileEditor() {
         {/* Syntax highlighted overlay */}
         <div
           ref={highlightRef}
-          className="absolute inset-0 overflow-hidden pointer-events-none p-4 [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:p-0 [&_code]:leading-6 [&_code]:whitespace-pre"
+          className="absolute inset-0 overflow-hidden pointer-events-none p-4 [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:p-0 [&_span]:!bg-transparent [&_code]:leading-6 [&_code]:whitespace-pre"
           dangerouslySetInnerHTML={{ __html: highlightedHtml }}
         />
 

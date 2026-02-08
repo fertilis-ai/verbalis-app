@@ -440,7 +440,13 @@ export class SapioAgentAdapter {
       const errorType = classifyError(error);
       const strategy = ERROR_STRATEGIES[errorType];
 
-      if (strategy.type === "abort" || this.loopContext.consecutiveErrors >= this.loopContext.config.maxConsecutiveErrors) {
+      // Always re-throw API and network errors — they're not recoverable without user action.
+      // Only tool errors should use the retry/skip strategy.
+      if (strategy.type === "abort" ||
+          errorType === "api_error" ||
+          errorType === "network_error" ||
+          errorType === "unknown" ||
+          this.loopContext.consecutiveErrors >= this.loopContext.config.maxConsecutiveErrors) {
         throw error;
       }
 
@@ -503,6 +509,17 @@ export class SapioAgentAdapter {
       case "message_end": {
         // Only process assistant messages for thinking/tool-call events
         if (!("role" in event.message) || event.message.role !== "assistant") {
+          break;
+        }
+
+        // Check if the LLM response was an error (e.g. provider API failure)
+        const msg = event.message as unknown as { stopReason?: string; errorMessage?: string };
+        if (msg.stopReason === "error" && msg.errorMessage) {
+          this.emit({
+            type: "loop_error",
+            error: msg.errorMessage,
+            errorType: "api_error",
+          });
           break;
         }
 
