@@ -126,10 +126,12 @@ vi.mock("lucide-react", () =>
     {
       get: (_, name) => {
         if (name === "__esModule") return true;
+        if (typeof name === "symbol" || name === "then") return undefined;
         return (props: any) => (
           <div data-testid={`icon-${String(name)}`} {...props} />
         );
       },
+      has: () => true,
     }
   )
 );

@@ -22,6 +22,9 @@ vi.mock("lucide-react", () => ({
   AlertTriangle: (props: any) => (
     <span data-testid="icon-AlertTriangle" {...props}>AlertTriangle</span>
   ),
+  KanbanSquare: (props: any) => (
+    <span data-testid="icon-KanbanSquare" {...props}>KanbanSquare</span>
+  ),
 }));
 
 // Mock Button
@@ -105,7 +108,7 @@ const mockDoneTasks: MockTaskData[] = [
 ];
 
 const mockTaskStore = {
-  selectedFolderId: "folder-1",
+  selectedFolderId: "folder-1" as string | null,
   getTasksByStage: vi.fn((stage: string) => {
     switch (stage) {
       case "backlog":
@@ -275,7 +278,7 @@ describe("KanbanBoard", () => {
       mockTaskStore.selectedFolderId = null;
       render(<KanbanBoard />);
 
-      expect(screen.getByText("Select a folder to view tasks")).toBeInTheDocument();
+      expect(screen.getByText("No folder selected")).toBeInTheDocument();
     });
 
     it("disables all action buttons when no folder selected", () => {

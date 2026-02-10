@@ -17,7 +17,7 @@ const mockOpenItem = {
 
 const mockToolboxStore = {
   openItems: [mockOpenItem],
-  activeItemKey: "prompts/My Prompt",
+  activeItemKey: "prompts/My Prompt" as string | null,
   updateItem: vi.fn().mockResolvedValue(undefined),
   updateOpenItemContent: vi.fn(),
   markOpenItemSaved: vi.fn(),
@@ -48,10 +48,12 @@ vi.mock("lucide-react", () =>
     {
       get: (_, name) => {
         if (name === "__esModule") return true;
+        if (typeof name === "symbol" || name === "then") return undefined;
         return (props: any) => (
           <div data-testid={`icon-${String(name)}`} {...props} />
         );
       },
+      has: () => true,
     }
   )
 );
@@ -144,22 +146,6 @@ describe("ToolboxEditor", () => {
         "prompts",
         "My Prompt",
         "new content"
-      );
-    });
-
-    it("saves on Ctrl+S", () => {
-      render(<ToolboxEditor />);
-      const textarea = screen.getByRole("textbox");
-      fireEvent.keyDown(textarea, { key: "s", ctrlKey: true });
-      expect(mockToolboxStore.updateItem).toHaveBeenCalledWith(
-        "prompts",
-        "My Prompt",
-        "current content"
-      );
-      expect(mockToolboxStore.markOpenItemSaved).toHaveBeenCalledWith(
-        "prompts",
-        "My Prompt",
-        "current content"
       );
     });
 

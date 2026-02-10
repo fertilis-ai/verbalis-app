@@ -167,6 +167,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce("file contents here");
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-1",
         name: "read_file",
         arguments: { path: "/tmp/test.txt" },
@@ -185,6 +186,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce(undefined);
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-2",
         name: "write_file",
         arguments: { path: "/tmp/out.txt", content: "hello" },
@@ -203,6 +205,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce(undefined);
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-3",
         name: "delete_path",
         arguments: { path: "/tmp/remove" },
@@ -216,6 +219,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce(undefined);
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-4",
         name: "create_directory",
         arguments: { path: "/tmp/newdir" },
@@ -230,6 +234,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce(dirContents);
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-5",
         name: "read_directory",
         arguments: { path: "/tmp", max_depth: 2 },
@@ -244,6 +249,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce(true);
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-6",
         name: "path_exists",
         arguments: { path: "/tmp/exists" },
@@ -257,6 +263,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce(false);
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-7",
         name: "path_exists",
         arguments: { path: "/tmp/nope" },
@@ -270,6 +277,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce(["a.txt", "b.txt", "c.txt"]);
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-8",
         name: "list_files",
         arguments: { dir: "/tmp", extension: "txt" },
@@ -284,6 +292,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce("single result");
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-8b",
         name: "list_files",
         arguments: { dir: "/tmp" },
@@ -297,6 +306,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce(undefined);
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-9",
         name: "rename_path",
         arguments: { old_path: "/tmp/a", new_path: "/tmp/b" },
@@ -311,6 +321,7 @@ describe("tools", () => {
       mockExecuteWebTool.mockResolvedValueOnce("web result");
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-10",
         name: "http_fetch",
         arguments: { url: "https://example.com" },
@@ -325,6 +336,7 @@ describe("tools", () => {
       mockExecuteWebTool.mockResolvedValueOnce("search results");
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-11",
         name: "web_search",
         arguments: { query: "test" },
@@ -338,6 +350,7 @@ describe("tools", () => {
       mockExecuteWebTool.mockResolvedValueOnce("scraped content");
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-12",
         name: "scrape_webpage",
         arguments: { url: "https://example.com" },
@@ -349,6 +362,7 @@ describe("tools", () => {
 
     it("returns error for unknown tool", async () => {
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-err",
         name: "nonexistent_tool",
         arguments: {},
@@ -366,6 +380,7 @@ describe("tools", () => {
       mockInvoke.mockRejectedValueOnce(new Error("Permission denied"));
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-fail",
         name: "read_file",
         arguments: { path: "/root/secret" },
@@ -383,6 +398,7 @@ describe("tools", () => {
       mockInvoke.mockRejectedValueOnce("string error");
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-fail2",
         name: "read_file",
         arguments: { path: "/tmp/x" },
@@ -396,6 +412,7 @@ describe("tools", () => {
       mockExecuteWebTool.mockRejectedValueOnce(new Error("Network error"));
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-webfail",
         name: "http_fetch",
         arguments: { url: "https://bad.example.com" },
@@ -409,6 +426,7 @@ describe("tools", () => {
       mockInvoke.mockResolvedValueOnce({ key: "value" });
 
       const result = await executeTool({
+        type: "toolCall",
         id: "tc-obj",
         name: "read_file",
         arguments: { path: "/tmp/data.json" },

@@ -89,11 +89,6 @@ describe("ModelPicker", () => {
   // -------------------------------------------------------------------------
 
   describe("rendering", () => {
-    it("renders the Refresh Models button", () => {
-      render(<ModelPicker />);
-      expect(screen.getByText("Refresh Models")).toBeInTheDocument();
-    });
-
     it("renders Available Models panel", () => {
       render(<ModelPicker />);
       expect(screen.getByText("Available Models")).toBeInTheDocument();
@@ -156,36 +151,6 @@ describe("ModelPicker", () => {
   // -------------------------------------------------------------------------
   // Refresh button
   // -------------------------------------------------------------------------
-
-  describe("refresh button", () => {
-    it("disables the refresh button in non-Tauri mode", () => {
-      render(<ModelPicker />);
-      const refreshBtn = screen.getByText("Refresh Models").closest("button")!;
-      expect(refreshBtn).toBeDisabled();
-    });
-
-    it("shows 'Desktop app required' message in non-Tauri mode", () => {
-      render(<ModelPicker />);
-      expect(screen.getByText("Desktop app required")).toBeInTheDocument();
-    });
-
-    it("shows error message when fetch fails", () => {
-      mockSettingsStore.modelFetchError = "Connection failed";
-      render(<ModelPicker />);
-      expect(screen.getByText("Connection failed")).toBeInTheDocument();
-    });
-
-    it("shows loader icon when fetching", () => {
-      mockSettingsStore.modelFetchStatus = "fetching";
-      render(<ModelPicker />);
-      expect(screen.getByTestId("icon-Loader2")).toBeInTheDocument();
-    });
-
-    it("shows refresh icon when idle", () => {
-      render(<ModelPicker />);
-      expect(screen.getByTestId("icon-RefreshCw")).toBeInTheDocument();
-    });
-  });
 
   // -------------------------------------------------------------------------
   // Available models panel

@@ -58,6 +58,7 @@ function makeTaskTree(tasks: TaskData[] = []): TaskTreeNode[] {
       type: "folder" as const,
       isPinned: false,
       tasks,
+      updatedAt: "2025-01-01T00:00:00.000Z",
     },
   ];
 }
@@ -81,6 +82,7 @@ function makeFolderData(tasks: TaskData[] = []): TaskFolderData {
   return {
     id: "folder-1",
     name: "Test Backlog",
+    isPinned: false,
     tasks,
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2025-01-01T00:00:00.000Z",
@@ -225,7 +227,7 @@ describe("task-store", () => {
     it("preserves selection when deleting a different folder", async () => {
       const tree: TaskTreeNode[] = [
         ...makeTaskTree(),
-        { id: "folder-2", name: "Other", path: "/mock-data/tasks/folder-2", type: "folder", isPinned: false, tasks: [] },
+        { id: "folder-2", name: "Other", path: "/mock-data/tasks/folder-2", type: "folder" as const, isPinned: false, tasks: [], updatedAt: "2025-01-01T00:00:00.000Z" },
       ];
       useTaskStore.setState({ taskTree: tree, selectedFolderId: "folder-1" });
       mockLoadTaskTree.mockResolvedValue(tree);

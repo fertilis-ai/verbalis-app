@@ -214,3 +214,5 @@ This is a fresh project (initial commit). The foundation is established with mod
 - Dev server runs on port 3001 (configurable in vite.config.ts)
 - Bun is the package manager - do not use npm/yarn/pnpm
 - The `routeTree.gen.ts` file is auto-generated - never edit manually
+- Use `bunx tauri icon ~/assets/fertilis_logo_white.png` to generate app icons
+- Use `bunx tauri build --bundles dmg` to bundle a new mac release (.dmg) 

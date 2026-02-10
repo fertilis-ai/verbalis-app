@@ -107,6 +107,8 @@ vi.mock("lucide-react", () => ({
   Server: (props: any) => <span data-testid="icon-Server" {...props} />,
   Bug: (props: any) => <span data-testid="icon-Bug" {...props} />,
   Info: (props: any) => <span data-testid="icon-Info" {...props} />,
+  RefreshCw: (props: any) => <span data-testid="icon-RefreshCw" {...props} />,
+  Loader2: (props: any) => <span data-testid="icon-Loader2" {...props} />,
 }));
 
 // Import after mocks

@@ -20,11 +20,12 @@ const UNDO_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 class UndoManager {
   private operations: Map<string, UndoOperation> = new Map();
   private toolCallToOperation: Map<string, string> = new Map();
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     // Periodically clean up expired operations
     if (typeof window !== "undefined") {
-      setInterval(() => this.cleanupExpired(), 5 * 60 * 1000); // Every 5 minutes
+      this.cleanupTimer = setInterval(() => this.cleanupExpired(), 5 * 60 * 1000); // Every 5 minutes
     }
   }
 
@@ -399,6 +400,10 @@ class UndoManager {
    * Clear all operations (for testing)
    */
   clear() {
+    if (this.cleanupTimer !== null) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
     this.operations.clear();
     this.toolCallToOperation.clear();
   }

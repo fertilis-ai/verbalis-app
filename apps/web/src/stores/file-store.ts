@@ -88,23 +88,117 @@ interface FileState {
 // Helper to detect language from file extension
 function getLanguageFromPath(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const fileName = path.split("/").pop() ?? "";
+
+  // Extensionless file handling
+  const nameMap: Record<string, string> = {
+    Dockerfile: "dockerfile",
+    Makefile: "makefile",
+    Containerfile: "dockerfile",
+    Justfile: "makefile",
+    Rakefile: "ruby",
+    Gemfile: "ruby",
+    Vagrantfile: "ruby",
+  };
+  if (nameMap[fileName]) return nameMap[fileName];
+  if (fileName.startsWith(".env")) return "shell";
+
   const langMap: Record<string, string> = {
+    // JavaScript / TypeScript
     ts: "typescript",
     tsx: "tsx",
     js: "javascript",
     jsx: "jsx",
-    py: "python",
-    rs: "rust",
-    go: "go",
-    md: "markdown",
+    mjs: "javascript",
+    mts: "typescript",
+    cjs: "javascript",
+    cts: "typescript",
+    // Web
+    html: "html",
+    htm: "html",
+    css: "css",
+    scss: "scss",
+    less: "less",
+    sass: "sass",
+    vue: "vue",
+    svelte: "svelte",
+    astro: "astro",
+    // Data / Config
     json: "json",
+    jsonc: "jsonc",
     yaml: "yaml",
     yml: "yaml",
     toml: "toml",
-    css: "css",
-    html: "html",
+    xml: "xml",
+    csv: "csv",
+    ini: "ini",
+    // Markdown / Docs
+    md: "markdown",
+    mdx: "mdx",
+    // Shell
     sh: "bash",
     bash: "bash",
+    zsh: "bash",
+    fish: "fish",
+    ps1: "powershell",
+    // Systems
+    c: "c",
+    h: "c",
+    cpp: "cpp",
+    cc: "cpp",
+    cxx: "cpp",
+    hpp: "cpp",
+    rs: "rust",
+    go: "go",
+    zig: "zig",
+    // JVM
+    java: "java",
+    kt: "kotlin",
+    kts: "kotlin",
+    scala: "scala",
+    groovy: "groovy",
+    gradle: "groovy",
+    // .NET
+    cs: "csharp",
+    fs: "fsharp",
+    // Apple
+    swift: "swift",
+    // Scripting
+    py: "python",
+    rb: "ruby",
+    pl: "perl",
+    pm: "perl",
+    lua: "lua",
+    r: "r",
+    R: "r",
+    php: "php",
+    // Functional
+    ex: "elixir",
+    exs: "elixir",
+    erl: "erlang",
+    hs: "haskell",
+    clj: "clojure",
+    ml: "ocaml",
+    // Mobile
+    dart: "dart",
+    // Query / Schema
+    sql: "sql",
+    graphql: "graphql",
+    gql: "graphql",
+    proto: "proto",
+    prisma: "prisma",
+    // DevOps / Infra
+    tf: "terraform",
+    hcl: "hcl",
+    nix: "nix",
+    // Misc
+    tex: "latex",
+    latex: "latex",
+    diff: "diff",
+    patch: "diff",
+    log: "log",
+    dockerfile: "dockerfile",
+    makefile: "makefile",
   };
   return langMap[ext] ?? "plaintext";
 }

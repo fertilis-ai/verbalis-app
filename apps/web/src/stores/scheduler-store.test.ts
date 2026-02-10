@@ -55,7 +55,7 @@ vi.mock("cron-parser", () => ({
   },
 }));
 
-const mockChatStoreGetState = vi.fn(() => ({ conversations: [] }));
+const mockChatStoreGetState = vi.fn(() => ({ conversations: [] as any[] }));
 vi.mock("@/stores/chat-store", () => ({
   useChatStore: Object.assign(vi.fn(() => ({})), {
     getState: (...args: unknown[]) => mockChatStoreGetState(...args),
@@ -84,6 +84,7 @@ function makeScheduleNode(overrides: Partial<SchedulerTreeNode> = {}): Scheduler
     name: "My Schedule",
     path: "/mock-data/scheduler/sched-1.yaml",
     type: "schedule" as const,
+    isPinned: false,
     cron: "0 9 * * *",
     enabled: false,
     hasError: false,
@@ -943,13 +944,13 @@ describe("scheduler-store", () => {
             id: "conv-1",
             title: "Test",
             messages: [
-              { id: "m1", role: "assistant", content: "Starting task", toolCalls: [], createdAt: new Date() },
+              { id: "m1", role: "assistant" as const, content: "Starting task", toolCalls: [], createdAt: new Date() },
               {
                 id: "m2",
-                role: "assistant",
+                role: "assistant" as const,
                 content: "",
                 toolCalls: [
-                  { id: "tc1", name: "search", status: "success", args: "{}", result: "found", error: undefined },
+                  { id: "tc1", name: "search", status: "success" as const, args: "{}", result: "found", error: undefined, arguments: {} },
                 ],
                 createdAt: new Date(),
               },
@@ -981,10 +982,10 @@ describe("scheduler-store", () => {
             messages: [
               {
                 id: "m1",
-                role: "assistant",
+                role: "assistant" as const,
                 content: "",
                 toolCalls: [
-                  { id: "tc1", name: "writeFile", status: "error", args: "{}", result: "", error: "Permission denied" },
+                  { id: "tc1", name: "writeFile", status: "error" as const, args: "{}", result: "", error: "Permission denied", arguments: {} },
                 ],
                 createdAt: new Date(),
               },

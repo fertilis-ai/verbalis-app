@@ -50,7 +50,8 @@ function RootComponent() {
     initFetchPolyfill()
       .then(() => initAppDataDir())
       .then(() => initConfigSync())
-      .then(() => setInitialized(true));
+      .catch((err) => console.error("[init] Startup error:", err))
+      .finally(() => setInitialized(true));
   }, []);
 
   useEffect(() => {
@@ -87,7 +88,7 @@ function RootComponent() {
         </div>
         <Toaster richColors />
       </ThemeProvider>
-      <TanStackRouterDevtools position="bottom-left" />
+      {import.meta.env.DEV && <TanStackRouterDevtools position="bottom-right" />}
     </>
   );
 }

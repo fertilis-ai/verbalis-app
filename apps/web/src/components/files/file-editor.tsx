@@ -1,7 +1,6 @@
 import * as React from "react";
 import { useFileStore } from "@/stores/file-store";
-import { createHighlighter, type Highlighter } from "shiki";
-import { CODE_HIGHLIGHT_THEMES } from "@/lib/code-theme";
+import { highlightCode, escapeHtml } from "@/lib/highlighter";
 
 export function FileEditor() {
   const { activeFilePath, openFiles, updateFileContent } = useFileStore();
@@ -9,7 +8,6 @@ export function FileEditor() {
   const lineNumbersRef = React.useRef<HTMLDivElement>(null);
   const highlightRef = React.useRef<HTMLDivElement>(null);
 
-  const [highlighter, setHighlighter] = React.useState<Highlighter | null>(null);
   const [highlightedHtml, setHighlightedHtml] = React.useState("");
 
   const activeFile = openFiles.find((f) => f.path === activeFilePath);
@@ -18,57 +16,24 @@ export function FileEditor() {
   const lineCount = content.split("\n").length;
   const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
-  // Initialize Shiki highlighter
+  // Update syntax highlighting when content or language changes
   React.useEffect(() => {
-    let mounted = true;
-
-    async function initHighlighter() {
-      const h = await createHighlighter({
-        themes: CODE_HIGHLIGHT_THEMES.list,
-        langs: [
-          "typescript", "tsx", "javascript", "jsx",
-          "python", "rust", "go", "markdown",
-          "json", "yaml", "toml", "css", "html", "bash",
-        ],
-      });
-      if (mounted) {
-        setHighlighter(h);
-      }
-    }
-
-    initHighlighter();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Update syntax highlighting when content, language, or highlighter changes
-  React.useEffect(() => {
-    if (!highlighter || !activeFile) {
+    if (!activeFile) {
       setHighlightedHtml("");
       return;
     }
 
-    const lang = activeFile.language;
-    if (lang === "plaintext") {
-      setHighlightedHtml(`<pre><code>${escapeHtml(content)}</code></pre>`);
-      return;
-    }
+    let cancelled = false;
 
-    try {
-      const html = highlighter.codeToHtml(content, {
-        lang,
-        themes: {
-          dark: CODE_HIGHLIGHT_THEMES.dark,
-          light: CODE_HIGHLIGHT_THEMES.light,
-        },
-      });
-      setHighlightedHtml(html);
-    } catch {
-      setHighlightedHtml(`<pre><code>${escapeHtml(content)}</code></pre>`);
-    }
-  }, [content, highlighter, activeFile]);
+    highlightCode(content, activeFile.language).then((html) => {
+      if (cancelled) return;
+      setHighlightedHtml(html ?? `<pre><code>${escapeHtml(content)}</code></pre>`);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [content, activeFile?.language]);
 
   // Sync scroll between textarea, line numbers, and highlight overlay
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
@@ -156,13 +121,4 @@ export function FileEditor() {
       </div>
     </div>
   );
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }

@@ -2,8 +2,7 @@ import * as React from "react";
 import { Wrench } from "lucide-react";
 import { useToolboxStore, itemKey, type ToolboxCategory } from "@/stores/toolbox-store";
 import { ToolboxTabs } from "./toolbox-tabs";
-import { createHighlighter, type Highlighter } from "shiki";
-import { CODE_HIGHLIGHT_THEMES } from "@/lib/code-theme";
+import { highlightCode, escapeHtml } from "@/lib/highlighter";
 
 // Map category to language for syntax highlighting
 function getLanguage(category: ToolboxCategory): string {
@@ -27,7 +26,6 @@ export function ToolboxEditor() {
   const { openItems, activeItemKey, updateItem, updateOpenItemContent, markOpenItemSaved } =
     useToolboxStore();
   const [highlightedHtml, setHighlightedHtml] = React.useState("");
-  const [highlighter, setHighlighter] = React.useState<Highlighter | null>(null);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = React.useRef<HTMLDivElement>(null);
@@ -38,49 +36,25 @@ export function ToolboxEditor() {
   );
   const hasOpenItems = openItems.length > 0;
 
-  // Initialize Shiki highlighter
+  // Update syntax highlighting when content or category changes
   React.useEffect(() => {
-    let mounted = true;
-
-    async function initHighlighter() {
-      const h = await createHighlighter({
-        themes: CODE_HIGHLIGHT_THEMES.list,
-        langs: ["yaml", "markdown", "json"],
-      });
-      if (mounted) {
-        setHighlighter(h);
-      }
-    }
-
-    initHighlighter();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  // Update syntax highlighting when content or highlighter changes
-  React.useEffect(() => {
-    if (!highlighter || !activeItem) {
+    if (!activeItem) {
       setHighlightedHtml("");
       return;
     }
 
+    let cancelled = false;
     const lang = getLanguage(activeItem.category);
-    try {
-      const html = highlighter.codeToHtml(activeItem.currentContent, {
-        lang,
-        themes: {
-          dark: CODE_HIGHLIGHT_THEMES.dark,
-          light: CODE_HIGHLIGHT_THEMES.light,
-        },
-      });
-      setHighlightedHtml(html);
-    } catch {
-      // Fallback if highlighting fails
-      setHighlightedHtml(`<pre><code>${escapeHtml(activeItem.currentContent)}</code></pre>`);
-    }
-  }, [activeItem?.currentContent, activeItem?.category, highlighter]);
+
+    highlightCode(activeItem.currentContent, lang).then((html) => {
+      if (cancelled) return;
+      setHighlightedHtml(html ?? `<pre><code>${escapeHtml(activeItem.currentContent)}</code></pre>`);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeItem?.currentContent, activeItem?.category]);
 
   const handleSave = async () => {
     if (activeItem) {
@@ -194,13 +168,4 @@ export function ToolboxEditor() {
       )}
     </div>
   );
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }

@@ -39,12 +39,19 @@ function makeOpenFile(overrides: Partial<OpenFile> = {}): OpenFile {
   };
 }
 
+interface TauriNode {
+  name: string;
+  path: string;
+  is_directory: boolean;
+  children?: TauriNode[];
+}
+
 function makeTauriNode(
   name: string,
   path: string,
   isDir: boolean,
-  children?: ReturnType<typeof makeTauriNode>[]
-) {
+  children?: TauriNode[]
+): TauriNode {
   return { name, path, is_directory: isDir, children };
 }
 

@@ -16,7 +16,7 @@ export function TaskCard({ task }: TaskCardProps) {
 
   return (
     <div
-      className="group relative cursor-pointer rounded-md border border-border bg-card p-3 shadow-sm transition-shadow hover:shadow-md"
+      className="group relative cursor-pointer rounded-md border border-border bg-sidebar p-3 shadow-sm transition-shadow hover:shadow-md"
       onClick={() => openTaskModal(task)}
     >
       {/* Content */}

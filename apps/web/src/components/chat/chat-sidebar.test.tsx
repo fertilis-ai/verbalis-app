@@ -133,9 +133,9 @@ describe("ChatSidebar", () => {
   // -------------------------------------------------------------------------
 
   describe("rendering", () => {
-    it("renders the header with 'Chats' label", () => {
+    it("renders the header with 'Chat' label", () => {
       render(<ChatSidebar />);
-      expect(screen.getByText("Chats")).toBeInTheDocument();
+      expect(screen.getByText("Chat")).toBeInTheDocument();
     });
 
     it("renders the 'New folder' button", () => {

@@ -7,7 +7,7 @@ import * as React from "react";
 import { CronBuilder } from "./cron-builder";
 
 describe("CronBuilder", () => {
-  let onChange: ReturnType<typeof vi.fn>;
+  let onChange: (cron: string) => void;
 
   beforeEach(() => {
     onChange = vi.fn();

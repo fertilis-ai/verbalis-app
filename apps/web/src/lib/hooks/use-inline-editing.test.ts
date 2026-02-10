@@ -3,7 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useInlineEditing } from "./use-inline-editing";
 
 describe("useInlineEditing", () => {
-  let onRename: ReturnType<typeof vi.fn>;
+  let onRename: (id: string, name: string, type: string) => Promise<void>;
 
   beforeEach(() => {
     onRename = vi.fn().mockResolvedValue(undefined);
