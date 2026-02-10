@@ -2,7 +2,7 @@
 
 A local-first personal AI assistant that runs as a native desktop app (via Tauri) or in the browser. Sapio keeps your data on-device, learns over time, and acts autonomously on your behalf — with configurable safety guardrails so you stay in control.
 
-Built by [Fertilis](https://github.com/fertilis).
+Built by [Fertilis.ai](https://fertilis.ai).
 
 ![Sapio Settings — Model Discovery](assets/screenshot_settings.png)
 
