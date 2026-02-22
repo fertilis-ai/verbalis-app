@@ -6,6 +6,7 @@ import {
 } from "./evaluator";
 import { DEFAULT_GUARDRAILS_CONFIG } from "./types";
 import type { GuardrailsConfig } from "./types";
+import { ADVANCED_MODE_CONFIG } from "./presets";
 
 // Helper to create a config with overrides
 function makeConfig(overrides: Partial<GuardrailsConfig> = {}): GuardrailsConfig {
@@ -323,6 +324,21 @@ describe("GuardrailsEvaluator", () => {
       // delete_path is file_system + high risk
       const result = evaluator.evaluate("delete_path", { path: "/tmp/ok.txt" });
       expect(result.requiresConfirmation).toBe(true);
+    });
+
+    it("advanced preset allows write_file without confirmation and requires it for delete_path", () => {
+      const advancedEvaluator = new GuardrailsEvaluator(ADVANCED_MODE_CONFIG);
+
+      const writeResult = advancedEvaluator.evaluate("write_file", {
+        path: "/tmp/new-file.txt",
+        content: "hello",
+      });
+      expect(writeResult.allowed).toBe(true);
+      expect(writeResult.requiresConfirmation).toBe(false);
+
+      const deleteResult = advancedEvaluator.evaluate("delete_path", { path: "/tmp/new-file.txt" });
+      expect(deleteResult.allowed).toBe(true);
+      expect(deleteResult.requiresConfirmation).toBe(true);
     });
 
     it("should not require confirmation for low risk memory tool", () => {

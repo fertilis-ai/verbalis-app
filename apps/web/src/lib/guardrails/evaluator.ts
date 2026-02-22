@@ -363,11 +363,28 @@ export class GuardrailsEvaluator {
   // Helper Methods
   // ============================================================================
 
+  private getRuntimePlatform(): string {
+    const proc = (globalThis as { process?: { platform?: unknown } }).process;
+    if (proc && typeof proc.platform === "string") {
+      return proc.platform;
+    }
+
+    if (typeof navigator !== "undefined" && typeof navigator.platform === "string") {
+      const platform = navigator.platform.toLowerCase();
+      if (platform.includes("mac")) return "darwin";
+      if (platform.includes("win")) return "win32";
+      if (platform.includes("linux")) return "linux";
+    }
+
+    return "";
+  }
+
   private matchGlob(value: string, pattern: string): boolean {
+    const platform = this.getRuntimePlatform();
     return minimatch(value, pattern, {
       matchBase: true,
       dot: true,
-      nocase: process.platform === "darwin" || process.platform === "win32",
+      nocase: platform === "darwin" || platform === "win32",
     });
   }
 

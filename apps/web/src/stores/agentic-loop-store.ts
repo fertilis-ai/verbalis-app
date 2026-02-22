@@ -317,6 +317,10 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
       case "tool_confirmed":
         if (isCurrentLoop) {
           set((state) => ({
+            currentStatus:
+              state.pendingToolCalls.length <= 1 && state.currentStatus === "tool_pending"
+                ? "thinking"
+                : state.currentStatus,
             pendingToolCalls: state.pendingToolCalls.filter(
               tc => tc.id !== event.toolCallId
             ),
@@ -327,6 +331,10 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
       case "tool_rejected":
         if (isCurrentLoop) {
           set((state) => ({
+            currentStatus:
+              state.pendingToolCalls.length <= 1 && state.currentStatus === "tool_pending"
+                ? "thinking"
+                : state.currentStatus,
             pendingToolCalls: state.pendingToolCalls.filter(
               tc => tc.id !== event.toolCallId
             ),
@@ -364,6 +372,14 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
         }
         break;
 
+      case "tool_cancelled":
+        // Notify external listeners (chat-store)
+        notifyToolStateChange(conversationId, event.toolCall);
+        if (isCurrentLoop) {
+          set({ currentStatus: "thinking" });
+        }
+        break;
+
       case "loop_paused":
         if (isCurrentLoop) {
           set({ currentStatus: "paused" });
@@ -384,6 +400,8 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
             pendingToolCalls: [],
           });
         }
+        // Clean up any tool calls still stuck in pending/executing state
+        useChatStore.getState().markToolCallsStopped(conversationId);
         break;
 
       case "loop_error":

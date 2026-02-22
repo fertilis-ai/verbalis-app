@@ -11,6 +11,7 @@ import {
   type ToolCallState,
   type ToolCallStatus,
   getToolsForContext,
+  normalizeToolCallStatus,
 } from "@/lib/tools";
 import { stripProtocolMarkers } from "@/lib/protocol-parser";
 import { messagesToPiMessages } from "@/lib/message-conversion";
@@ -646,6 +647,7 @@ export const useChatStore = create<ChatState>((set, get) => {
             case "tool_executing":
             case "tool_completed":
             case "tool_failed":
+            case "tool_cancelled":
               syncToolCallToConversation(event.toolCall);
               break;
             case "loop_error":
@@ -919,15 +921,20 @@ export const useChatStore = create<ChatState>((set, get) => {
             content: stripProtocolMarkers(m.content),
             createdAt: new Date(m.createdAt),
             ...(m.toolCalls?.length ? {
-              toolCalls: m.toolCalls.map((tc) => ({
-                ...tc,
-                status: (tc.status === "pending" || tc.status === "executing")
-                  ? "error" as ToolCallStatus
-                  : tc.status as ToolCallStatus,
-                error: (tc.status === "pending" || tc.status === "executing")
-                  ? (tc.error || "Interrupted — app closed during execution")
-                  : tc.error,
-              })),
+              toolCalls: m.toolCalls.map((tc) => {
+                const normalizedStatus = normalizeToolCallStatus(tc.status);
+                const wasInFlight =
+                  normalizedStatus === "pending" ||
+                  normalizedStatus === "pending_confirmation" ||
+                  normalizedStatus === "executing";
+                return {
+                  ...tc,
+                  status: wasInFlight ? "error" as ToolCallStatus : normalizedStatus,
+                  error: wasInFlight
+                    ? (tc.error || "Interrupted — app closed during execution")
+                    : tc.error,
+                };
+              }),
             } : {}),
           })),
           createdAt: new Date(loaded.createdAt),
@@ -1221,6 +1228,42 @@ export const useChatStore = create<ChatState>((set, get) => {
 
     // Delegate to the loop store
     useAgenticLoopStore.getState().rejectTool(conversationId, toolCallId, "Rejected by user");
+
+    // Immediately reflect rejection in chat history to avoid stale pending UI.
+    const state = get();
+    const isGhost = state.isGhostMode && state.ghostConversation?.id === conversationId;
+
+    const updateFn = (c: Conversation): Conversation => {
+      let changed = false;
+      const messages = c.messages.map((m) => {
+        if (!m.toolCalls) return m;
+        const updatedToolCalls = m.toolCalls.map((tc) => {
+          if (tc.id !== toolCallId) return tc;
+          changed = true;
+          return {
+            ...tc,
+            status: "cancelled" as const,
+            error: "Rejected by user",
+            completedAt: tc.completedAt ?? new Date(),
+          };
+        });
+        return changed ? { ...m, toolCalls: updatedToolCalls } : m;
+      });
+      return changed ? { ...c, messages, updatedAt: new Date() } : c;
+    };
+
+    if (isGhost) {
+      set((s) => {
+        if (!s.ghostConversation) return s;
+        return { ghostConversation: updateFn(s.ghostConversation) };
+      });
+    } else {
+      set((s) => ({
+        conversations: s.conversations.map((c) =>
+          c.id === conversationId ? updateFn(c) : c
+        ),
+      }));
+    }
   },
 
   markToolCallsStopped: (conversationId: string) => {
@@ -1232,7 +1275,11 @@ export const useChatStore = create<ChatState>((set, get) => {
       const messages = c.messages.map((m) => {
         if (!m.toolCalls) return m;
         const updatedToolCalls = m.toolCalls.map((tc) => {
-          if (tc.status === "pending" || tc.status === "executing") {
+          if (
+            tc.status === "pending" ||
+            tc.status === "pending_confirmation" ||
+            tc.status === "executing"
+          ) {
             changed = true;
             return { ...tc, status: "stopped" as const };
           }
@@ -1291,13 +1338,15 @@ subscribeToToolEvents((conversationId, toolCall) => {
       const updatedToolCalls = [...m.toolCalls];
       updatedToolCalls[tcIndex] = {
         ...updatedToolCalls[tcIndex],
-        status: toolCall.status,
+        status: normalizeToolCallStatus(toolCall.status),
         result: toolCall.result ?? updatedToolCalls[tcIndex].result,
         error: toolCall.error ?? updatedToolCalls[tcIndex].error,
         startedAt: toolCall.startedAt ?? updatedToolCalls[tcIndex].startedAt,
         completedAt: toolCall.completedAt ?? updatedToolCalls[tcIndex].completedAt,
         durationMs: toolCall.durationMs ?? updatedToolCalls[tcIndex].durationMs,
         undoAvailable: toolCall.undoAvailable ?? updatedToolCalls[tcIndex].undoAvailable,
+        guardrailReason: toolCall.guardrailReason ?? updatedToolCalls[tcIndex].guardrailReason,
+        guardrailViolations: toolCall.guardrailViolations ?? updatedToolCalls[tcIndex].guardrailViolations,
       };
 
       return { ...m, toolCalls: updatedToolCalls };

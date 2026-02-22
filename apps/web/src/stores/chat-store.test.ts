@@ -19,6 +19,7 @@ const {
   mockIsTauri,
   mockGetAppDataDir,
   mockGetToolsForContext,
+  mockNormalizeToolCallStatus,
   mockStreamSimple,
   mockGetModel,
   mockGetActiveModels,
@@ -44,6 +45,18 @@ const {
   mockIsTauri: vi.fn(() => false),
   mockGetAppDataDir: vi.fn().mockResolvedValue("/mock-data"),
   mockGetToolsForContext: vi.fn().mockReturnValue([]),
+  mockNormalizeToolCallStatus: vi.fn((status: string) => {
+    switch (status) {
+      case "completed":
+        return "success";
+      case "failed":
+        return "error";
+      case "awaiting_approval":
+        return "pending_confirmation";
+      default:
+        return status;
+    }
+  }),
   mockStreamSimple: vi.fn(),
   mockGetModel: vi.fn().mockReturnValue(null),
   mockGetActiveModels: vi.fn().mockReturnValue([]),
@@ -100,6 +113,7 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@/lib/tools", () => ({
   getToolsForContext: mockGetToolsForContext,
+  normalizeToolCallStatus: mockNormalizeToolCallStatus,
 }));
 
 vi.mock("@/lib/protocol-parser", () => ({
@@ -679,6 +693,9 @@ describe("chat-store", () => {
               { id: "tc1", name: "read_file", arguments: {}, status: "pending", result: undefined, error: undefined },
               { id: "tc2", name: "write_file", arguments: {}, status: "executing", result: undefined, error: undefined },
               { id: "tc3", name: "done", arguments: {}, status: "success", result: "ok", error: undefined },
+              { id: "tc4", name: "legacy_done", arguments: {}, status: "completed", result: "legacy ok", error: undefined },
+              { id: "tc5", name: "legacy_fail", arguments: {}, status: "failed", result: undefined, error: "legacy err" },
+              { id: "tc6", name: "awaiting", arguments: {}, status: "awaiting_approval", result: undefined, error: undefined },
             ],
           },
         ],
@@ -691,12 +708,18 @@ describe("chat-store", () => {
 
       const updated = useChatStore.getState().conversations.find((c) => c.id === "c1");
       const toolCalls = updated?.messages[0].toolCalls;
-      expect(toolCalls).toHaveLength(3);
+      expect(toolCalls).toHaveLength(6);
       expect(toolCalls![0].status).toBe("error");
       expect(toolCalls![0].error).toBe("Interrupted — app closed during execution");
       expect(toolCalls![1].status).toBe("error");
       expect(toolCalls![1].error).toBe("Interrupted — app closed during execution");
       expect(toolCalls![2].status).toBe("success");
+      expect(toolCalls![3].status).toBe("success");
+      expect(toolCalls![3].result).toBe("legacy ok");
+      expect(toolCalls![4].status).toBe("error");
+      expect(toolCalls![4].error).toBe("legacy err");
+      expect(toolCalls![5].status).toBe("error");
+      expect(toolCalls![5].error).toBe("Interrupted — app closed during execution");
     });
 
     it("does not call loadChatByPath if conversation has no path", async () => {
@@ -1368,9 +1391,8 @@ describe("chat-store", () => {
 
       useChatStore.getState().markToolCallsStopped("c1");
 
-      // pending_confirmation is NOT "pending" or "executing", so unchanged
       const updated = useChatStore.getState().conversations[0].messages[0];
-      expect(updated.toolCalls![0].status).toBe("pending_confirmation");
+      expect(updated.toolCalls![0].status).toBe("stopped");
     });
 
     it("handles multiple messages in conversation", () => {
@@ -1438,6 +1460,31 @@ describe("chat-store", () => {
       useChatStore.setState({ currentConversationId: "c1" });
       useChatStore.getState().rejectToolExecution("tc-1");
       expect(mockRejectTool).toHaveBeenCalledWith("c1", "tc-1", "Rejected by user");
+    });
+
+    it("marks the rejected tool call as cancelled in conversation state", () => {
+      const conv = makeConversation({
+        id: "c1",
+        messages: [
+          makeMessage({
+            id: "m1",
+            role: "assistant",
+            toolCalls: [
+              { id: "tc-1", name: "write_file", arguments: {}, status: "pending_confirmation" },
+            ],
+          }),
+        ],
+      });
+      useChatStore.setState({
+        conversations: [conv],
+        currentConversationId: "c1",
+      });
+
+      useChatStore.getState().rejectToolExecution("tc-1");
+
+      const updated = useChatStore.getState().conversations[0].messages[0].toolCalls?.[0];
+      expect(updated?.status).toBe("cancelled");
+      expect(updated?.error).toBe("Rejected by user");
     });
 
     it("does nothing when no conversation is selected", () => {

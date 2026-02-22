@@ -109,11 +109,14 @@ function toolCallToState(toolCall: ToolCall): ToolCallState {
 export class SapioAgentAdapter {
   private abortController: AbortController | null = null;
   private pendingToolConfirmations: Map<string, { resolve: () => void; reject: (reason: string) => void }> = new Map();
+  private pendingDispatchToolCalls: Map<string, ToolCallState> = new Map();
+  private handledToolCallIds: Set<string> = new Set();
   private loopContext: LoopContext;
   private config: SapioAdapterConfig | null = null;
   private getMessagesCallback: (() => Message[]) | null = null;
   private isPausedFlag = false;
   private resumeResolver: (() => void) | null = null;
+  private didEmitLoopAborted = false;
 
   constructor(
     private conversationId: string,
@@ -147,6 +150,9 @@ export class SapioAgentAdapter {
 
     this.config = adapterConfig;
     this.abortController = new AbortController();
+    this.didEmitLoopAborted = false;
+    this.pendingDispatchToolCalls.clear();
+    this.handledToolCallIds.clear();
     this.loopContext.status = "thinking";
     this.loopContext.startedAt = new Date();
 
@@ -164,7 +170,10 @@ export class SapioAgentAdapter {
       if (this.abortController?.signal.aborted) {
         this.loopContext.status = "aborted";
         logAgent("ADAPTER", "Adapter aborted by user");
-        this.emit({ type: "loop_aborted" });
+        if (!this.didEmitLoopAborted) {
+          this.emit({ type: "loop_aborted" });
+          this.didEmitLoopAborted = true;
+        }
       } else {
         const errorType = classifyError(error);
         this.loopContext.status = "error";
@@ -208,16 +217,23 @@ export class SapioAgentAdapter {
   }
 
   stop(): void {
-    this.loopContext.status = "completed";
+    this.loopContext.status = "aborted";
     this.abortController?.abort();
     this.rejectAllPendingConfirmations("Loop stopped by user");
+    if (!this.didEmitLoopAborted) {
+      this.emit({ type: "loop_aborted" });
+      this.didEmitLoopAborted = true;
+    }
   }
 
   abort(): void {
     this.loopContext.status = "aborted";
     this.abortController?.abort();
     this.rejectAllPendingConfirmations("Loop aborted by user");
-    this.emit({ type: "loop_aborted" });
+    if (!this.didEmitLoopAborted) {
+      this.emit({ type: "loop_aborted" });
+      this.didEmitLoopAborted = true;
+    }
   }
 
   // ============================================================================
@@ -320,6 +336,7 @@ export class SapioAgentAdapter {
       case "tool_executing":
       case "tool_completed":
       case "tool_failed":
+      case "tool_cancelled":
         return { toolName: event.toolCall.name, toolCallId: event.toolCall.id };
       case "thinking_completed":
         return { contentLength: event.content.length, toolCallCount: event.toolCalls.length };
@@ -409,8 +426,17 @@ export class SapioAgentAdapter {
         );
       }
 
+      // If cancelled mid-iteration, do not emit completion events.
+      if (this.abortController?.signal.aborted) {
+        return this.getMessagesCallback!();
+      }
+
       // Get final result
       const result = await eventStream.result;
+
+      if (this.abortController?.signal.aborted || this.loopContext.status === "aborted") {
+        return this.getMessagesCallback!();
+      }
 
       // Complete iteration
       iteration.status = "completed";
@@ -471,6 +497,24 @@ export class SapioAgentAdapter {
         break;
 
       case "turn_start":
+        if (this.pendingDispatchToolCalls.size > 0) {
+          for (const [, pendingCall] of this.pendingDispatchToolCalls) {
+            const cancelledCall: ToolCallState = {
+              ...pendingCall,
+              status: "cancelled",
+              error: "Tool call was not dispatched for execution by the runtime",
+              completedAt: new Date(),
+            };
+            this.emit({
+              type: "tool_cancelled",
+              toolCall: cancelledCall,
+              reason: cancelledCall.error || "Tool call was not dispatched for execution by the runtime",
+            });
+          }
+          this.pendingDispatchToolCalls.clear();
+          this.abort();
+          break;
+        }
         this.loopContext.status = "thinking";
         this.emit({ type: "thinking_started" });
         break;
@@ -530,6 +574,11 @@ export class SapioAgentAdapter {
         // Extract tool calls from the message if present
         const messageToolCalls = this.extractToolCallsFromMessage(event.message);
         const toolCallStates = messageToolCalls.map(tc => toolCallToState(tc));
+        for (const toolCallState of toolCallStates) {
+          if (!this.handledToolCallIds.has(toolCallState.id)) {
+            this.pendingDispatchToolCalls.set(toolCallState.id, toolCallState);
+          }
+        }
 
         toolCalls.push(...toolCallStates);
         iteration.toolCalls = toolCalls;
@@ -560,10 +609,43 @@ export class SapioAgentAdapter {
         // Progressive tool updates (e.g., long-running operations)
         break;
 
-      case "tool_execution_end":
-        // Tool completion is handled in createWrappedExecute
-        // Statistics are updated there to avoid double-counting
+      case "tool_execution_end": {
+        // Handle tool failures that bypassed createWrappedExecute
+        // (e.g., tool name not found, args validation error in pi-agent-core)
+        const endEvent = event as { toolCallId: string; toolName: string; result: unknown; isError: boolean };
+        if (!this.handledToolCallIds.has(endEvent.toolCallId)) {
+          this.handledToolCallIds.add(endEvent.toolCallId);
+          const resultObj = endEvent.result as { content?: Array<{ text?: string }> } | undefined;
+          const errorMsg = endEvent.isError
+            ? resultObj?.content?.[0]?.text || `Tool ${endEvent.toolName} failed`
+            : undefined;
+          const existing = this.pendingDispatchToolCalls.get(endEvent.toolCallId);
+          const tcState: ToolCallState = {
+            ...(existing || {
+              id: endEvent.toolCallId,
+              name: endEvent.toolName,
+              arguments: {},
+              category: getToolCategory(endEvent.toolName),
+              riskLevel: getToolRiskLevel(endEvent.toolName),
+              queuedAt: new Date(),
+            }),
+            status: endEvent.isError ? "error" : "success",
+            error: errorMsg,
+            completedAt: new Date(),
+          };
+          this.pendingDispatchToolCalls.delete(endEvent.toolCallId);
+          if (endEvent.isError) {
+            logAgent("TOOL", `Tool ${endEvent.toolName} failed (not dispatched to adapter)`, { error: errorMsg });
+            this.emit({ type: "tool_failed", toolCall: tcState, error: errorMsg || "Unknown error" });
+            this.loopContext.failedToolCalls++;
+          } else {
+            this.emit({ type: "tool_completed", toolCall: tcState });
+            this.loopContext.totalToolCalls++;
+            this.loopContext.successfulToolCalls++;
+          }
+        }
         break;
+      }
 
       case "turn_end":
         // Turn complete, may have more turns if tool results need processing
@@ -612,10 +694,14 @@ export class SapioAgentAdapter {
 
   private buildWrappedTools(): AgentTool<TSchema>[] {
     if (!isTauri()) {
-      return []; // No tools in web-only mode
+      logAgent("TOOL", "Skipping tool registration - not in Tauri environment");
+      return [];
     }
 
     const piTools = getToolsForContext();
+    logAgent("TOOL", `Registered ${piTools.length} tools`, {
+      names: piTools.map(t => t.name),
+    });
 
     return piTools.map((tool): AgentTool<TSchema> => ({
       name: tool.name,
@@ -658,144 +744,203 @@ export class SapioAgentAdapter {
         riskLevel: getToolRiskLevel(tool.name),
         queuedAt: new Date(),
       };
+      this.pendingDispatchToolCalls.delete(toolCallId);
+      try {
+        // Evaluate guardrails
+        const evaluation = evaluator.evaluate(tool.name, params as Record<string, unknown>);
+        // Mark handled only after preflight begins successfully.
+        this.handledToolCallIds.add(toolCallId);
 
-      // Evaluate guardrails
-      const evaluation = evaluator.evaluate(tool.name, params as Record<string, unknown>);
-
-      if (!evaluation.allowed) {
-        logAgent("TOOL", `Tool ${tool.name} - blocked by guardrails`, { reason: evaluation.reason });
-        tcState.status = "error";
-        tcState.error = evaluation.reason;
-        tracker.markError(record.id, evaluation.reason);
-        this.loopContext.failedToolCalls++;
-        this.emit({ type: "tool_failed", toolCall: tcState, error: evaluation.reason });
-        return {
-          content: [{ type: "text", text: `Error: ${evaluation.reason}` }],
-          details: { isError: true },
-        };
-      }
-
-      // Handle confirmation requirement
-      if (evaluation.requiresConfirmation) {
-        logAgent("TOOL", `Tool ${tool.name} - pending confirmation`);
-        tcState.status = "pending_confirmation";
-        tcState.guardrailReason = evaluation.reason;
-        tcState.guardrailViolations = evaluation.violations.map(v => ({
-          type: v.type, message: v.message, severity: v.severity,
-        }));
-        tracker.markPendingConfirmation(record.id);
-        this.loopContext.status = "tool_pending";
-        this.emit({ type: "tool_pending", toolCall: tcState });
-
-        try {
-          await this.waitForConfirmation(toolCallId);
-          logAgent("TOOL", `Tool ${tool.name} - confirmed by user`);
-        } catch (rejectReason) {
-          logAgent("TOOL", `Tool ${tool.name} - rejected by user`, { reason: rejectReason });
+        if (!evaluation.allowed) {
+          logAgent("TOOL", `Tool ${tool.name} - blocked by guardrails`, { reason: evaluation.reason });
           tcState.status = "cancelled";
-          tcState.error = typeof rejectReason === "string" ? rejectReason : "Rejected by user";
-          tracker.markCancelled(record.id, tcState.error);
+          tcState.error = evaluation.reason;
+          tcState.guardrailReason = evaluation.reason;
+          tcState.guardrailViolations = evaluation.violations.map(v => ({
+            type: v.type,
+            message: v.message,
+            severity: v.severity,
+          }));
+          tcState.completedAt = new Date();
+          tcState.durationMs = tcState.startedAt
+            ? tcState.completedAt.getTime() - tcState.startedAt.getTime()
+            : undefined;
+          tracker.markCancelled(record.id, evaluation.reason);
           this.loopContext.skippedToolCalls++;
+          this.emit({ type: "tool_cancelled", toolCall: tcState, reason: evaluation.reason });
+
+          // Hard guardrail blocks should terminate the active loop immediately
+          // to prevent repeated retries against blocked policies.
+          this.abort();
+
+          const violationSummary = evaluation.violations.map(v => v.message).join("; ");
           return {
-            content: [{ type: "text", text: `Tool execution rejected: ${tcState.error}` }],
+            content: [{
+              type: "text",
+              text: `Guardrail blocked tool execution: ${evaluation.reason}${violationSummary ? ` (${violationSummary})` : ""}`,
+            }],
             details: { isError: true, cancelled: true },
           };
         }
-      }
 
-      // Prepare undo data if supported
-      let undoOperationId: string | null = null;
-      if (toolSupportsUndo(tool.name)) {
+        // Handle confirmation requirement
+        if (evaluation.requiresConfirmation) {
+          logAgent("TOOL", `Tool ${tool.name} - pending confirmation`);
+          tcState.status = "pending_confirmation";
+          tcState.guardrailReason = evaluation.reason;
+          tcState.guardrailViolations = evaluation.violations.map(v => ({
+            type: v.type, message: v.message, severity: v.severity,
+          }));
+          tracker.markPendingConfirmation(record.id);
+          this.loopContext.status = "tool_pending";
+          this.emit({ type: "tool_pending", toolCall: tcState });
+
+          try {
+            await this.waitForConfirmation(toolCallId);
+            logAgent("TOOL", `Tool ${tool.name} - confirmed by user`);
+          } catch (rejectReason) {
+            logAgent("TOOL", `Tool ${tool.name} - rejected by user`, { reason: rejectReason });
+            tcState.status = "cancelled";
+            tcState.error = typeof rejectReason === "string" ? rejectReason : "Rejected by user";
+            tcState.completedAt = new Date();
+            tcState.durationMs = tcState.startedAt
+              ? tcState.completedAt.getTime() - tcState.startedAt.getTime()
+              : undefined;
+            tracker.markCancelled(record.id, tcState.error);
+            this.loopContext.skippedToolCalls++;
+            this.emit({
+              type: "tool_cancelled",
+              toolCall: tcState,
+              reason: tcState.error,
+            });
+            return {
+              content: [{ type: "text", text: `Tool execution rejected: ${tcState.error}` }],
+              details: { isError: true, cancelled: true },
+            };
+          }
+        }
+
+        // Prepare undo data if supported
+        let undoOperationId: string | null = null;
+        let deleteHandledByUndoPreparation = false;
+        if (toolSupportsUndo(tool.name)) {
+          try {
+            if (tool.name === "write_file") {
+              const undoData = await undoManager.prepareFileWriteUndo((params as { path: string }).path);
+              undoOperationId = await undoManager.registerUndo(toolCallId, "file_write", undoData);
+            } else if (tool.name === "delete_path") {
+              const undoData = await undoManager.prepareFileDeleteUndo((params as { path: string }).path);
+              if (undoData) {
+                undoOperationId = await undoManager.registerUndo(toolCallId, "file_delete", undoData);
+                // prepareFileDeleteUndo moves the file/dir to trash, which already fulfills deletion.
+                deleteHandledByUndoPreparation = true;
+              }
+            } else if (tool.name === "create_directory") {
+              const undoData = await undoManager.prepareDirectoryCreateUndo((params as { path: string }).path);
+              if (undoData) {
+                undoOperationId = await undoManager.registerUndo(toolCallId, "directory_create", undoData);
+              }
+            }
+          } catch (error) {
+            console.warn("[SapioAgentAdapter] Failed to prepare undo:", error);
+          }
+        }
+
+        // Execute tool
+        logAgent("TOOL", `Tool ${tool.name} - executing`, { toolCallId, params });
+        tcState.status = "executing";
+        tcState.startedAt = new Date();
+        tracker.markExecuting(record.id);
+        this.loopContext.status = "tool_executing";
+        this.emit({ type: "tool_executing", toolCall: tcState });
+
         try {
-          if (tool.name === "write_file") {
-            const undoData = await undoManager.prepareFileWriteUndo((params as { path: string }).path);
-            undoOperationId = await undoManager.registerUndo(toolCallId, "file_write", undoData);
-          } else if (tool.name === "delete_path") {
-            const undoData = await undoManager.prepareFileDeleteUndo((params as { path: string }).path);
-            if (undoData) {
-              undoOperationId = await undoManager.registerUndo(toolCallId, "file_delete", undoData);
+          const piToolCall: ToolCall = {
+            type: "toolCall",
+            id: toolCallId,
+            name: tool.name,
+            arguments: params as Record<string, unknown>,
+          };
+
+          const result = deleteHandledByUndoPreparation
+            ? {
+              toolCallId,
+              toolName: tool.name,
+              status: "success" as const,
+              result: `Successfully deleted ${(params as { path: string }).path}`,
             }
-          } else if (tool.name === "create_directory") {
-            const undoData = await undoManager.prepareDirectoryCreateUndo((params as { path: string }).path);
-            if (undoData) {
-              undoOperationId = await undoManager.registerUndo(toolCallId, "directory_create", undoData);
+            : await executeTool(piToolCall);
+
+          tcState.completedAt = new Date();
+          tcState.durationMs = tcState.completedAt.getTime() - tcState.startedAt.getTime();
+
+          if (result.status === "success") {
+            logAgent("TOOL", `Tool ${tool.name} - success`, { durationMs: tcState.durationMs });
+            tcState.status = "success";
+            tcState.result = result.result;
+            tracker.markSuccess(record.id, result.result || "");
+            this.loopContext.successfulToolCalls++;
+
+            if (undoOperationId) {
+              tracker.setUndoAvailable(record.id, undoOperationId);
+              tcState.undoAvailable = true;
             }
+
+            this.emit({ type: "tool_completed", toolCall: tcState });
+
+            // Record for rate limiting
+            evaluator.recordExecution(tool.name, getToolCategory(tool.name));
+            this.loopContext.totalToolCalls++;
+
+            return {
+              content: [{ type: "text", text: result.result || "Success" }],
+              details: { result: result.result },
+            };
+          } else {
+            logAgent("TOOL", `Tool ${tool.name} - error`, { error: result.error });
+            tcState.status = "error";
+            tcState.error = result.error;
+            tracker.markError(record.id, result.error || "Unknown error");
+            this.loopContext.failedToolCalls++;
+            this.emit({ type: "tool_failed", toolCall: tcState, error: result.error || "Unknown error" });
+
+            return {
+              content: [{ type: "text", text: `Error: ${result.error || "Unknown error"}` }],
+              details: { isError: true },
+            };
           }
         } catch (error) {
-          console.warn("[SapioAgentAdapter] Failed to prepare undo:", error);
-        }
-      }
-
-      // Execute tool
-      logAgent("TOOL", `Tool ${tool.name} - executing`, { toolCallId, params });
-      tcState.status = "executing";
-      tcState.startedAt = new Date();
-      tracker.markExecuting(record.id);
-      this.loopContext.status = "tool_executing";
-      this.emit({ type: "tool_executing", toolCall: tcState });
-
-      try {
-        const piToolCall: ToolCall = {
-          type: "toolCall",
-          id: toolCallId,
-          name: tool.name,
-          arguments: params as Record<string, unknown>,
-        };
-
-        const result = await executeTool(piToolCall);
-
-        tcState.completedAt = new Date();
-        tcState.durationMs = tcState.completedAt.getTime() - tcState.startedAt.getTime();
-
-        if (result.status === "success") {
-          logAgent("TOOL", `Tool ${tool.name} - success`, { durationMs: tcState.durationMs });
-          tcState.status = "success";
-          tcState.result = result.result;
-          tracker.markSuccess(record.id, result.result || "");
-          this.loopContext.successfulToolCalls++;
-
-          if (undoOperationId) {
-            tracker.setUndoAvailable(record.id, undoOperationId);
-            tcState.undoAvailable = true;
-          }
-
-          this.emit({ type: "tool_completed", toolCall: tcState });
-
-          // Record for rate limiting
-          evaluator.recordExecution(tool.name, getToolCategory(tool.name));
-          this.loopContext.totalToolCalls++;
-
-          return {
-            content: [{ type: "text", text: result.result || "Success" }],
-            details: { result: result.result },
-          };
-        } else {
-          logAgent("TOOL", `Tool ${tool.name} - error`, { error: result.error });
+          tcState.completedAt = new Date();
+          tcState.durationMs = tcState.startedAt
+            ? tcState.completedAt.getTime() - tcState.startedAt.getTime()
+            : undefined;
           tcState.status = "error";
-          tcState.error = result.error;
-          tracker.markError(record.id, result.error || "Unknown error");
+          tcState.error = error instanceof Error ? error.message : String(error);
+          logAgent("TOOL", `Tool ${tool.name} - exception`, { error: tcState.error });
+          tracker.markError(record.id, tcState.error);
           this.loopContext.failedToolCalls++;
-          this.emit({ type: "tool_failed", toolCall: tcState, error: result.error || "Unknown error" });
+          this.emit({ type: "tool_failed", toolCall: tcState, error: tcState.error });
 
           return {
-            content: [{ type: "text", text: `Error: ${result.error || "Unknown error"}` }],
+            content: [{ type: "text", text: `Error: ${tcState.error}` }],
             details: { isError: true },
           };
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.handledToolCallIds.add(toolCallId);
         tcState.completedAt = new Date();
         tcState.durationMs = tcState.startedAt
           ? tcState.completedAt.getTime() - tcState.startedAt.getTime()
           : undefined;
         tcState.status = "error";
-        tcState.error = error instanceof Error ? error.message : String(error);
-        logAgent("TOOL", `Tool ${tool.name} - exception`, { error: tcState.error });
-        tracker.markError(record.id, tcState.error);
+        tcState.error = errorMessage;
+        logAgent("TOOL", `Tool ${tool.name} - pre-execution exception`, { error: errorMessage });
+        tracker.markError(record.id, errorMessage);
         this.loopContext.failedToolCalls++;
-        this.emit({ type: "tool_failed", toolCall: tcState, error: tcState.error });
-
+        this.emit({ type: "tool_failed", toolCall: tcState, error: errorMessage });
         return {
-          content: [{ type: "text", text: `Error: ${tcState.error}` }],
+          content: [{ type: "text", text: `Error: ${errorMessage}` }],
           details: { isError: true },
         };
       }

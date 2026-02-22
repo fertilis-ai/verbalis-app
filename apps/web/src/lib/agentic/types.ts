@@ -174,6 +174,7 @@ export type AgentLoopEvent =
   | { type: "tool_executing"; toolCall: ToolCallState }
   | { type: "tool_completed"; toolCall: ToolCallState }
   | { type: "tool_failed"; toolCall: ToolCallState; error: string }
+  | { type: "tool_cancelled"; toolCall: ToolCallState; reason: string }
   | { type: "loop_paused" }
   | { type: "loop_resumed" }
   | { type: "loop_completed"; context: LoopContext; reason: StopReason }

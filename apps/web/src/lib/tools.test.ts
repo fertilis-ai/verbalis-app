@@ -50,6 +50,7 @@ import {
   getToolsForContext,
   getToolCategory,
   getToolRiskLevel,
+  normalizeToolCallStatus,
   toolSupportsUndo,
   executeTool,
 } from "./tools";
@@ -159,6 +160,32 @@ describe("tools", () => {
 
     it("returns false for unknown tools", () => {
       expect(toolSupportsUndo("nonexistent_tool")).toBe(false);
+    });
+  });
+
+  describe("normalizeToolCallStatus", () => {
+    it("keeps current status values unchanged", () => {
+      expect(normalizeToolCallStatus("pending")).toBe("pending");
+      expect(normalizeToolCallStatus("pending_confirmation")).toBe("pending_confirmation");
+      expect(normalizeToolCallStatus("executing")).toBe("executing");
+      expect(normalizeToolCallStatus("success")).toBe("success");
+      expect(normalizeToolCallStatus("error")).toBe("error");
+      expect(normalizeToolCallStatus("cancelled")).toBe("cancelled");
+      expect(normalizeToolCallStatus("timeout")).toBe("timeout");
+      expect(normalizeToolCallStatus("stopped")).toBe("stopped");
+    });
+
+    it("maps legacy aliases to current statuses", () => {
+      expect(normalizeToolCallStatus("completed")).toBe("success");
+      expect(normalizeToolCallStatus("failed")).toBe("error");
+      expect(normalizeToolCallStatus("queued")).toBe("pending");
+      expect(normalizeToolCallStatus("awaiting_approval")).toBe("pending_confirmation");
+    });
+
+    it("falls back unknown values to stopped", () => {
+      expect(normalizeToolCallStatus("mystery_status")).toBe("stopped");
+      expect(normalizeToolCallStatus(undefined)).toBe("stopped");
+      expect(normalizeToolCallStatus(null)).toBe("stopped");
     });
   });
 

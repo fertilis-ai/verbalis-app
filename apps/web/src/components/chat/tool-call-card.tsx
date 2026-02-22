@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import type { ToolCallState } from "@/lib/tools";
+import { normalizeToolCallStatus, type ToolCallState } from "@/lib/tools";
 import type { RiskLevel, ToolCategory } from "@/lib/tools/categories";
 import { RISK_LEVEL_CONFIG, CATEGORY_CONFIG } from "@/lib/tools/categories";
 
@@ -167,13 +167,14 @@ export function ToolCallCard({
   showCategory = true,
   compact = false,
 }: ToolCallCardProps) {
+  const normalizedStatus = normalizeToolCallStatus(toolCall.status);
   const [isExpanded, setIsExpanded] = React.useState(
-    toolCall.status === "pending_confirmation"
+    normalizedStatus === "pending_confirmation"
   );
   const [copiedField, setCopiedField] = React.useState<string | null>(null);
 
   const Icon = TOOL_ICONS[toolCall.name] || FileText;
-  const status = STATUS_CONFIG[toolCall.status] || STATUS_CONFIG.pending;
+  const status = STATUS_CONFIG[normalizedStatus] || STATUS_CONFIG.stopped;
   const StatusIcon = status.icon;
 
   const category = toolCall.category || "custom";
@@ -184,10 +185,10 @@ export function ToolCallCard({
 
   // Auto-expand when status changes to pending_confirmation
   React.useEffect(() => {
-    if (toolCall.status === "pending_confirmation") {
+    if (normalizedStatus === "pending_confirmation") {
       setIsExpanded(true);
     }
-  }, [toolCall.status]);
+  }, [normalizedStatus]);
 
   // ============================================================================
   // Helpers
@@ -329,15 +330,41 @@ export function ToolCallCard({
           )}
 
           {/* Guardrail reason */}
-          {toolCall.status === "pending_confirmation" && toolCall.guardrailReason && (
-            <div className="flex items-start gap-2 rounded border border-amber-500/30 bg-amber-500/10 p-2">
-              <ShieldAlert className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+          {toolCall.guardrailReason && (
+            <div
+              className={cn(
+                "flex items-start gap-2 rounded border p-2",
+                normalizedStatus === "pending_confirmation"
+                  ? "border-amber-500/30 bg-amber-500/10"
+                  : "border-red-500/30 bg-red-500/10"
+              )}
+            >
+              <ShieldAlert
+                className={cn(
+                  "h-4 w-4 shrink-0 mt-0.5",
+                  normalizedStatus === "pending_confirmation" ? "text-amber-500" : "text-red-500"
+                )}
+              />
               <div className="space-y-1">
-                <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                <p
+                  className={cn(
+                    "text-xs font-medium",
+                    normalizedStatus === "pending_confirmation"
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-red-600 dark:text-red-400"
+                  )}
+                >
                   {toolCall.guardrailReason}
                 </p>
                 {toolCall.guardrailViolations && toolCall.guardrailViolations.length > 0 && (
-                  <ul className="text-xs text-amber-600/80 dark:text-amber-400/80 space-y-0.5">
+                  <ul
+                    className={cn(
+                      "text-xs space-y-0.5",
+                      normalizedStatus === "pending_confirmation"
+                        ? "text-amber-600/80 dark:text-amber-400/80"
+                        : "text-red-600/80 dark:text-red-400/80"
+                    )}
+                  >
                     {toolCall.guardrailViolations.map((v, i) => (
                       <li key={i} className="flex items-center gap-1">
                         <span className="font-mono text-[10px] uppercase">{v.severity}</span>
@@ -427,7 +454,7 @@ export function ToolCallCard({
           {/* Action buttons */}
           <div className="flex items-center gap-2 pt-1">
             {/* Confirmation buttons */}
-            {toolCall.status === "pending_confirmation" && (
+            {normalizedStatus === "pending_confirmation" && (
               <>
                 <Button
                   size="sm"
@@ -459,7 +486,7 @@ export function ToolCallCard({
             )}
 
             {/* Undo button */}
-            {toolCall.undoAvailable && toolCall.status === "success" && onUndo && (
+            {toolCall.undoAvailable && normalizedStatus === "success" && onUndo && (
               <Button
                 size="sm"
                 variant="outline"

@@ -50,6 +50,34 @@ export interface ToolCallState {
   guardrailViolations?: Array<{ type: string; message: string; severity: string }>;
 }
 
+/**
+ * Normalize persisted/legacy statuses to the current ToolCallStatus union.
+ * Falls back to "stopped" for unknown values to avoid misleading loading spinners.
+ */
+export function normalizeToolCallStatus(status: string | null | undefined): ToolCallStatus {
+  switch (status) {
+    case "pending":
+    case "pending_confirmation":
+    case "executing":
+    case "success":
+    case "error":
+    case "cancelled":
+    case "timeout":
+    case "stopped":
+      return status;
+    case "completed":
+      return "success";
+    case "failed":
+      return "error";
+    case "queued":
+      return "pending";
+    case "awaiting_approval":
+      return "pending_confirmation";
+    default:
+      return "stopped";
+  }
+}
+
 // Define parameter schemas for each tool
 const ReadFileParams = Type.Object({
   path: Type.String({ description: "Path to the file to read" }),

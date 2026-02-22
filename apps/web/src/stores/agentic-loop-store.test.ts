@@ -420,7 +420,7 @@ describe("agentic-loop-store", () => {
 
     it("tool_confirmed removes from pending", () => {
       const tc = makeToolCall({ id: "tc-1" });
-      useAgenticLoopStore.setState({ pendingToolCalls: [tc] });
+      useAgenticLoopStore.setState({ pendingToolCalls: [tc], currentStatus: "tool_pending" });
 
       useAgenticLoopStore.getState().handleLoopEvent("conv-1", {
         type: "tool_confirmed",
@@ -428,11 +428,12 @@ describe("agentic-loop-store", () => {
       });
 
       expect(useAgenticLoopStore.getState().pendingToolCalls).toHaveLength(0);
+      expect(useAgenticLoopStore.getState().currentStatus).toBe("thinking");
     });
 
     it("tool_rejected removes from pending", () => {
       const tc = makeToolCall({ id: "tc-1" });
-      useAgenticLoopStore.setState({ pendingToolCalls: [tc] });
+      useAgenticLoopStore.setState({ pendingToolCalls: [tc], currentStatus: "tool_pending" });
 
       useAgenticLoopStore.getState().handleLoopEvent("conv-1", {
         type: "tool_rejected",
@@ -441,6 +442,7 @@ describe("agentic-loop-store", () => {
       });
 
       expect(useAgenticLoopStore.getState().pendingToolCalls).toHaveLength(0);
+      expect(useAgenticLoopStore.getState().currentStatus).toBe("thinking");
     });
 
     it("tool_executing sets status to tool_executing", () => {
@@ -475,6 +477,17 @@ describe("agentic-loop-store", () => {
       const s = useAgenticLoopStore.getState();
       expect(s.totalToolCalls).toBe(1);
       expect(s.failedToolCalls).toBe(1);
+    });
+
+    it("tool_cancelled sets status back to thinking", () => {
+      const tc = makeToolCall({ id: "tc-1", status: "cancelled" });
+      useAgenticLoopStore.setState({ currentStatus: "tool_pending" });
+      useAgenticLoopStore.getState().handleLoopEvent("conv-1", {
+        type: "tool_cancelled",
+        toolCall: tc,
+        reason: "Rejected by user",
+      });
+      expect(useAgenticLoopStore.getState().currentStatus).toBe("thinking");
     });
 
     it("loop_paused sets status to paused", () => {
@@ -611,6 +624,35 @@ describe("agentic-loop-store", () => {
       const callback = vi.fn();
       const unsub = subscribeToToolEvents(callback);
       expect(typeof unsub).toBe("function");
+      unsub();
+    });
+
+    it("emits pending and cancelled lifecycle updates to subscribers", () => {
+      useAgenticLoopStore.setState({ currentLoopId: "conv-1", currentStatus: "thinking" });
+      const callback = vi.fn();
+      const unsub = subscribeToToolEvents(callback);
+
+      const pendingTool = makeToolCall({ id: "tc-1", status: "pending_confirmation" });
+      const cancelledTool = makeToolCall({ id: "tc-1", status: "cancelled", error: "Rejected by user" });
+
+      useAgenticLoopStore.getState().handleLoopEvent("conv-1", {
+        type: "tool_pending",
+        toolCall: pendingTool,
+      });
+      useAgenticLoopStore.getState().handleLoopEvent("conv-1", {
+        type: "tool_rejected",
+        toolCallId: "tc-1",
+        reason: "Rejected by user",
+      });
+      useAgenticLoopStore.getState().handleLoopEvent("conv-1", {
+        type: "tool_cancelled",
+        toolCall: cancelledTool,
+        reason: "Rejected by user",
+      });
+
+      expect(callback).toHaveBeenCalledWith("conv-1", pendingTool);
+      expect(callback).toHaveBeenCalledWith("conv-1", cancelledTool);
+      expect(useAgenticLoopStore.getState().pendingToolCalls).toHaveLength(0);
       unsub();
     });
   });
