@@ -3,6 +3,7 @@ import { isTauri } from "@/lib/storage";
 import { isLoggingEnabled } from "@/lib/logger";
 import { useChatStore } from "@/stores/chat-store";
 import type { TaskData } from "@/lib/storage";
+import { YOLO_MODE_CONFIG } from "@/lib/guardrails/presets";
 
 async function appendTaskLog(line: string): Promise<void> {
   if (!isLoggingEnabled() || !isTauri()) return;
@@ -44,6 +45,7 @@ export async function executeTask(
       agentId: task.agent,
       allowAutoRename: false,
       setStreaming: false,
+      guardrailsConfig: YOLO_MODE_CONFIG,
     });
 
     await appendTaskLog(`[${new Date().toISOString()}] Completed task "${task.title}" (${task.id})`);

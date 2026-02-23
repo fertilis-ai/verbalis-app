@@ -8,6 +8,7 @@ import {
   type ScheduleData,
   type SchedulerTreeNode,
 } from "@/lib/storage";
+import { YOLO_MODE_CONFIG } from "@/lib/guardrails/presets";
 
 const DEFAULT_TICK_MS = 60_000;
 const DEFAULT_SCHEDULE_TITLE = "Scheduled Run";
@@ -119,6 +120,7 @@ async function executeSchedule(
       agentId: schedule.agentId,
       allowAutoRename: false,
       setStreaming: false,
+      guardrailsConfig: YOLO_MODE_CONFIG,
     });
 
     await appendSchedulerLog(`[${new Date().toISOString()}] Completed schedule "${schedule.name}" (${schedule.id})`);

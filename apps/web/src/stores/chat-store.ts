@@ -20,6 +20,7 @@ import { useAgentStore } from "./agent-store";
 import { useAgenticLoopStore, subscribeToToolEvents } from "./agentic-loop-store";
 import type { AgentLoopEvent } from "@/lib/agentic/types";
 import type { SapioAdapterConfig } from "@/lib/agentic/sapio-agent-adapter";
+import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import { appFetch } from "@/lib/http";
 import { DEFAULT_MODEL_ID, getActiveModels, PROVIDER_API_MAP, PROVIDER_BASE_URL_MAP, type ModelId, type ChatModelId } from "@/lib/models";
 import {
@@ -253,7 +254,7 @@ interface ChatState {
   sendMessageToConversation: (
     conversationId: string,
     content: string,
-    options?: { agentId?: string | null; model?: ModelId; allowAutoRename?: boolean; setStreaming?: boolean }
+    options?: { agentId?: string | null; model?: ModelId; allowAutoRename?: boolean; setStreaming?: boolean; guardrailsConfig?: GuardrailsConfig }
   ) => Promise<void>;
 
   // Actions - folder management
@@ -441,8 +442,9 @@ export const useChatStore = create<ChatState>((set, get) => {
     setStreaming: boolean;
     agentIdOverride?: string | null;
     modelOverride?: ModelId;
+    guardrailsConfigOverride?: GuardrailsConfig;
   }) => {
-    const { conversationId, content, isGhost, allowAutoRename, setStreaming, agentIdOverride, modelOverride } = params;
+    const { conversationId, content, isGhost, allowAutoRename, setStreaming, agentIdOverride, modelOverride, guardrailsConfigOverride } = params;
     const state = get();
     const existingConversation = isGhost
       ? state.ghostConversation
@@ -544,7 +546,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       // guardrails, debug logging, and event flow.
       const runWithAdapter = async (adapterModel: Model<Api>, adapterApiKey: string, adapterIsLocal: boolean) => {
         const loopStore = useAgenticLoopStore.getState();
-        const guardrailsConfig = settings.guardrailsConfig;
+        const guardrailsConfig = guardrailsConfigOverride ?? settings.guardrailsConfig;
 
         // Get or create adapter for this conversation
         let adapter = loopStore.getAdapter(conversationId);
@@ -1023,6 +1025,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       setStreaming: options?.setStreaming ?? false,
       agentIdOverride: options?.agentId,
       modelOverride: options?.model,
+      guardrailsConfigOverride: options?.guardrailsConfig,
     });
   },
 
