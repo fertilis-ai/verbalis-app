@@ -9,6 +9,9 @@ import {
   WebSearchParams,
   ScrapeWebpageParams,
 } from "./tools/web-tools";
+import { resolvePath, type ResolvePathResult } from "./path-resolution";
+import { useSettingsStore } from "@/stores/settings-store";
+import { getAppDataDir } from "@/lib/storage";
 
 // Tool result returned after execution
 export interface ToolResult {
@@ -263,11 +266,70 @@ export function toolSupportsUndo(toolName: string): boolean {
   return TOOL_DEFINITIONS[toolName]?.supportsUndo ?? false;
 }
 
+/** Maps tool names to the argument keys that hold file paths. */
+const TOOL_PATH_PARAMS: Record<string, string[]> = {
+  read_file: ["path"],
+  write_file: ["path"],
+  delete_path: ["path"],
+  create_directory: ["path"],
+  read_directory: ["path"],
+  path_exists: ["path"],
+  list_files: ["dir"],
+  rename_path: ["old_path", "new_path"],
+};
+
+/**
+ * Resolve path arguments for a tool call using the user's Working Directory
+ * and settings directory. Returns the args with resolved paths and a list
+ * of resolutions for logging.
+ */
+async function resolveToolPaths(
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<{ resolved: Record<string, unknown>; resolutions: ResolvePathResult[] }> {
+  const pathKeys = TOOL_PATH_PARAMS[toolName];
+  if (!pathKeys) return { resolved: args, resolutions: [] };
+
+  const settings = useSettingsStore.getState();
+  const settingsDir = await getAppDataDir();
+
+  const resolved = { ...args };
+  const resolutions: ResolvePathResult[] = [];
+
+  for (const key of pathKeys) {
+    const raw = args[key];
+    if (typeof raw !== "string") continue;
+
+    const result = resolvePath(raw, settings.workingDirectory, settingsDir, settings.homeDir);
+    if (result.resolvedPath !== result.originalPath.trim()) {
+      resolutions.push(result);
+    }
+    resolved[key] = result.resolvedPath;
+  }
+
+  return { resolved, resolutions };
+}
+
+/** Append "(resolved from ...)" notes to a result string. */
+function withResolutionNotes(message: string, resolutions: ResolvePathResult[]): string {
+  if (resolutions.length === 0) return message;
+  const notes = resolutions
+    .map((r) => `(resolved "${r.originalPath.trim()}" → "${r.resolvedPath}")`)
+    .join(" ");
+  return `${message} ${notes}`;
+}
+
 // Execute a tool call via Tauri invoke
 export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
-  const { id, name, arguments: args } = toolCall;
+  const { id, name, arguments: rawArgs } = toolCall;
 
   try {
+    // Resolve relative paths before execution
+    const { resolved: args, resolutions } = await resolveToolPaths(
+      name,
+      rawArgs as Record<string, unknown>,
+    );
+
     let result: unknown;
 
     switch (name) {
@@ -282,19 +344,19 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
           path: params.path,
           content: params.content,
         });
-        result = `Successfully wrote to ${params.path}`;
+        result = withResolutionNotes(`Successfully wrote to ${params.path}`, resolutions);
         break;
       }
       case "delete_path": {
         const params = args as Static<typeof DeletePathParams>;
         await invoke("delete_path", { path: params.path });
-        result = `Successfully deleted ${params.path}`;
+        result = withResolutionNotes(`Successfully deleted ${params.path}`, resolutions);
         break;
       }
       case "create_directory": {
         const params = args as Static<typeof CreateDirectoryParams>;
         await invoke("create_directory", { path: params.path });
-        result = `Successfully created directory ${params.path}`;
+        result = withResolutionNotes(`Successfully created directory ${params.path}`, resolutions);
         break;
       }
       case "read_directory": {
@@ -310,7 +372,8 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       case "path_exists": {
         const params = args as Static<typeof PathExistsParams>;
         const exists = await invoke("path_exists", { path: params.path });
-        result = exists ? `Path exists: ${params.path}` : `Path does not exist: ${params.path}`;
+        const msg = exists ? `Path exists: ${params.path}` : `Path does not exist: ${params.path}`;
+        result = withResolutionNotes(msg, resolutions);
         break;
       }
       case "list_files": {
@@ -328,7 +391,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
           oldPath: params.old_path,
           newPath: params.new_path,
         });
-        result = `Successfully renamed ${params.old_path} to ${params.new_path}`;
+        result = withResolutionNotes(`Successfully renamed ${params.old_path} to ${params.new_path}`, resolutions);
         break;
       }
       case "http_fetch":

@@ -541,6 +541,11 @@ export const useChatStore = create<ChatState>((set, get) => {
         systemPrompt = `${baseSystemPrompt}\n\n## File Context\nThe user has attached the following files for reference:\n\n${fileContext}`;
       }
 
+      // Inject Working Directory context
+      if (settings.workingDirectory) {
+        systemPrompt += `\n\n## Working Directory\nThe user's current working directory is: ${settings.workingDirectory}\n- Relative paths in file tools (read_file, write_file, etc.) automatically resolve to this directory.\n- Paths starting with agents/, prompts/, memories/, skills/, workflows/ automatically resolve to the Sapio data directory.`;
+      }
+
       // Helper: run a model through the SapioAgentAdapter (Tauri only)
       // Shared by both local and cloud models for consistent tool execution,
       // guardrails, debug logging, and event flow.
