@@ -531,14 +531,38 @@ export const useChatStore = create<ChatState>((set, get) => {
       const baseSystemPrompt = agent?.systemPrompt ?? "You are a helpful AI assistant.";
       const temperature = agent?.temperature ?? 0.7;
 
+      let systemPrompt = baseSystemPrompt;
+
+      // Load persistent memories from settings directory
+      const settingsDir = settings.settingsDirectory;
+      if (settingsDir) {
+        try {
+          const soulContent = await readFile(`${settingsDir}/memories/SOUL.md`);
+          if (soulContent.trim()) {
+            systemPrompt += `\n\n## Soul\n${soulContent}`;
+          }
+        } catch { /* SOUL.md doesn't exist yet, skip */ }
+
+        try {
+          const userContent = await readFile(`${settingsDir}/memories/USER.md`);
+          if (userContent.trim()) {
+            systemPrompt += `\n\n## User\n${userContent}`;
+          }
+        } catch { /* USER.md doesn't exist yet, skip */ }
+      }
+
+      // Inject current agent context
+      if (agent) {
+        systemPrompt += `\n\n## Current Agent\nName: ${agent.name}\nModel: ${agent.model}\nTemperature: ${agent.temperature}`;
+      }
+
       // Inject file context into system prompt
       const contextFiles = get().contextFiles;
-      let systemPrompt = baseSystemPrompt;
       if (contextFiles.length > 0) {
         const fileContext = contextFiles
           .map((f) => `### ${f.name}\n\`\`\`\n${f.content}\n\`\`\``)
           .join("\n\n");
-        systemPrompt = `${baseSystemPrompt}\n\n## File Context\nThe user has attached the following files for reference:\n\n${fileContext}`;
+        systemPrompt += `\n\n## File Context\nThe user has attached the following files for reference:\n\n${fileContext}`;
       }
 
       // Inject Working Directory context
