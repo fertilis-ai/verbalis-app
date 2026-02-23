@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { getUniqueName } from "@/lib/tree-utils";
 import { useToolboxStore, itemKey as makeItemKey, type ToolboxCategory, type ToolboxItem } from "@/stores/toolbox-store";
 
 const CATEGORIES: { id: ToolboxCategory; label: string; icon: LucideIcon }[] = [
@@ -60,20 +61,6 @@ export function ToolboxSidebar() {
     }
   }, [editingId]);
 
-  // Generate a unique name for a new item (e.g., "Untitled Prompt", "Untitled Prompt 2", etc.)
-  const generateUniqueName = (baseName: string, category: ToolboxCategory) => {
-    const categoryItems = items.filter((i) => i.category === category);
-    const existingNames = new Set(categoryItems.map((i) => i.name));
-
-    if (!existingNames.has(baseName)) return baseName;
-
-    let counter = 2;
-    while (existingNames.has(`${baseName} ${counter}`)) {
-      counter++;
-    }
-    return `${baseName} ${counter}`;
-  };
-
   const handleStartCreate = async (category: ToolboxCategory, singularLabel: string) => {
     // Expand the folder when creating
     if (!expandedFolders.has(category)) {
@@ -82,7 +69,8 @@ export function ToolboxSidebar() {
 
     // Generate default name (e.g., "Untitled Prompt", "Untitled Agent")
     const baseName = `Untitled ${singularLabel}`;
-    const defaultName = generateUniqueName(baseName, category);
+    const existingNames = items.filter((i) => i.category === category).map((i) => i.name);
+    const defaultName = getUniqueName(baseName, existingNames);
 
     // Create item immediately with default name
     await createItem(defaultName, category);

@@ -73,7 +73,7 @@ describe("task-runner", () => {
       expect(mockSendMessageToConversation).toHaveBeenCalledWith(
         "conv-123",
         "Do something useful",
-        { agentId: "default", allowAutoRename: false, setStreaming: false }
+        expect.objectContaining({ agentId: "default", allowAutoRename: false, setStreaming: false })
       );
     });
 

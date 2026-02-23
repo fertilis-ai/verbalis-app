@@ -42,6 +42,8 @@ import {
   type ChatData,
 } from "@/lib/storage";
 import { logAgent } from "@/lib/logger";
+import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
+import { normalizeBaseUrl, buildOpenAiBaseUrl, buildOpenAiUrl } from "@/lib/url-utils";
 
 /** Resolve a model ID to its pi-ai Model object, provider, and API key. */
 function resolveModelObject(
@@ -113,27 +115,7 @@ function resolveModelObject(
   return { modelObj, provider: entry.provider, apiKey };
 }
 
-type LocalProvider = "lmstudio" | "ollama";
-
-function normalizeBaseUrl(input: string): string {
-  return input.trim().replace(/\/+$/, "");
-}
-
-function buildOpenAiBaseUrl(baseUrl: string): string {
-  const trimmed = normalizeBaseUrl(baseUrl);
-  if (trimmed.endsWith("/v1")) {
-    return trimmed;
-  }
-  if (trimmed.includes("/v1/")) {
-    const idx = trimmed.indexOf("/v1/");
-    return trimmed.slice(0, idx + 3);
-  }
-  return `${trimmed}/v1`;
-}
-
-function buildOpenAiUrl(baseUrl: string, path: string): string {
-  return `${buildOpenAiBaseUrl(baseUrl)}${path}`;
-}
+import type { LocalLlmProvider } from "./settings-store";
 
 function buildContextFromConversation(params: {
   conversation: Conversation;
@@ -151,7 +133,7 @@ function buildContextFromConversation(params: {
   };
 }
 
-async function resolveLocalModel(provider: LocalProvider, baseUrl: string, fallback?: string) {
+async function resolveLocalModel(provider: LocalLlmProvider, baseUrl: string, fallback?: string) {
   if (fallback?.trim()) return fallback.trim();
   try {
     const url = buildOpenAiUrl(baseUrl, "/models");
@@ -174,7 +156,7 @@ async function resolveLocalModel(provider: LocalProvider, baseUrl: string, fallb
   }
 }
 
-function buildLocalModel(params: { provider: LocalProvider; baseUrl: string; model: string }): Model<"openai-completions"> {
+function buildLocalModel(params: { provider: LocalLlmProvider; baseUrl: string; model: string }): Model<"openai-completions"> {
   const baseUrl = buildOpenAiBaseUrl(params.baseUrl);
   return {
     id: params.model,
@@ -285,50 +267,16 @@ interface ChatState {
   markToolCallsStopped: (conversationId: string) => void;
 }
 
-// Helper to find a node in the tree
-function findNodeInTree(tree: ChatTreeNode[], id: string): ChatTreeNode | null {
-  for (const node of tree) {
-    if (node.id === id) return node;
-    if (node.children) {
-      const found = findNodeInTree(node.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function getUniqueFolderName(baseName: string, existingNames: string[]): string {
-  if (!existingNames.includes(baseName)) return baseName;
-  let counter = 2;
-  let candidate = `${baseName} ${counter}`;
-  while (existingNames.includes(candidate)) {
-    counter += 1;
-    candidate = `${baseName} ${counter}`;
-  }
-  return candidate;
-}
-
-function getSiblingFolderNames(tree: ChatTreeNode[], parentFolderId?: string): string[] {
-  if (!parentFolderId) {
-    return tree
-      .filter((node) => node.type === "folder")
-      .map((node) => node.name);
-  }
-
-  const parent = findNodeInTree(tree, parentFolderId);
-  if (parent?.type === "folder" && parent.children) {
-    return parent.children
-      .filter((node) => node.type === "folder")
-      .map((node) => node.name);
-  }
-
-  return [];
-}
-
 function deriveConversationTitle(content: string, maxLength = 50): string | null {
   const trimmed = content.trim();
   if (!trimmed) return null;
   return trimmed.slice(0, maxLength);
+}
+
+/** Merge incoming tool calls with existing ones, skipping duplicates by ID. */
+function mergeToolCalls(existing: ToolCallState[], incoming: ToolCallState[]): ToolCallState[] {
+  const existingIds = new Set(existing.map((tc) => tc.id));
+  return [...existing, ...incoming.filter((tc) => !existingIds.has(tc.id))];
 }
 
 /** Update the last assistant message in a messages array with the given partial updates. */
@@ -376,6 +324,17 @@ function conversationToChatData(conv: Conversation, model: string, agentId: stri
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
+  /** Apply an update function to a conversation, handling ghost-vs-regular dispatch. */
+  const applyUpdate = (conversationId: string, updateFn: (c: Conversation) => Conversation) => {
+    const { isGhostMode, ghostConversation } = get();
+    const isGhost = isGhostMode && ghostConversation?.id === conversationId;
+    if (isGhost) {
+      set((s) => s.ghostConversation ? { ghostConversation: updateFn(s.ghostConversation) } : s);
+    } else {
+      set((s) => ({ conversations: s.conversations.map((c) => c.id === conversationId ? updateFn(c) : c) }));
+    }
+  };
+
   const createConversationInternal = async (options: {
     folderId?: string;
     title?: string;
@@ -663,12 +622,7 @@ export const useChatStore = create<ChatState>((set, get) => {
                   ...messages[lastIdx],
                   content: event.content,
                   ...(event.toolCalls.length > 0 ? {
-                    toolCalls: (() => {
-                      const existing = messages[lastIdx].toolCalls ?? [];
-                      const existingIds = new Set(existing.map(tc => tc.id));
-                      const newOnes = event.toolCalls.filter(tc => !existingIds.has(tc.id));
-                      return [...existing, ...newOnes];
-                    })(),
+                    toolCalls: mergeToolCalls(messages[lastIdx].toolCalls ?? [], event.toolCalls),
                   } : {}),
                 };
                 return { ...c, messages, updatedAt: new Date() };
@@ -1100,7 +1054,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   createFolder: async (name: string, parentFolderId?: string) => {
     try {
       const existingNames = getSiblingFolderNames(get().chatTree, parentFolderId);
-      const uniqueName = getUniqueFolderName(name, existingNames);
+      const uniqueName = getUniqueName(name, existingNames);
       let parentPath: string | undefined;
       if (parentFolderId) {
         const folder = findNodeInTree(get().chatTree, parentFolderId);
@@ -1262,10 +1216,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     useAgenticLoopStore.getState().rejectTool(conversationId, toolCallId, "Rejected by user");
 
     // Immediately reflect rejection in chat history to avoid stale pending UI.
-    const state = get();
-    const isGhost = state.isGhostMode && state.ghostConversation?.id === conversationId;
-
-    const updateFn = (c: Conversation): Conversation => {
+    applyUpdate(conversationId, (c) => {
       let changed = false;
       const messages = c.messages.map((m) => {
         if (!m.toolCalls) return m;
@@ -1282,27 +1233,11 @@ export const useChatStore = create<ChatState>((set, get) => {
         return changed ? { ...m, toolCalls: updatedToolCalls } : m;
       });
       return changed ? { ...c, messages, updatedAt: new Date() } : c;
-    };
-
-    if (isGhost) {
-      set((s) => {
-        if (!s.ghostConversation) return s;
-        return { ghostConversation: updateFn(s.ghostConversation) };
-      });
-    } else {
-      set((s) => ({
-        conversations: s.conversations.map((c) =>
-          c.id === conversationId ? updateFn(c) : c
-        ),
-      }));
-    }
+    });
   },
 
   markToolCallsStopped: (conversationId: string) => {
-    const state = get();
-    const isGhost = state.isGhostMode && state.ghostConversation?.id === conversationId;
-
-    const updateFn = (c: Conversation): Conversation => {
+    applyUpdate(conversationId, (c) => {
       let changed = false;
       const messages = c.messages.map((m) => {
         if (!m.toolCalls) return m;
@@ -1320,20 +1255,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         return changed ? { ...m, toolCalls: updatedToolCalls } : m;
       });
       return changed ? { ...c, messages, updatedAt: new Date() } : c;
-    };
-
-    if (isGhost) {
-      set((s) => {
-        if (!s.ghostConversation) return s;
-        return { ghostConversation: updateFn(s.ghostConversation) };
-      });
-    } else {
-      set((s) => ({
-        conversations: s.conversations.map((c) =>
-          c.id === conversationId ? updateFn(c) : c
-        ),
-      }));
-    }
+    });
   },
   };
 });

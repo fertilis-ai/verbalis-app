@@ -17,6 +17,7 @@ import {
 import { runScheduleNow as runScheduleNowByPath } from "@/lib/scheduler-runner";
 import { useChatStore, type Message } from "@/stores/chat-store";
 import { useAgenticLoopStore } from "@/stores/agentic-loop-store";
+import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
 
 export type { ScheduleData, SchedulerTreeNode };
 
@@ -58,46 +59,6 @@ interface SchedulerState {
 
   // Helper to get selected schedule
   getSelectedSchedule: () => ScheduleData | null;
-}
-
-// Helper to find a node in the tree (recursive)
-function findNodeInTree(tree: SchedulerTreeNode[], id: string): SchedulerTreeNode | null {
-  for (const node of tree) {
-    if (node.id === id) return node;
-    if (node.type === "folder" && node.children) {
-      const found = findNodeInTree(node.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function getUniqueFolderName(baseName: string, existingNames: string[]): string {
-  if (!existingNames.includes(baseName)) return baseName;
-  let counter = 2;
-  let candidate = `${baseName} ${counter}`;
-  while (existingNames.includes(candidate)) {
-    counter += 1;
-    candidate = `${baseName} ${counter}`;
-  }
-  return candidate;
-}
-
-function getSiblingFolderNames(tree: SchedulerTreeNode[], parentFolderId?: string): string[] {
-  if (!parentFolderId) {
-    return tree
-      .filter((node) => node.type === "folder")
-      .map((node) => node.name);
-  }
-
-  const parent = findNodeInTree(tree, parentFolderId);
-  if (parent?.type === "folder" && parent.children) {
-    return parent.children
-      .filter((node) => node.type === "folder")
-      .map((node) => node.name);
-  }
-
-  return [];
 }
 
 // Helper to collect all schedule paths from tree
@@ -173,7 +134,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   createFolder: async (name, parentFolderId) => {
     try {
       const existingNames = getSiblingFolderNames(get().schedulerTree, parentFolderId);
-      const uniqueName = getUniqueFolderName(name, existingNames);
+      const uniqueName = getUniqueName(name, existingNames);
       let parentPath: string | undefined;
       if (parentFolderId) {
         const parentNode = findNodeInTree(get().schedulerTree, parentFolderId);
