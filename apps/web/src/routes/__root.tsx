@@ -15,7 +15,7 @@ import { getHueCssOverrides, applyHueOverrides, clearHueOverrides } from "@/lib/
 
 import "../index.css";
 
-export interface RouterAppContext {}
+export type RouterAppContext = {}
 
 export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootComponent,

@@ -1,4 +1,4 @@
-import * as React from "react";
+import type * as React from "react";
 import { ShieldAlert, ShieldCheck, Shield, ShieldX, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

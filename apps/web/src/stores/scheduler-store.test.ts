@@ -46,7 +46,11 @@ vi.mock("cronstrue", () => ({
   },
 }));
 
-const mockCronParse = vi.fn(() => ({
+// Mock implementations declare rest params so the wrappers below can spread
+// into them (a zero-param implementation triggers TS2556 on spread). The
+// wrappers can't be direct references: the hoisted vi.mock factory runs
+// before these consts initialize.
+const mockCronParse = vi.fn((..._args: unknown[]) => ({
   next: () => ({ toISOString: () => "2025-06-01T09:00:00.000Z" }),
 }));
 vi.mock("cron-parser", () => ({
@@ -55,7 +59,7 @@ vi.mock("cron-parser", () => ({
   },
 }));
 
-const mockChatStoreGetState = vi.fn(() => ({ conversations: [] as any[] }));
+const mockChatStoreGetState = vi.fn((..._args: unknown[]) => ({ conversations: [] as any[] }));
 vi.mock("@/stores/chat-store", () => ({
   useChatStore: Object.assign(vi.fn(() => ({})), {
     getState: (...args: unknown[]) => mockChatStoreGetState(...args),

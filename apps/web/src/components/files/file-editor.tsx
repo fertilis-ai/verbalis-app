@@ -64,7 +64,7 @@ export function FileEditor() {
       const end = textarea.selectionEnd;
 
       const newValue =
-        content.substring(0, start) + "  " + content.substring(end);
+        `${content.substring(0, start)}  ${content.substring(end)}`;
 
       if (activeFilePath) {
         updateFileContent(activeFilePath, newValue);

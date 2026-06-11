@@ -7,10 +7,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const source = resolve(root, "packages/pi-sidecar/src/index.mjs");
 
 // Get the target triple for Tauri sidecar naming convention
-const targetTriple = execSync("rustc -vV")
-  .toString()
-  .match(/host: (.+)/)[1]
-  .trim();
+const rustcOutput = execSync("rustc -vV").toString();
+const tripleMatch = rustcOutput.match(/host: (.+)/);
+if (!tripleMatch) {
+  throw new Error(
+    `Failed to detect target triple from \`rustc -vV\` output:\n${rustcOutput}`
+  );
+}
+const targetTriple = tripleMatch[1].trim();
 
 const target = resolve(
   root,

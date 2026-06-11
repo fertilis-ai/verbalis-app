@@ -18,6 +18,22 @@ export function findNodeInTree<T extends TreeNode>(tree: T[], id: string): T | n
   return null;
 }
 
+/** Walk a recursive tree depth-first, collecting the defined results of `visit`. */
+export function collectFromTree<T extends { children?: T[] }, R>(
+  nodes: T[],
+  visit: (node: T) => R | undefined
+): R[] {
+  const results: R[] = [];
+  for (const node of nodes) {
+    const value = visit(node);
+    if (value !== undefined) results.push(value);
+    if (node.children) {
+      results.push(...collectFromTree(node.children, visit));
+    }
+  }
+  return results;
+}
+
 /** Return `baseName` if unique, otherwise append " 2", " 3", etc. */
 export function getUniqueName(baseName: string, existingNames: string[]): string {
   if (!existingNames.includes(baseName)) return baseName;

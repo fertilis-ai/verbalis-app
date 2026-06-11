@@ -17,7 +17,6 @@ import {
   executeWebSearch,
   executeScrapeWebpage,
   type HttpResponse,
-  type SearchResult,
 } from "./web-tools";
 import { isTauri } from "@/lib/storage";
 import { invoke } from "@tauri-apps/api/core";

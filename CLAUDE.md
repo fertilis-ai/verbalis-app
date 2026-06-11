@@ -209,8 +209,10 @@ This is a fresh project (initial commit). The foundation is established with mod
 
 ## Notes
 
-- Testing infrastructure not yet configured (add vitest/jest as needed)
-- Desktop app identifier is placeholder: `com.tauri.dev` (change in tauri.conf.json)
+- Tests use Vitest (jsdom): `bun run test` from root (or `bun run test:run` in apps/web). `bun run quick_test` runs a fast subset
+- Lint with Biome (linter-only, formatter disabled): `bun run lint` / `bun run lint:fix` from root
+- CI (.github/workflows/ci.yml) runs lint, check-types, and tests on every push/PR
+- Desktop app identifier is `com.sapio.app` (tauri.conf.json)
 - Dev server runs on port 3001 (configurable in vite.config.ts)
 - Bun is the package manager - do not use npm/yarn/pnpm
 - The `routeTree.gen.ts` file is auto-generated - never edit manually

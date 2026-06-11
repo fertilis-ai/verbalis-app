@@ -43,6 +43,7 @@ import {
 } from "@/lib/storage";
 import { logAgent } from "@/lib/logger";
 import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
+import { toggleInSet } from "@/lib/set-utils";
 import { normalizeBaseUrl, buildOpenAiBaseUrl, buildOpenAiUrl } from "@/lib/url-utils";
 
 /** Resolve a model ID to its pi-ai Model object, provider, and API key. */
@@ -443,7 +444,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     };
 
     // Log user input (truncate for privacy/size)
-    const messagePreview = content.length > 100 ? content.slice(0, 100) + "..." : content;
+    const messagePreview = content.length > 100 ? `${content.slice(0, 100)}...` : content;
     logAgent("USER_INPUT", `Message received: ${messagePreview}`, { conversationId, isGhost });
 
     updateConversation((c) => ({
@@ -495,19 +496,23 @@ export const useChatStore = create<ChatState>((set, get) => {
       // Load persistent memories from settings directory
       const settingsDir = settings.settingsDirectory;
       if (settingsDir) {
-        try {
-          const soulContent = await readFile(`${settingsDir}/memories/SOUL.md`);
-          if (soulContent.trim()) {
-            systemPrompt += `\n\n## Soul\n${soulContent}`;
+        const loadMemoryFile = async (filename: string, heading: string) => {
+          try {
+            const content = await readFile(`${settingsDir}/memories/${filename}`);
+            if (content.trim()) {
+              systemPrompt += `\n\n## ${heading}\n${content}`;
+            }
+          } catch (error) {
+            // Missing file is expected; anything else (permissions, corruption)
+            // silently degrades the system prompt, so surface it.
+            const message = error instanceof Error ? error.message : String(error);
+            if (!/not found|no such file|os error 2/i.test(message)) {
+              console.warn(`[chat-store] Failed to load ${filename}:`, error);
+            }
           }
-        } catch { /* SOUL.md doesn't exist yet, skip */ }
-
-        try {
-          const userContent = await readFile(`${settingsDir}/memories/USER.md`);
-          if (userContent.trim()) {
-            systemPrompt += `\n\n## User\n${userContent}`;
-          }
-        } catch { /* USER.md doesn't exist yet, skip */ }
+        };
+        await loadMemoryFile("SOUL.md", "Soul");
+        await loadMemoryFile("USER.md", "User");
       }
 
       // Inject current agent context
@@ -641,7 +646,7 @@ export const useChatStore = create<ChatState>((set, get) => {
                 return {
                   ...c,
                   messages: updateLastAssistantMessage(c.messages, {
-                    content: lastContent + `\n\nError: ${event.error}`,
+                    content: `${lastContent}\n\nError: ${event.error}`,
                   }),
                   updatedAt: new Date(),
                 };
@@ -872,7 +877,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       ...(isGhostMode && { isGhostMode: false, ghostConversation: null }),
     });
 
-    if (!conversation || !conversation.path) return;
+    if (!conversation?.path) return;
     if (conversation.messages.length > 0) return;
 
     const loaded = await loadChatByPath(conversation.path);
@@ -1094,15 +1099,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   },
 
   toggleFolderExpansion: (folderId: string) => {
-    set((state) => {
-      const newExpanded = new Set(state.expandedFolders);
-      if (newExpanded.has(folderId)) {
-        newExpanded.delete(folderId);
-      } else {
-        newExpanded.add(folderId);
-      }
-      return { expandedFolders: newExpanded };
-    });
+    set((state) => ({ expandedFolders: toggleInSet(state.expandedFolders, folderId) }));
   },
 
   toggleFolderPin: async (folderId: string) => {
@@ -1160,7 +1157,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       try {
         let content = await readFile(filePath);
         if (content.length > MAX_CONTENT_LENGTH) {
-          content = content.slice(0, MAX_CONTENT_LENGTH) + "\n... (truncated)";
+          content = `${content.slice(0, MAX_CONTENT_LENGTH)}\n... (truncated)`;
         }
         const name = filePath.split("/").pop() ?? filePath;
         files.push({ path: filePath, name, content });

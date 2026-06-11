@@ -231,9 +231,7 @@ export class GuardrailsEvaluator {
 
     // Check allowlist if default policy is deny
     if (shellCommands.defaultPolicy === "deny") {
-      const allowed = shellCommands.allowlist.some(pattern =>
-        this.matchCommandPattern(normalizedCommand, pattern)
-      );
+      const allowed = this.isCommandAllowlisted(normalizedCommand, shellCommands.allowlist);
 
       if (!allowed) {
         return {
@@ -246,6 +244,30 @@ export class GuardrailsEvaluator {
     }
 
     return null;
+  }
+
+  /**
+   * A command only counts as allowlisted if it contains no command
+   * substitution and every chained segment independently matches the
+   * allowlist — otherwise `echo hi && <anything>` would ride in on the
+   * `echo *` pattern.
+   */
+  private isCommandAllowlisted(command: string, allowlist: string[]): boolean {
+    if (/\$\(|`/.test(command)) {
+      return false;
+    }
+
+    const segments = command
+      .split(/&&|\|\||[;|\n]/)
+      .map(segment => segment.trim())
+      .filter(Boolean);
+    if (segments.length === 0) {
+      return false;
+    }
+
+    return segments.every(segment =>
+      allowlist.some(pattern => this.matchCommandPattern(segment, pattern))
+    );
   }
 
   // ============================================================================
@@ -396,11 +418,11 @@ export class GuardrailsEvaluator {
 
     if (pattern.endsWith(" *")) {
       const prefix = pattern.slice(0, -2);
-      return command === prefix || command.startsWith(prefix + " ");
+      return command === prefix || command.startsWith(`${prefix} `);
     }
 
     // Exact match
-    return command === pattern || command.startsWith(pattern + " ");
+    return command === pattern || command.startsWith(`${pattern} `);
   }
 
   // ============================================================================

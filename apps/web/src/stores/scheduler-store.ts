@@ -17,7 +17,8 @@ import {
 import { runScheduleNow as runScheduleNowByPath } from "@/lib/scheduler-runner";
 import { useChatStore, type Message } from "@/stores/chat-store";
 import { useAgenticLoopStore } from "@/stores/agentic-loop-store";
-import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
+import { collectFromTree, findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
+import { toggleInSet } from "@/lib/set-utils";
 
 export type { ScheduleData, SchedulerTreeNode };
 
@@ -61,28 +62,11 @@ interface SchedulerState {
   getSelectedSchedule: () => ScheduleData | null;
 }
 
-// Helper to collect all schedule paths from tree
-function collectSchedulePathsFromTree(tree: SchedulerTreeNode[]): string[] {
-  const paths: string[] = [];
-
-  const traverse = (nodes: SchedulerTreeNode[]) => {
-    for (const node of nodes) {
-      if (node.type === "schedule") {
-        paths.push(node.path);
-      }
-      if (node.type === "folder" && node.children) {
-        traverse(node.children);
-      }
-    }
-  };
-
-  traverse(tree);
-  return paths;
-}
-
 // Helper to load full schedule data from disk
 async function loadAllSchedulesFromTree(tree: SchedulerTreeNode[]): Promise<ScheduleData[]> {
-  const paths = collectSchedulePathsFromTree(tree);
+  const paths = collectFromTree(tree, (node) =>
+    node.type === "schedule" ? node.path : undefined
+  );
   const schedules: ScheduleData[] = [];
 
   for (const path of paths) {
@@ -172,14 +156,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   },
 
   toggleFolderExpansion: (folderId) => {
-    const { expandedFolders } = get();
-    const newExpanded = new Set(expandedFolders);
-    if (newExpanded.has(folderId)) {
-      newExpanded.delete(folderId);
-    } else {
-      newExpanded.add(folderId);
-    }
-    set({ expandedFolders: newExpanded });
+    set({ expandedFolders: toggleInSet(get().expandedFolders, folderId) });
   },
 
   createSchedule: async (name, folderId) => {
@@ -226,7 +203,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   updateSchedule: async (scheduleId, updates) => {
     // Find the schedule in tree to get its path
     const node = findNodeInTree(get().schedulerTree, scheduleId);
-    if (!node || node.type !== "schedule") return;
+    if (node?.type !== "schedule") return;
 
     // Load full schedule data from disk
     const schedule = await loadSchedule(node.path);
@@ -272,7 +249,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   deleteSchedule: async (scheduleId) => {
     const { selectedScheduleId } = get();
     const node = findNodeInTree(get().schedulerTree, scheduleId);
-    if (!node || node.type !== "schedule") return;
+    if (node?.type !== "schedule") return;
 
     await deleteScheduleByPath(node.path);
 
@@ -297,7 +274,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     if (get().runningScheduleId) return;
 
     const node = findNodeInTree(get().schedulerTree, scheduleId);
-    if (!node || node.type !== "schedule") return;
+    if (node?.type !== "schedule") return;
 
     set({
       runningScheduleId: scheduleId,

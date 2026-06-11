@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
-import * as React from "react";
 
 // jsdom does not implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();

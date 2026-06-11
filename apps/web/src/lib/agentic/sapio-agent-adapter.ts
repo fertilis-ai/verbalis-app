@@ -20,12 +20,12 @@ import {
   type AgentToolResult,
   type AgentToolUpdateCallback,
 } from "@mariozechner/pi-agent-core";
-import {
-  type Message as PiMessage,
-  type Model,
-  type Api,
-  type Tool,
-  type ToolCall,
+import type {
+  Message as PiMessage,
+  Model,
+  Api,
+  Tool,
+  ToolCall,
 } from "@mariozechner/pi-ai";
 import type { Static, TSchema } from "@sinclair/typebox";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
@@ -38,22 +38,18 @@ import {
   getToolRiskLevel,
   getToolsForContext,
   toolSupportsUndo,
-  TOOL_DEFINITIONS,
   type ToolCallState,
-  type ToolCallStatus,
 } from "@/lib/tools";
 import type { Message } from "@/stores/chat-store";
-import { buildEmptyUsage, messagesToPiMessages } from "@/lib/message-conversion";
+import { messagesToPiMessages } from "@/lib/message-conversion";
 import type {
   AgentLoopEvent,
-  AgentLoopStatus,
   LoopIteration,
   LoopContext,
   StopReason,
   AgentLoopConfig as SapioLoopConfig,
 } from "./types";
 import {
-  DEFAULT_LOOP_CONFIG,
   createInitialLoopContext,
   classifyError,
   ERROR_STRATEGIES,

@@ -4,10 +4,6 @@ import {
   DEFAULT_GUARDRAILS_CONFIG,
 } from "./types";
 import type {
-  RateLimitState,
-  GuardrailsConfig,
-  CategoryConfirmationMatrix,
-  RestrictionConfig,
   ViolationType,
   UndoOperationType,
 } from "./types";

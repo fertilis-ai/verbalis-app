@@ -44,7 +44,7 @@ describe("SYSTEM_TOOL_DEFINITIONS", () => {
     const def = SYSTEM_TOOL_DEFINITIONS.clipboard_read;
     expect(def.name).toBe("clipboard_read");
     expect(def.category).toBe("system");
-    expect(def.riskLevel).toBe("low");
+    expect(def.riskLevel).toBe("medium");
     expect(def.supportsUndo).toBe(false);
   });
 
@@ -114,7 +114,6 @@ describe("executeShell", () => {
       command: "echo hello",
       cwd: "/tmp",
       timeoutMs: 30000,
-      sandbox: false,
     });
     expect(result).toContain("Exit code: 0");
     expect(result).toContain("Duration: 50ms");
@@ -138,7 +137,6 @@ describe("executeShell", () => {
       command: "ls",
       cwd: null,
       timeoutMs: 60000,
-      sandbox: false,
     });
   });
 
@@ -320,10 +318,10 @@ describe("executeNotificationSend", () => {
     });
 
     expect(mockInvoke).toHaveBeenCalledWith("send_notification", {
-      title: "Hello",
+      title: "[Sapio] Hello",
       body: "World",
     });
-    expect(result).toBe('Notification sent: "Hello"');
+    expect(result).toBe('Notification sent: "[Sapio] Hello"');
   });
 
   it("throws when Notification API is not supported in browser", async () => {
@@ -381,10 +379,10 @@ describe("executeNotificationSend", () => {
     });
 
     expect(Notification.requestPermission).toHaveBeenCalled();
-    expect(constructorSpy).toHaveBeenCalledWith("Alert", {
+    expect(constructorSpy).toHaveBeenCalledWith("[Sapio] Alert", {
       body: "Something happened",
     });
-    expect(result).toBe('Notification sent: "Alert"');
+    expect(result).toBe('Notification sent: "[Sapio] Alert"');
   });
 
   it("throws when permission request is rejected", async () => {
@@ -428,10 +426,10 @@ describe("executeNotificationSend", () => {
       body: "Details here",
     });
 
-    expect(constructorSpy).toHaveBeenCalledWith("Info", {
+    expect(constructorSpy).toHaveBeenCalledWith("[Sapio] Info", {
       body: "Details here",
     });
-    expect(result).toBe('Notification sent: "Info"');
+    expect(result).toBe('Notification sent: "[Sapio] Info"');
   });
 });
 
@@ -482,7 +480,7 @@ describe("executeSystemTool", () => {
       title: "Hi",
       body: "There",
     });
-    expect(result).toContain('Notification sent: "Hi"');
+    expect(result).toContain('Notification sent: "[Sapio] Hi"');
   });
 
   it("throws for unknown tool names", async () => {

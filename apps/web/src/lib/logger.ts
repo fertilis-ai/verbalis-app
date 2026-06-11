@@ -47,7 +47,7 @@ function formatLogEntry(category: LogCategory, message: string, data?: unknown):
     try {
       const dataStr = typeof data === "string" ? data : JSON.stringify(data, null, 2);
       // Truncate very long data
-      const truncated = dataStr.length > 1000 ? dataStr.slice(0, 1000) + "... (truncated)" : dataStr;
+      const truncated = dataStr.length > 1000 ? `${dataStr.slice(0, 1000)}... (truncated)` : dataStr;
       entry += `\n  Data: ${truncated}`;
     } catch {
       entry += `\n  Data: [unable to serialize]`;

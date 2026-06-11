@@ -210,7 +210,7 @@ export function ToolCallCard({
       // Show just the filename or last path component
       const parts = path.split("/");
       const summary = parts[parts.length - 1] || path;
-      return summary.length > 40 ? summary.slice(0, 40) + "..." : summary;
+      return summary.length > 40 ? `${summary.slice(0, 40)}...` : summary;
     }
     return "";
   };

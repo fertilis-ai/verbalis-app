@@ -148,7 +148,7 @@ export function ToolboxEditor() {
                   const start = textarea.selectionStart;
                   const end = textarea.selectionEnd;
                   const newValue =
-                    content.substring(0, start) + "  " + content.substring(end);
+                    `${content.substring(0, start)}  ${content.substring(end)}`;
                   if (activeItem) {
                     updateOpenItemContent(activeItem.category, activeItem.name, newValue);
                   }

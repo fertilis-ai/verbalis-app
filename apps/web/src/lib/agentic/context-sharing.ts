@@ -1,4 +1,4 @@
-import type { ToolExecutionRecord } from "@/lib/tools/execution-tracker";
+
 import { getExecutionTracker } from "@/lib/tools/execution-tracker";
 
 // ============================================================================
@@ -179,7 +179,7 @@ class SharedContextManager {
 
     const result = lines.join("\n");
     if (result.length > maxChars) {
-      return result.slice(0, maxChars) + "\n... (truncated)";
+      return `${result.slice(0, maxChars)}\n... (truncated)`;
     }
     return result;
   }
@@ -299,7 +299,7 @@ export function syncContextFromTracker() {
         // Parse exit code from result
         const exitCodeMatch = record.result.match(/Exit code: (\d+|-?\d+|N\/A)/);
         const exitCode = exitCodeMatch && exitCodeMatch[1] !== "N/A"
-          ? parseInt(exitCodeMatch[1])
+          ? parseInt(exitCodeMatch[1], 10)
           : null;
 
         manager.recordShellOutput({

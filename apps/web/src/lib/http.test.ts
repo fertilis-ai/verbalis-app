@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { appFetch, initFetchPolyfill } from "./http";
+import { setLoggingEnabled } from "./logger";
 
 const mockIsTauri = vi.fn(() => false);
 const mockTauriFetch = vi.fn();
@@ -96,6 +97,7 @@ describe("initFetchPolyfill", () => {
   afterEach(() => {
     // Restore fetch to avoid leaking between tests
     globalThis.fetch = savedFetch;
+    setLoggingEnabled(false);
   });
 
   it("does nothing when not in Tauri", async () => {
@@ -176,7 +178,8 @@ describe("initFetchPolyfill", () => {
       expect(mockTauriFetch).toHaveBeenCalled();
     });
 
-    it("logs POST request bodies via invoke", async () => {
+    it("logs POST request bodies via invoke when debug logging is enabled", async () => {
+      setLoggingEnabled(true);
       mockInvoke.mockResolvedValue(undefined);
 
       await globalThis.fetch("https://api.openai.com/v1/chat", {
@@ -191,6 +194,7 @@ describe("initFetchPolyfill", () => {
     });
 
     it("logs POST body when method is not specified (defaults to POST for body)", async () => {
+      setLoggingEnabled(true);
       mockInvoke.mockResolvedValue(undefined);
 
       await globalThis.fetch("https://api.openai.com/v1/chat", {
@@ -200,6 +204,18 @@ describe("initFetchPolyfill", () => {
       expect(mockInvoke).toHaveBeenCalledWith(
         "write_log_file",
         expect.objectContaining({ filename: "api_request.txt" })
+      );
+    });
+
+    it("does not log POST bodies when debug logging is disabled (default)", async () => {
+      await globalThis.fetch("https://api.openai.com/v1/chat", {
+        method: "POST",
+        body: JSON.stringify({ model: "gpt-4" }),
+      });
+
+      expect(mockInvoke).not.toHaveBeenCalledWith(
+        "write_log_file",
+        expect.anything()
       );
     });
 
@@ -213,6 +229,7 @@ describe("initFetchPolyfill", () => {
     });
 
     it("handles non-JSON body for logging gracefully", async () => {
+      setLoggingEnabled(true);
       mockInvoke.mockResolvedValue(undefined);
 
       await globalThis.fetch("https://api.openai.com/v1/chat", {

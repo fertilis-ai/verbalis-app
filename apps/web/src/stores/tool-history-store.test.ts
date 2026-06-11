@@ -48,7 +48,7 @@ import {
   selectRecentRecords,
   selectRecordsWithUndo,
 } from "./tool-history-store";
-import type { ToolHistoryFilters, SortField } from "./tool-history-store";
+import type { ToolHistoryFilters, } from "./tool-history-store";
 import type { ToolExecutionRecord } from "@/lib/tools/execution-tracker";
 
 function getState() {

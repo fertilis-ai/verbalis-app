@@ -7,7 +7,7 @@ const mockExecuteTool = vi.fn();
 const mockIsTauri = vi.fn(() => true);
 const mockGetToolsForContext = vi.fn();
 const mockEvaluate = vi.fn();
-const mockToolSupportsUndo = vi.fn(() => false);
+const mockToolSupportsUndo = vi.fn((_toolName: string) => false);
 const mockPrepareFileWriteUndo = vi.fn();
 const mockPrepareFileDeleteUndo = vi.fn();
 const mockPrepareDirectoryCreateUndo = vi.fn();
@@ -68,7 +68,7 @@ vi.mock("@/lib/tools", () => ({
   getToolCategory: () => "file_system",
   getToolRiskLevel: () => "medium",
   getToolsForContext: (...args: unknown[]) => mockGetToolsForContext(...args),
-  toolSupportsUndo: (...args: unknown[]) => mockToolSupportsUndo(...args),
+  toolSupportsUndo: (...args: any[]) => mockToolSupportsUndo(args[0]),
   TOOL_DEFINITIONS: {},
 }));
 

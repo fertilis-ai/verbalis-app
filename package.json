@@ -18,6 +18,10 @@
     "build": "turbo build",
     "build:sidecar": "node packages/pi-sidecar/scripts/build-sidecar.mjs",
     "check-types": "turbo check-types",
+    "test": "turbo test:run",
+    "test:watch": "turbo test",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
     "dev:native": "turbo -F native dev",
     "dev:web": "turbo -F web dev",
     "quick_test": "bun run scripts/quick-test.ts"
@@ -28,6 +32,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
     "@sapio-app/config": "workspace:*",
     "turbo": "^2.6.3",
     "typescript": "catalog:"

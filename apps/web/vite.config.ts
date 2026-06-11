@@ -10,6 +10,13 @@ import { defineConfig } from "vite";
 // AND the output loads in a browser/webview (no unresolvable bare specifiers).
 // Uses Rollup's syntheticNamedExports so `import { Readable } from "stream"`
 // resolves to a no-op function via the Proxy default export.
+//
+// Why not alternatives: `rollupOptions.external` leaves bare specifiers like
+// `from"stream"` in the output, which can't resolve in a webview (blank
+// screen in the Tauri app); `vite-plugin-node-polyfills` fails on CommonJS
+// subpath resolution (e.g. `fs/promises`). The deps that pull these in
+// (pi-ai/pi-agent-core) only touch Node builtins on code paths the webview
+// never executes — each stubbed property warns at runtime if actually called.
 function nodeStubsPlugin(): Plugin {
   // Modules with real npm polyfills installed — let Vite resolve them normally
   const exclude = new Set(["buffer"]);
@@ -31,11 +38,26 @@ function nodeStubsPlugin(): Plugin {
     },
     load(id) {
       if (id.startsWith("\0node-stub:")) {
+        const moduleName = JSON.stringify(id.slice("\0node-stub:".length));
         return {
           code: [
+            `const moduleName = ${moduleName};`,
             "function noop() {}",
+            // Warn when a stubbed API is actually *called* (not merely
+            // imported), so real Node usage in the webview surfaces instead
+            // of failing silently.
+            "const warners = new Map();",
+            "function warner(prop) {",
+            "  if (!warners.has(prop)) {",
+            "    warners.set(prop, function stub() {",
+            "      console.warn(`[node-stub] ${moduleName}.${String(prop)}() called in webview — this is a no-op`);",
+            "      return noop;",
+            "    });",
+            "  }",
+            "  return warners.get(prop);",
+            "}",
             "const handler = {",
-            "  get(_, p) { return typeof p === 'symbol' ? undefined : noop; },",
+            "  get(_, p) { return typeof p === 'symbol' ? undefined : warner(p); },",
             "  apply() { return noop; },",
             "  construct() { return {}; },",
             "};",

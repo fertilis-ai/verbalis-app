@@ -106,7 +106,7 @@ async function fetchGoogle(apiKey: string): Promise<FetchModelsResult> {
 async function fetchOpenRouter(apiKey?: string): Promise<FetchModelsResult> {
   try {
     const headers: Record<string, string> = {};
-    if (apiKey?.trim()) headers["Authorization"] = `Bearer ${apiKey.trim()}`;
+    if (apiKey?.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
     const resp = await appFetch("https://openrouter.ai/api/v1/models", { headers });
     if (!resp.ok) return { provider: "openrouter", models: [], error: await readErrorBody(resp) };
     const data = (await resp.json()) as { data?: Array<{ id: string; name?: string }> };

@@ -15,7 +15,7 @@ vi.mock("@/lib/storage", () => ({
 
 // Mock uuid
 vi.mock("uuid", () => ({
-  v4: vi.fn(() => "test-uuid-" + Math.random().toString(36).slice(2, 8)),
+  v4: vi.fn(() => `test-uuid-${Math.random().toString(36).slice(2, 8)}`),
 }));
 
 import { invoke } from "@tauri-apps/api/core";

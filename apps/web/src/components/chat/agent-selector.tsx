@@ -1,4 +1,4 @@
-import * as React from "react";
+
 import { Bot, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {

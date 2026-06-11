@@ -1,9 +1,6 @@
 import * as React from "react";
 import {
   Shield,
-  ShieldAlert,
-  ShieldCheck,
-  ShieldX,
   ChevronDown,
   ChevronRight,
   Download,
@@ -16,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
-import type { GuardrailsConfig, CategoryConfirmationMatrix } from "@/lib/guardrails/types";
+import type { CategoryConfirmationMatrix } from "@/lib/guardrails/types";
 import type { ToolCategory } from "@/lib/tools/categories";
 import { CATEGORY_CONFIG, RISK_LEVEL_CONFIG } from "@/lib/tools/categories";
 import { PRESET_LABELS, type UserModePreset, detectPreset } from "@/lib/guardrails/presets";
@@ -455,7 +452,7 @@ export function GuardrailsSection() {
                     setGuardrailsConfig({
                       rateLimits: {
                         ...guardrailsConfig.rateLimits,
-                        [key]: parseInt(e.target.value) || fallback,
+                        [key]: parseInt(e.target.value, 10) || fallback,
                       },
                     })
                   }

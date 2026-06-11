@@ -189,7 +189,7 @@ export const useToolHistoryStore = create<ToolHistoryState>()(
       getFilteredRecords: () => {
         const { records, filters, sorting } = get();
 
-        let filtered = records.filter((record) => {
+        const filtered = records.filter((record) => {
           // Status filter
           if (filters.status !== "all" && record.status !== filters.status) {
             return false;
@@ -292,7 +292,7 @@ export const useToolHistoryStore = create<ToolHistoryState>()(
 
         for (const recordId of recordIds) {
           const record = records.find((r) => r.id === recordId);
-          if (!record || !record.undoAvailable || !record.undoOperationId) {
+          if (!record?.undoAvailable || !record.undoOperationId) {
             failed++;
             continue;
           }

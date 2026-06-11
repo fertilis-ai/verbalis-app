@@ -37,7 +37,7 @@ const COMPLETE_BLOCK_WITH_CONSTRAIN_REGEX =
 
 // Check if text ends with an incomplete block (for streaming)
 const INCOMPLETE_BLOCK_PATTERNS = [
-  /<\|channel\|>[^]*$/,  // Started but not complete
+  /<\|channel\|>[\s\S]*$/,  // Started but not complete
   /<\|[^|>]*$/,          // Incomplete marker at end
 ];
 

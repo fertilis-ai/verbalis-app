@@ -74,7 +74,7 @@ describe("getToolRiskLevel", () => {
 
   it("returns correct risk levels for system tools", () => {
     expect(getToolRiskLevel("shell_execute")).toBe("critical");
-    expect(getToolRiskLevel("clipboard_read")).toBe("low");
+    expect(getToolRiskLevel("clipboard_read")).toBe("medium");
     expect(getToolRiskLevel("clipboard_write")).toBe("medium");
     expect(getToolRiskLevel("notification_send")).toBe("low");
   });

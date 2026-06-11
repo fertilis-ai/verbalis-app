@@ -53,7 +53,6 @@ export async function executeShell(
     command,
     cwd: cwd || null,
     timeoutMs: timeout_ms,
-    sandbox: false, // Will be controlled by guardrails
   });
 
   return formatShellOutput(output);
@@ -98,7 +97,10 @@ export async function executeClipboardWrite(
 export async function executeNotificationSend(
   args: Static<typeof NotificationSendParams>
 ): Promise<string> {
-  const { title, body } = args;
+  // Prefix and cap agent-sent notifications so they can't impersonate
+  // system alerts or other apps.
+  const title = `[Sapio] ${args.title}`.slice(0, 100);
+  const body = args.body.slice(0, 400);
 
   if (!isTauri()) {
     // Browser fallback using Notification API
@@ -175,7 +177,9 @@ export const SYSTEM_TOOL_DEFINITIONS: Record<string, ToolDefinitionV2> = {
     name: "clipboard_read",
     description: "Read the current contents of the system clipboard",
     category: "system",
-    riskLevel: "low",
+    // The clipboard often holds passwords or other sensitive copied data —
+    // reading it is a quiet exfiltration channel, not a low-risk operation.
+    riskLevel: "medium",
     parameters: ClipboardReadParams,
     requiresNetwork: false,
     supportsUndo: false,

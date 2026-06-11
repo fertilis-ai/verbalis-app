@@ -1,4 +1,4 @@
-import type { ToolCategory, RiskLevel } from "@/lib/tools/categories";
+import type { ToolCategory, } from "@/lib/tools/categories";
 
 // ============================================================================
 // Guardrails Configuration
@@ -132,6 +132,14 @@ export const DEFAULT_GUARDRAILS_CONFIG: GuardrailsConfig = {
     blocklist: [
       "rm -rf *",
       "rm -fr *",
+      // Inline-code flags turn allowlisted interpreters into arbitrary-code
+      // escape hatches (e.g. `python -c "import os; ..."`)
+      "python -c *",
+      "python3 -c *",
+      "node -e *",
+      "node --eval *",
+      "node -p *",
+      "bun -e *",
       "sudo *",
       "su *",
       "chmod 777 *",

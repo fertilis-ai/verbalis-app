@@ -7,6 +7,7 @@ import {
   renameToolboxItem,
   type ToolboxItemData,
 } from "@/lib/storage";
+import { toggleInSet } from "@/lib/set-utils";
 
 export type ToolboxCategory = "prompts" | "memories" | "agents" | "skills" | "workflows";
 
@@ -73,15 +74,7 @@ export const useToolboxStore = create<ToolboxState>((set, get) => ({
   },
 
   toggleFolderExpansion: (category) => {
-    set((state) => {
-      const newExpanded = new Set(state.expandedFolders);
-      if (newExpanded.has(category)) {
-        newExpanded.delete(category);
-      } else {
-        newExpanded.add(category);
-      }
-      return { expandedFolders: newExpanded };
-    });
+    set((state) => ({ expandedFolders: toggleInSet(state.expandedFolders, category) }));
   },
 
   loadItemsFromDisk: async () => {

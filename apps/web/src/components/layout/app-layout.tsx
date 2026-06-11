@@ -1,4 +1,4 @@
-import * as React from "react";
+import type * as React from "react";
 import { IconBar } from "./sidebar";
 import { ResizablePane } from "./resizable-pane";
 import { useLayoutStore, type SectionId } from "@/stores/layout-store";

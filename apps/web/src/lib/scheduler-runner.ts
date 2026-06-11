@@ -9,6 +9,7 @@ import {
   type SchedulerTreeNode,
 } from "@/lib/storage";
 import { YOLO_MODE_CONFIG } from "@/lib/guardrails/presets";
+import { collectFromTree } from "@/lib/tree-utils";
 
 const DEFAULT_TICK_MS = 60_000;
 const DEFAULT_SCHEDULE_TITLE = "Scheduled Run";
@@ -22,18 +23,7 @@ async function appendSchedulerLog(line: string): Promise<void> {
 }
 
 function collectSchedulePaths(tree: SchedulerTreeNode[]): string[] {
-  const paths: string[] = [];
-  const walk = (nodes: SchedulerTreeNode[]) => {
-    for (const node of nodes) {
-      if (node.type === "schedule") {
-        paths.push(node.path);
-      } else if (node.type === "folder" && node.children) {
-        walk(node.children);
-      }
-    }
-  };
-  walk(tree);
-  return paths;
+  return collectFromTree(tree, (node) => (node.type === "schedule" ? node.path : undefined));
 }
 
 function computeNextRun(cron: string, fromDate: Date): string | null {
@@ -160,8 +150,12 @@ async function normalizeSchedule(schedule: ScheduleData, schedulePath: string): 
 }
 
 async function runSchedulerTick(): Promise<void> {
-  if (tickInFlight) return;
+  if (tickInFlight) {
+    console.warn("[scheduler-runner] Previous tick still running, skipping this tick");
+    return;
+  }
   tickInFlight = true;
+  const tickStartedAt = Date.now();
 
   try {
     const tree = await loadSchedulerTree();
@@ -196,6 +190,12 @@ async function runSchedulerTick(): Promise<void> {
     console.error("[scheduler-runner] Tick failed:", error);
   } finally {
     tickInFlight = false;
+    const tickDuration = Date.now() - tickStartedAt;
+    if (tickDuration > DEFAULT_TICK_MS) {
+      console.warn(
+        `[scheduler-runner] Tick took ${tickDuration}ms, longer than the ${DEFAULT_TICK_MS}ms interval`
+      );
+    }
   }
 }
 

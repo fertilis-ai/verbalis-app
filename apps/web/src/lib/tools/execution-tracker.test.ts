@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, } from "vitest";
 import {
   ExecutionTracker,
   getExecutionTracker,
@@ -576,7 +576,7 @@ describe("ExecutionTracker", () => {
       });
 
       const stats = tracker.getStatistics();
-      expect(stats.byTool["read_file"]).toBe(2);
+      expect(stats.byTool.read_file).toBe(2);
     });
 
     it("calculates success rate correctly", () => {

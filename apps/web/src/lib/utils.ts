@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
-  return text.slice(0, maxLength) + `\n... (truncated, ${text.length} total chars)`;
+  return `${text.slice(0, maxLength)}\n... (truncated, ${text.length} total chars)`;
 }
 
 export function createSingleton<T>(factory: () => T, cleanup?: (instance: T) => void) {

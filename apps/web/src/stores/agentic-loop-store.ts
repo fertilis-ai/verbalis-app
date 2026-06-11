@@ -6,8 +6,8 @@ import type {
   LoopIteration,
   AgentLoopEvent,
 } from "@/lib/agentic/types";
-import { DEFAULT_LOOP_CONFIG, createInitialLoopContext } from "@/lib/agentic/types";
-import { SapioAgentAdapter, createSapioAdapter } from "@/lib/agentic/sapio-agent-adapter";
+import { DEFAULT_LOOP_CONFIG, } from "@/lib/agentic/types";
+import { type SapioAgentAdapter, createSapioAdapter } from "@/lib/agentic/sapio-agent-adapter";
 import { useSettingsStore } from "./settings-store";
 import type { ToolCallState } from "@/lib/tools";
 import { useChatStore } from "./chat-store";
@@ -84,6 +84,16 @@ interface AgenticLoopState {
 // Store Implementation
 // ============================================================================
 
+// Event-handler unsubscribers per conversation. Without unsubscribing, a
+// replaced/removed adapter keeps emitting into handleLoopEvent with a stale
+// conversationId (leak + cross-conversation state corruption).
+const adapterUnsubscribers = new Map<string, () => void>();
+
+function unsubscribeAdapter(conversationId: string): void {
+  adapterUnsubscribers.get(conversationId)?.();
+  adapterUnsubscribers.delete(conversationId);
+}
+
 export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
   // Initial State
   activeAdapters: new Map(),
@@ -110,6 +120,7 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
     if (activeAdapters.has(conversationId)) {
       const existing = activeAdapters.get(conversationId)!;
       existing.stop();
+      unsubscribeAdapter(conversationId);
     }
 
     // Get guardrails config from settings
@@ -120,9 +131,10 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
     const adapter = createSapioAdapter(conversationId, agentId, guardrailsConfig, loopConfig);
 
     // Subscribe to events
-    adapter.onEvent((event) => {
+    const unsubscribe = adapter.onEvent((event) => {
       get().handleLoopEvent(conversationId, event);
     });
+    adapterUnsubscribers.set(conversationId, unsubscribe);
 
     // Store adapter and initial context
     const newAdapters = new Map(activeAdapters);
@@ -150,6 +162,7 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
     if (adapter) {
       adapter.stop();
     }
+    unsubscribeAdapter(conversationId);
 
     const newAdapters = new Map(activeAdapters);
     newAdapters.delete(conversationId);

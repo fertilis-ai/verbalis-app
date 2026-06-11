@@ -152,7 +152,7 @@ pub fn init_app_data_dir() -> Result<(), String> {
 
 /// Read a directory tree recursively (with max depth)
 #[tauri::command]
-pub fn read_directory(path: String, max_depth: Option<u32>) -> Result<Vec<FileNode>, String> {
+pub async fn read_directory(path: String, max_depth: Option<u32>) -> Result<Vec<FileNode>, String> {
     let path = expand_tilde(&path);
     let path = Path::new(&path);
 
@@ -221,14 +221,14 @@ fn read_directory_recursive(
 
 /// Read a file's content
 #[tauri::command]
-pub fn read_file(path: String) -> Result<String, String> {
+pub async fn read_file(path: String) -> Result<String, String> {
     let path = expand_tilde(&path);
     fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 /// Write content to a file
 #[tauri::command]
-pub fn write_file(path: String, content: String) -> Result<(), String> {
+pub async fn write_file(path: String, content: String) -> Result<(), String> {
     let path = expand_tilde(&path);
     let path = Path::new(&path);
 
@@ -243,7 +243,7 @@ pub fn write_file(path: String, content: String) -> Result<(), String> {
 
 /// Delete a file or directory
 #[tauri::command]
-pub fn delete_path(path: String) -> Result<(), String> {
+pub async fn delete_path(path: String) -> Result<(), String> {
     let path = expand_tilde(&path);
     let path = Path::new(&path);
 
@@ -256,7 +256,7 @@ pub fn delete_path(path: String) -> Result<(), String> {
 
 /// Create a directory
 #[tauri::command]
-pub fn create_directory(path: String) -> Result<(), String> {
+pub async fn create_directory(path: String) -> Result<(), String> {
     let path = expand_tilde(&path);
     fs::create_dir_all(&path).map_err(|e| format!("Failed to create directory: {}", e))
 }
@@ -382,7 +382,6 @@ pub async fn execute_shell(
     command: String,
     cwd: Option<String>,
     timeout_ms: Option<u64>,
-    _sandbox: bool,
 ) -> Result<ShellOutput, String> {
     let start = std::time::Instant::now();
     let timeout = Duration::from_millis(timeout_ms.unwrap_or(60000)); // Default 60s
@@ -530,7 +529,13 @@ pub async fn http_request(
     let status = response.status().as_u16();
     let headers: HashMap<String, String> = response.headers()
         .iter()
-        .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+        .map(|(k, v)| {
+            let value = v.to_str().unwrap_or_else(|_| {
+                log::warn!("Dropping non-UTF8 value for response header {}", k);
+                ""
+            });
+            (k.to_string(), value.to_string())
+        })
         .collect();
 
     let body = response.text().await
@@ -634,7 +639,7 @@ pub fn save_config(config: AppConfig) -> Result<(), String> {
 
 /// Rename/move a file or directory
 #[tauri::command]
-pub fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
+pub async fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
     let old_path = expand_tilde(&old_path);
     let new_path = expand_tilde(&new_path);
 

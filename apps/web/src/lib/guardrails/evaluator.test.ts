@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, } from "vitest";
 import {
   GuardrailsEvaluator,
   getGuardrailsEvaluator,
@@ -192,6 +192,36 @@ describe("GuardrailsEvaluator", () => {
       const result = evaluator.evaluate("shell_execute", { command: "" });
       // Empty string doesn't match blocklist, but also not in allowlist
       expect(result).toBeDefined();
+    });
+
+    it("should block interpreter inline-code flags (python -c, node -e)", () => {
+      expect(
+        evaluator.evaluate("shell_execute", { command: 'python -c "import os; os.system(\'id\')"' }).allowed
+      ).toBe(false);
+      expect(
+        evaluator.evaluate("shell_execute", { command: 'node -e "process.exit(0)"' }).allowed
+      ).toBe(false);
+    });
+
+    it("should still allow interpreters running script files", () => {
+      expect(evaluator.evaluate("shell_execute", { command: "python script.py" }).allowed).toBe(true);
+      expect(evaluator.evaluate("shell_execute", { command: "node build.js" }).allowed).toBe(true);
+    });
+
+    it("should deny chained commands when any segment is not allowlisted", () => {
+      const result = evaluator.evaluate("shell_execute", { command: "echo hi && apt-get install x" });
+      expect(result.allowed).toBe(false);
+      expect(result.violations[0].type).toBe("blocked_command");
+    });
+
+    it("should allow chained commands when every segment is allowlisted", () => {
+      expect(evaluator.evaluate("shell_execute", { command: "git status && git log" }).allowed).toBe(true);
+      expect(evaluator.evaluate("shell_execute", { command: "grep foo file.txt | head -5" }).allowed).toBe(true);
+    });
+
+    it("should deny allowlisted commands containing command substitution", () => {
+      expect(evaluator.evaluate("shell_execute", { command: "echo $(cat /etc/passwd)" }).allowed).toBe(false);
+      expect(evaluator.evaluate("shell_execute", { command: "echo `whoami`" }).allowed).toBe(false);
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findNodeInTree, getUniqueName, getSiblingFolderNames, type TreeNode } from "./tree-utils";
+import { collectFromTree, findNodeInTree, getUniqueName, getSiblingFolderNames, type TreeNode } from "./tree-utils";
 
 const tree: TreeNode[] = [
   { id: "f1", name: "Folder A", type: "folder", children: [
@@ -27,6 +27,26 @@ describe("findNodeInTree", () => {
 
   it("returns null for empty tree", () => {
     expect(findNodeInTree([], "f1")).toBeNull();
+  });
+});
+
+describe("collectFromTree", () => {
+  it("collects matching nodes depth-first, including nested ones", () => {
+    const ids = collectFromTree(tree, (node) => (node.type === "chat" ? node.id : undefined));
+    expect(ids).toEqual(["c1", "c2", "c3"]);
+  });
+
+  it("skips nodes for which visit returns undefined", () => {
+    const ids = collectFromTree(tree, (node) => (node.type === "folder" ? node.id : undefined));
+    expect(ids).toEqual(["f1", "f2", "f3"]);
+  });
+
+  it("returns empty array for empty tree", () => {
+    expect(collectFromTree([], (node: TreeNode) => node.id)).toEqual([]);
+  });
+
+  it("returns empty array when nothing matches", () => {
+    expect(collectFromTree(tree, () => undefined)).toEqual([]);
   });
 });
 

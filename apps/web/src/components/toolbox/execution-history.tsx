@@ -1,12 +1,10 @@
 import * as React from "react";
 import {
-  Filter,
   Download,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
   Undo2,
-  Check,
   X,
   Clock,
   Loader2,
@@ -16,7 +14,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   useToolHistoryStore,
   selectUniqueToolNames,

@@ -112,7 +112,7 @@ export function SchedulerView() {
             <div className="flex-1">
               <label className="text-sm font-medium">Name</label>
               <Input
-                key={selectedSchedule.id + "-name"}
+                key={`${selectedSchedule.id}-name`}
                 defaultValue={selectedSchedule.name}
                 onChange={(e) => debouncedUpdate({ name: e.target.value })}
                 className="mt-1"
@@ -181,7 +181,7 @@ export function SchedulerView() {
           <div>
             <label className="text-sm font-medium">Prompt</label>
             <textarea
-              key={selectedSchedule.id + "-prompt"}
+              key={`${selectedSchedule.id}-prompt`}
               defaultValue={selectedSchedule.prompt}
               onChange={(e) => debouncedUpdate({ prompt: e.target.value })}
               autoCapitalize="off"

@@ -1,11 +1,12 @@
-import { spawnSync } from "child_process";
-import { writeFileSync } from "fs";
-import path from "path";
+import { spawnSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import path from "node:path";
 
 const webDir = path.resolve(import.meta.dir, "../apps/web");
 const logPath = path.join(webDir, "test-durations.log");
 
 function stripAnsi(str: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape sequences are control characters by definition
   return str.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
@@ -33,7 +34,7 @@ const testLine = /^\s*([✓×✗⊘])\s+(.+?)\s+(\d+)\s*ms\s*$/;
 
 const tests: { name: string; duration: number; passed: boolean }[] = [];
 
-for (const line of (stdout + "\n" + stderr).split("\n")) {
+for (const line of (`${stdout}\n${stderr}`).split("\n")) {
   const match = line.match(testLine);
   if (match) {
     tests.push({
@@ -82,7 +83,7 @@ const logLines = [
   ),
 ];
 
-writeFileSync(logPath, logLines.join("\n") + "\n");
+writeFileSync(logPath, `${logLines.join("\n")}\n`);
 console.log(`\n  Log written to apps/web/test-durations.log`);
 
 process.exit(result.status ?? 1);

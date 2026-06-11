@@ -1,4 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isLoggingEnabled } from "@/lib/logger";
 
 /**
  * Selectively polyfill globalThis.fetch with Tauri's HTTP plugin fetch.
@@ -29,8 +30,14 @@ export async function initFetchPolyfill(): Promise<void> {
           !parsed.hostname.endsWith(".localhost") &&
           !parsed.hostname.startsWith("127.")
         ) {
-          // Log POST request bodies (LLM API calls) for debugging
-          if (init?.body && (!init.method || init.method.toUpperCase() === "POST")) {
+          // Log POST request bodies (LLM API calls) only when the user has
+          // explicitly enabled agent debug logging — bodies contain full
+          // conversation content and must not hit disk by default.
+          if (
+            isLoggingEnabled() &&
+            init?.body &&
+            (!init.method || init.method.toUpperCase() === "POST")
+          ) {
             const raw = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
             try { const pretty = JSON.stringify(JSON.parse(raw), null, 2); invoke("write_log_file", { filename: "api_request.txt", content: pretty }).catch(() => {}); } catch { invoke("write_log_file", { filename: "api_request.txt", content: raw }).catch(() => {}); }
           }

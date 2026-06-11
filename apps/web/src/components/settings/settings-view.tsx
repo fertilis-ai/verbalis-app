@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Moon, Sun, Monitor, Eye, EyeOff, FolderOpen, Palette, FolderCog, Shield, Key, Cpu, Server, Bug, Info, RefreshCw, Loader2 } from "lucide-react";
+import { Moon, Sun, Monitor, Eye, EyeOff, FolderOpen, Palette, FolderCog, Key, Cpu, Server, Bug, Info, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";

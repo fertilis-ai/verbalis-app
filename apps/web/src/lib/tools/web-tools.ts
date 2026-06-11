@@ -192,7 +192,7 @@ function parseSearchResults(html: string, maxResults: number): SearchResult[] {
   // Simple regex-based parsing for DuckDuckGo HTML results
   const resultRegex = /<a[^>]+class="result__a"[^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>.*?<a[^>]+class="result__snippet"[^>]*>([^<]+)<\/a>/gs;
 
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = resultRegex.exec(html)) !== null && results.length < maxResults) {
     results.push({
       url: match[1],
@@ -256,7 +256,7 @@ function parseWebpage(html: string, selector?: string): ScrapeResult {
   // Extract links
   const linkRegex = /<a[^>]+href="([^"]+)"[^>]*>/g;
   const links: string[] = [];
-  let linkMatch;
+  let linkMatch: RegExpExecArray | null;
   while ((linkMatch = linkRegex.exec(cleanHtml)) !== null && links.length < 50) {
     if (linkMatch[1].startsWith("http")) {
       links.push(linkMatch[1]);
