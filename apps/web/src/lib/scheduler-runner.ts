@@ -10,6 +10,7 @@ import {
 } from "@/lib/storage";
 import { YOLO_MODE_CONFIG } from "@/lib/guardrails/presets";
 import { collectFromTree } from "@/lib/tree-utils";
+import { listWorkflows, loadWorkflow, runWorkflow } from "@/lib/workflows/run-workflow";
 
 const DEFAULT_TICK_MS = 60_000;
 const DEFAULT_SCHEDULE_TITLE = "Scheduled Run";
@@ -149,6 +150,61 @@ async function normalizeSchedule(schedule: ScheduleData, schedulePath: string): 
   }
 }
 
+// ---------------------------------------------------------------------------
+// Workflow scheduling
+//
+// Workflows (Toolbox "workflows" category) with a `trigger.schedule` cron are
+// discovered alongside schedules on each tick. Unlike schedules they have no
+// persisted run state, so next-run times are tracked in memory: a workflow's
+// nextRun is seeded on first sighting (so it doesn't fire on startup) and
+// advanced after each run.
+// ---------------------------------------------------------------------------
+
+const workflowNextRun = new Map<string, Date>();
+
+async function runWorkflowsTick(now: Date): Promise<void> {
+  let names: string[];
+  try {
+    names = await listWorkflows();
+  } catch {
+    return;
+  }
+  const seen = new Set<string>();
+
+  for (const name of names) {
+    const workflow = await loadWorkflow(name);
+    const cron = workflow?.trigger?.schedule;
+    if (!workflow || !cron) continue;
+    seen.add(name);
+
+    const existing = workflowNextRun.get(name);
+    if (!existing) {
+      // First sighting — seed the next run without firing immediately.
+      const next = computeNextRun(cron, now);
+      if (next) workflowNextRun.set(name, new Date(next));
+      continue;
+    }
+
+    if (existing <= now) {
+      const next = computeNextRun(cron, now);
+      workflowNextRun.set(name, next ? new Date(next) : new Date(now.getTime() + DEFAULT_TICK_MS));
+      try {
+        await appendSchedulerLog(`[${now.toISOString()}] Starting workflow "${name}"`);
+        await runWorkflow(workflow);
+        await appendSchedulerLog(`[${new Date().toISOString()}] Completed workflow "${name}"`);
+      } catch (error) {
+        await appendSchedulerLog(`[${new Date().toISOString()}] Error in workflow "${name}": ${error}`);
+        console.error("[scheduler-runner] Workflow failed:", name, error);
+      }
+    }
+  }
+
+  // Drop tracking for workflows that no longer exist / lost their schedule.
+  for (const key of [...workflowNextRun.keys()]) {
+    if (!seen.has(key)) workflowNextRun.delete(key);
+  }
+}
+
 async function runSchedulerTick(): Promise<void> {
   if (tickInFlight) {
     console.warn("[scheduler-runner] Previous tick still running, skipping this tick");
@@ -186,6 +242,9 @@ async function runSchedulerTick(): Promise<void> {
         await executeSchedule(schedule, schedulePath, { manual: false });
       }
     }
+
+    // Discover and run scheduled workflows alongside schedules.
+    await runWorkflowsTick(now);
   } catch (error) {
     console.error("[scheduler-runner] Tick failed:", error);
   } finally {

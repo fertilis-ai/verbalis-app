@@ -169,6 +169,17 @@ describe("agent-store", () => {
       expect(agents).toHaveLength(3);
     });
 
+    it("preserves a per-agent tools allowlist", async () => {
+      mockListAgents.mockResolvedValue(["scoped"]);
+      mockLoadAgent.mockResolvedValue({
+        ...makeAgent("scoped"),
+        tools: ["read_file", "web_search"],
+      });
+      await useAgentStore.getState().loadAgentsFromDisk();
+      const agent = useAgentStore.getState().agents.find((a) => a.name === "scoped");
+      expect(agent?.tools).toEqual(["read_file", "web_search"]);
+    });
+
     it("sets selectedAgent to first loaded agent", async () => {
       mockListAgents.mockResolvedValue(["default", "Writer"]);
       mockLoadAgent.mockImplementation((name: string) =>

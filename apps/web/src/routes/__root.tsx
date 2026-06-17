@@ -4,7 +4,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { initAppDataDir } from "@/lib/storage";
+import { initAppDataDir, ensureWellKnownMemories } from "@/lib/storage";
 import { initConfigSync } from "@/lib/config-sync";
 import { initFetchPolyfill } from "@/lib/http";
 import { startSchedulerRunner } from "@/lib/scheduler-runner";
@@ -49,6 +49,7 @@ function RootComponent() {
   useEffect(() => {
     initFetchPolyfill()
       .then(() => initAppDataDir())
+      .then(() => ensureWellKnownMemories())
       .then(() => initConfigSync())
       .catch((err) => console.error("[init] Startup error:", err))
       .finally(() => setInitialized(true));
@@ -63,7 +64,10 @@ function RootComponent() {
   useEffect(() => {
     if (!initialized) return;
     if (!agentId && agents.length > 0) {
-      setAgentId(agents[0].name);
+      // Restore the persisted agent selection if it still exists, else default.
+      const persisted = useSettingsStore.getState().selectedAgentId;
+      const restored = persisted && agents.some((a) => a.name === persisted) ? persisted : agents[0].name;
+      setAgentId(restored);
     }
   }, [initialized, agentId, agents, setAgentId]);
 

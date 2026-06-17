@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { useSettingsStore } from "@/stores/settings-store";
 
 // Mock @tauri-apps/api/core
 vi.mock("@tauri-apps/api/core", () => ({
@@ -103,16 +104,46 @@ describe("tools", () => {
   });
 
   describe("getToolsForContext", () => {
+    const TOOLBOX_TOOLS = ["list_toolbox_items", "read_toolbox_item", "write_toolbox_item", "delete_toolbox_item"];
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    function setSelfEnhancement(enabled: boolean) {
+      vi.spyOn(useSettingsStore, "getState").mockReturnValue({
+        allowSelfEnhancement: enabled,
+      } as ReturnType<typeof useSettingsStore.getState>);
+    }
+
     it("returns an array of tool objects with name, description, and parameters", () => {
       const tools = getToolsForContext();
       expect(Array.isArray(tools)).toBe(true);
-      expect(tools.length).toBe(Object.keys(TOOL_DEFINITIONS).length);
 
       for (const tool of tools) {
         expect(tool).toHaveProperty("name");
         expect(tool).toHaveProperty("description");
         expect(tool).toHaveProperty("parameters");
       }
+    });
+
+    it("excludes self-enhancement tools by default but keeps remember", () => {
+      setSelfEnhancement(false);
+      const names = getToolsForContext().map((t) => t.name);
+      for (const t of TOOLBOX_TOOLS) expect(names).not.toContain(t);
+      expect(names).toContain("remember");
+    });
+
+    it("includes self-enhancement tools when enabled", () => {
+      setSelfEnhancement(true);
+      const names = getToolsForContext().map((t) => t.name);
+      for (const t of TOOLBOX_TOOLS) expect(names).toContain(t);
+    });
+
+    it("scopes to an allowlist when provided", () => {
+      setSelfEnhancement(true);
+      const tools = getToolsForContext(["read_file", "web_search"]);
+      expect(tools.map((t) => t.name).sort()).toEqual(["read_file", "web_search"]);
     });
 
     it("returns tools with correct names", () => {

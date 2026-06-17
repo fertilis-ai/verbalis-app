@@ -60,12 +60,13 @@ const {
   mockStreamSimple: vi.fn(),
   mockGetModel: vi.fn().mockReturnValue(null),
   mockGetActiveModels: vi.fn().mockReturnValue([]),
-  mockSettingsGetState: vi.fn(() => ({
+  mockSettingsGetState: vi.fn((): Record<string, unknown> => ({
     apiKeys: {},
     localLLM: { enabled: false, provider: "lmstudio", baseUrl: "", model: "" },
     guardrailsConfig: {},
     selectedModels: [],
     defaultModel: "claude-sonnet-4-20250514",
+    setSelectedAgentId: vi.fn(),
   })),
   mockConfirmTool: vi.fn(),
   mockRejectTool: vi.fn(),

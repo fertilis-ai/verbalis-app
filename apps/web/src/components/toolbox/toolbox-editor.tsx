@@ -1,8 +1,10 @@
 import * as React from "react";
-import { Wrench } from "lucide-react";
+import { Wrench, Play, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { useToolboxStore, itemKey, type ToolboxCategory } from "@/stores/toolbox-store";
 import { ToolboxTabs } from "./toolbox-tabs";
 import { highlightCode, escapeHtml } from "@/lib/highlighter";
+import { runWorkflowByName } from "@/lib/workflows/run-workflow";
 
 // Map category to language for syntax highlighting
 function getLanguage(category: ToolboxCategory): string {
@@ -26,6 +28,7 @@ export function ToolboxEditor() {
   const { openItems, activeItemKey, updateItem, updateOpenItemContent, markOpenItemSaved } =
     useToolboxStore();
   const [highlightedHtml, setHighlightedHtml] = React.useState("");
+  const [isRunning, setIsRunning] = React.useState(false);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = React.useRef<HTMLDivElement>(null);
@@ -60,6 +63,27 @@ export function ToolboxEditor() {
     if (activeItem) {
       await updateItem(activeItem.category, activeItem.name, activeItem.currentContent);
       markOpenItemSaved(activeItem.category, activeItem.name, activeItem.currentContent);
+    }
+  };
+
+  const handleRunWorkflow = async () => {
+    if (!activeItem || activeItem.category !== "workflows" || isRunning) return;
+    // Persist any unsaved edits so the run uses the current content.
+    if (activeItem.isModified) await handleSave();
+    setIsRunning(true);
+    const name = activeItem.name;
+    toast(`Running workflow "${name}"…`);
+    try {
+      const result = await runWorkflowByName(name);
+      if (result.error) {
+        toast.error(`Workflow "${name}" failed: ${result.error}`);
+      } else {
+        toast.success(`Workflow "${name}" completed (${result.stepOutputs.length} steps).`);
+      }
+    } catch (error) {
+      toast.error(`Workflow "${name}" failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsRunning(false);
     }
   };
 
@@ -103,6 +127,20 @@ export function ToolboxEditor() {
           </div>
         </div>
       ) : (
+        <div className="flex flex-1 flex-col overflow-hidden">
+        {activeItem.category === "workflows" && (
+          <div className="flex items-center justify-end gap-2 border-b border-border/50 px-3 py-1.5">
+            <button
+              type="button"
+              onClick={handleRunWorkflow}
+              disabled={isRunning}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {isRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+              {isRunning ? "Running…" : "Run workflow"}
+            </button>
+          </div>
+        )}
         <div className="flex flex-1 overflow-hidden font-mono text-sm">
           {/* Line numbers */}
           <div
@@ -164,6 +202,7 @@ export function ToolboxEditor() {
               autoCorrect="off"
             />
           </div>
+        </div>
         </div>
       )}
     </div>

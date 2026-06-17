@@ -12,6 +12,10 @@ import {
 import { resolvePath, type ResolvePathResult } from "./path-resolution";
 import { useSettingsStore } from "@/stores/settings-store";
 import { getAppDataDir } from "@/lib/storage";
+import { executeToolboxTool, TOOLBOX_TOOL_NAMES as TOOLBOX_TOOL_NAME_LIST } from "./tools/toolbox-tools";
+import { executeRemember } from "./tools/memory-tools";
+
+const TOOLBOX_TOOL_NAMES = new Set<string>(TOOLBOX_TOOL_NAME_LIST);
 
 // Tool result returned after execution
 export interface ToolResult {
@@ -120,6 +124,40 @@ const ListFilesParams = Type.Object({
 const RenamePathParams = Type.Object({
   old_path: Type.String({ description: "Current path" }),
   new_path: Type.String({ description: "New path" }),
+});
+
+// Self-enhancement (Toolbox CRUD) parameter schemas
+const TOOLBOX_CATEGORY_DESC =
+  "Toolbox category: prompts, memories, agents, skills, or workflows";
+
+const ListToolboxItemsParams = Type.Object({
+  category: Type.Optional(Type.String({ description: `${TOOLBOX_CATEGORY_DESC}. Omit to list all categories.` })),
+});
+
+const ReadToolboxItemParams = Type.Object({
+  category: Type.String({ description: TOOLBOX_CATEGORY_DESC }),
+  name: Type.String({ description: "Item name (without extension)" }),
+});
+
+const WriteToolboxItemParams = Type.Object({
+  category: Type.String({ description: TOOLBOX_CATEGORY_DESC }),
+  name: Type.String({ description: "Item name (without extension)" }),
+  content: Type.String({
+    description:
+      "Full file content. memories/agents/skills are markdown (skills/agents need YAML frontmatter); prompts/workflows are YAML.",
+  }),
+});
+
+const DeleteToolboxItemParams = Type.Object({
+  category: Type.String({ description: TOOLBOX_CATEGORY_DESC }),
+  name: Type.String({ description: "Item name (without extension)" }),
+});
+
+const RememberParams = Type.Object({
+  content: Type.String({ description: "The fact to remember (a short statement)" }),
+  name: Type.Optional(
+    Type.String({ description: "Memory file to append to (default: 'learned'). Use 'USER' for facts about the user." })
+  ),
 });
 
 // Tool definitions with metadata (enhanced with categories and risk levels)
@@ -240,15 +278,82 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     parameters: ScrapeWebpageParams,
     requiresConfirmation: false,
   },
+  // Self-enhancement tools (only offered when allowSelfEnhancement is enabled)
+  list_toolbox_items: {
+    name: "list_toolbox_items",
+    description: "List the agent's Toolbox items (prompts, memories, agents, skills, workflows)",
+    parameters: ListToolboxItemsParams,
+    requiresConfirmation: false,
+    category: "file_system",
+    riskLevel: "low",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 50,
+  },
+  read_toolbox_item: {
+    name: "read_toolbox_item",
+    description: "Read the full content of a Toolbox item by category and name",
+    parameters: ReadToolboxItemParams,
+    requiresConfirmation: false,
+    category: "file_system",
+    riskLevel: "low",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 50,
+  },
+  write_toolbox_item: {
+    name: "write_toolbox_item",
+    description:
+      "Create or overwrite a Toolbox item (prompt, memory, agent, skill, or workflow). Content is validated against the category schema before saving.",
+    parameters: WriteToolboxItemParams,
+    requiresConfirmation: true,
+    category: "file_system",
+    riskLevel: "medium",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 100,
+  },
+  delete_toolbox_item: {
+    name: "delete_toolbox_item",
+    description: "Delete a Toolbox item by category and name",
+    parameters: DeleteToolboxItemParams,
+    requiresConfirmation: true,
+    category: "file_system",
+    riskLevel: "high",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 50,
+  },
+  remember: {
+    name: "remember",
+    description:
+      "Persist a fact to long-term memory so it is available in future conversations. Use this when you learn something durable about the user or task.",
+    parameters: RememberParams,
+    requiresConfirmation: false,
+    category: "memory",
+    riskLevel: "medium",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 100,
+  },
 };
 
-// Convert to pi-ai Tool format for context
-export function getToolsForContext(): Tool[] {
-  return Object.values(TOOL_DEFINITIONS).map((def) => ({
-    name: def.name,
-    description: def.description,
-    parameters: def.parameters as Tool["parameters"],
-  }));
+// Convert to pi-ai Tool format for context.
+// - Self-enhancement (Toolbox CRUD) tools are only included when the
+//   allowSelfEnhancement setting is enabled, given the autonomy implications.
+// - When `allowedTools` is provided (a per-agent allowlist), only those tools
+//   are exposed.
+export function getToolsForContext(allowedTools?: string[]): Tool[] {
+  const allowSelfEnhancement = useSettingsStore.getState().allowSelfEnhancement;
+  const allowSet = allowedTools && allowedTools.length > 0 ? new Set(allowedTools) : null;
+  return Object.values(TOOL_DEFINITIONS)
+    .filter((def) => allowSelfEnhancement || !TOOLBOX_TOOL_NAMES.has(def.name))
+    .filter((def) => !allowSet || allowSet.has(def.name))
+    .map((def) => ({
+      name: def.name,
+      description: def.description,
+      parameters: def.parameters as Tool["parameters"],
+    }));
 }
 
 // Get tool category
@@ -398,6 +503,17 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       case "web_search":
       case "scrape_webpage": {
         result = await executeWebTool(name, args);
+        break;
+      }
+      case "list_toolbox_items":
+      case "read_toolbox_item":
+      case "write_toolbox_item":
+      case "delete_toolbox_item": {
+        result = await executeToolboxTool(name, args as Record<string, unknown>);
+        break;
+      }
+      case "remember": {
+        result = await executeRemember(args as Record<string, unknown>);
         break;
       }
       default:

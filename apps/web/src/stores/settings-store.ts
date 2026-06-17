@@ -37,6 +37,8 @@ interface SettingsState {
     model: string;
   };
   defaultModel: ChatModelId;
+  // Last-selected chat agent (by name); persisted so selection survives restart.
+  selectedAgentId: string | null;
 
   // Model discovery
   availableModels: ProviderModel[];
@@ -50,6 +52,11 @@ interface SettingsState {
   // Debug settings
   agentDebugLogging: boolean;
 
+  // Self-enhancement: allow the agent to author/edit its own Toolbox files
+  // (prompts, memories, agents, skills, workflows). Off by default given the
+  // autonomy implications.
+  allowSelfEnhancement: boolean;
+
   setTheme: (theme: Theme) => void;
   setHue: (hue: HueId) => void;
   setHomeDir: (dir: string) => void;
@@ -62,7 +69,9 @@ interface SettingsState {
   setApiKey: (provider: "anthropic" | "openai" | "google" | "openrouter", key: string) => void;
   setLocalLLM: (updates: Partial<SettingsState["localLLM"]>) => void;
   setDefaultModel: (model: ChatModelId) => void;
+  setSelectedAgentId: (agentId: string | null) => void;
   setAgentDebugLogging: (enabled: boolean) => void;
+  setAllowSelfEnhancement: (enabled: boolean) => void;
 
   // Model discovery actions
   setAvailableModels: (models: ProviderModel[]) => void;
@@ -104,12 +113,14 @@ export const useSettingsStore = create<SettingsState>()(
         model: "",
       },
       defaultModel: DEFAULT_MODEL_ID,
+      selectedAgentId: null,
       availableModels: [],
       selectedModels: [],
       modelFetchStatus: "idle" as const,
       modelFetchError: null,
       guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
       agentDebugLogging: false,
+      allowSelfEnhancement: false,
 
       setTheme: (theme) => set({ theme }),
       setHue: (hue) => set({ hue }),
@@ -156,10 +167,12 @@ export const useSettingsStore = create<SettingsState>()(
           localLLM: { ...state.localLLM, ...updates },
         })),
       setDefaultModel: (defaultModel) => set({ defaultModel }),
+      setSelectedAgentId: (selectedAgentId) => set({ selectedAgentId }),
       setAgentDebugLogging: (agentDebugLogging) => {
         set({ agentDebugLogging });
         setLoggingEnabled(agentDebugLogging);
       },
+      setAllowSelfEnhancement: (allowSelfEnhancement) => set({ allowSelfEnhancement }),
 
       // Model discovery actions
       setAvailableModels: (availableModels) => set({ availableModels }),
@@ -262,10 +275,12 @@ export const useSettingsStore = create<SettingsState>()(
         ...(isTauri() ? {} : { apiKeys: state.apiKeys }),
         localLLM: state.localLLM,
         defaultModel: state.defaultModel,
+        selectedAgentId: state.selectedAgentId,
         availableModels: state.availableModels,
         selectedModels: state.selectedModels,
         guardrailsConfig: state.guardrailsConfig,
         agentDebugLogging: state.agentDebugLogging,
+        allowSelfEnhancement: state.allowSelfEnhancement,
       }),
       onRehydrateStorage: () => (state) => {
         // Sync the logging enabled state when the store is rehydrated from localStorage

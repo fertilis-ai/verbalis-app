@@ -15,6 +15,11 @@ import {
 } from "@/lib/tools";
 import { stripProtocolMarkers } from "@/lib/protocol-parser";
 import { messagesToPiMessages } from "@/lib/message-conversion";
+import { computeContextBudget, type ContextBudget } from "@/lib/context/token-estimate";
+import { trimMessagesToBudget } from "@/lib/context/trim";
+import { classifyError } from "@/lib/agentic/types";
+import { resolveMemories } from "@/lib/memory/resolve-memories";
+import { resolveSkills, renderSkillsForPrompt } from "@/lib/skills/resolve-skills";
 import { useSettingsStore } from "./settings-store";
 import { useAgentStore } from "./agent-store";
 import { useAgenticLoopStore, subscribeToToolEvents } from "./agentic-loop-store";
@@ -218,6 +223,11 @@ interface ChatState {
   model: string;
   agentId: string | null;
   isStreaming: boolean;
+
+  // Estimated context-window budget for the most recent send (null until first send)
+  contextBudget: ContextBudget | null;
+  // True when the sliding window dropped older messages on the most recent send
+  contextWindowTrimmed: boolean;
 
   // File context attached to conversation
   contextFiles: ContextFile[];
@@ -490,29 +500,26 @@ export const useChatStore = create<ChatState>((set, get) => {
       const isLocal = model === "local";
       const baseSystemPrompt = agent?.systemPrompt ?? "You are a helpful AI assistant.";
       const temperature = agent?.temperature ?? 0.7;
+      // Per-agent tool scoping: when the agent declares a `tools:` list, only
+      // those tools are exposed for this run.
+      const allowedTools = agent?.tools;
 
       let systemPrompt = baseSystemPrompt;
 
-      // Load persistent memories from settings directory
-      const settingsDir = settings.settingsDirectory;
-      if (settingsDir) {
-        const loadMemoryFile = async (filename: string, heading: string) => {
-          try {
-            const content = await readFile(`${settingsDir}/memories/${filename}`);
-            if (content.trim()) {
-              systemPrompt += `\n\n## ${heading}\n${content}`;
-            }
-          } catch (error) {
-            // Missing file is expected; anything else (permissions, corruption)
-            // silently degrades the system prompt, so surface it.
-            const message = error instanceof Error ? error.message : String(error);
-            if (!/not found|no such file|os error 2/i.test(message)) {
-              console.warn(`[chat-store] Failed to load ${filename}:`, error);
-            }
-          }
-        };
-        await loadMemoryFile("SOUL.md", "Soul");
-        await loadMemoryFile("USER.md", "User");
+      // Load persistent memories. Canonical store is the app-data memories dir
+      // (Toolbox "memories"); SOUL/USER and any `alwaysInclude` memory are
+      // injected, bounded in size, with a legacy read of settingsDir/memories/.
+      const memories = await resolveMemories({ settingsDir: settings.settingsDirectory });
+      for (const mem of memories) {
+        systemPrompt += `\n\n## ${mem.heading}\n${mem.body}`;
+      }
+
+      // Inject skill index (always) + matched skill bodies (by trigger).
+      try {
+        const resolvedSkills = await resolveSkills(content);
+        systemPrompt += renderSkillsForPrompt(resolvedSkills);
+      } catch (error) {
+        console.warn("[chat-store] Failed to resolve skills:", error);
       }
 
       // Inject current agent context
@@ -534,12 +541,21 @@ export const useChatStore = create<ChatState>((set, get) => {
         systemPrompt += `\n\n## Working Directory\nThe user's current working directory is: ${settings.workingDirectory}\n- Relative paths in file tools (read_file, write_file, etc.) automatically resolve to this directory.\n- Paths starting with agents/, prompts/, memories/, skills/, workflows/ automatically resolve to the Sapio data directory.`;
       }
 
+      // Memory / self-enhancement guidance
+      systemPrompt += `\n\n## Memory\nUse the \`remember\` tool to persist durable facts about the user or task so they are available in future sessions. Don't remember trivial or ephemeral details.`;
+      if (settings.allowSelfEnhancement) {
+        systemPrompt += `\n\n## Self-Enhancement\nYou may improve your own Toolbox using \`list_toolbox_items\`, \`read_toolbox_item\`, \`write_toolbox_item\`, and \`delete_toolbox_item\` (categories: prompts, memories, agents, skills, workflows). Writes and deletes require user confirmation. Prefer small, well-scoped edits.`;
+      }
+
       // Helper: run a model through the SapioAgentAdapter (Tauri only)
       // Shared by both local and cloud models for consistent tool execution,
       // guardrails, debug logging, and event flow.
       const runWithAdapter = async (adapterModel: Model<Api>, adapterApiKey: string, adapterIsLocal: boolean) => {
         const loopStore = useAgenticLoopStore.getState();
         const guardrailsConfig = guardrailsConfigOverride ?? settings.guardrailsConfig;
+
+        // Sliding-window aggressiveness: tightened on a context-overflow retry.
+        let historyBudgetFactor = 1;
 
         // Get or create adapter for this conversation
         let adapter = loopStore.getAdapter(conversationId);
@@ -548,13 +564,31 @@ export const useChatStore = create<ChatState>((set, get) => {
         }
         adapter = loopStore.createAdapter(conversationId, agentId);
 
-        // Set up message provider - gets fresh messages each iteration
-        adapter.setMessageProvider(() => {
+        // Message provider - gets fresh messages each iteration, trimmed to the
+        // context budget via a sliding window over message history.
+        const messageProvider = () => {
           const conv = isGhost
             ? get().ghostConversation
             : get().conversations.find((c) => c.id === conversationId);
-          return conv?.messages ?? [];
-        });
+          const messages = conv?.messages ?? [];
+          const trim = trimMessagesToBudget({
+            messages,
+            systemPrompt,
+            tools: getToolsForContext(allowedTools),
+            contextWindow: adapterModel.contextWindow,
+            maxTokens: adapterModel.maxTokens,
+            historyBudgetFactor,
+          });
+          if (trim.trimmed) {
+            set({ contextWindowTrimmed: true });
+            logAgent("CONTEXT", "Sliding window dropped older messages", {
+              droppedCount: trim.droppedCount,
+              kept: trim.messages.length,
+            });
+          }
+          return trim.messages;
+        };
+        adapter.setMessageProvider(messageProvider);
 
         // Helper to sync tool call state to conversation
         // Searches ALL messages (not just last) to find the tool call by ID
@@ -587,8 +621,12 @@ export const useChatStore = create<ChatState>((set, get) => {
           });
         };
 
-        // Subscribe to events for UI sync
-        const unsubscribe = adapter.onEvent((event: AgentLoopEvent) => {
+        // Context-overflow retry bookkeeping (see run block below).
+        let retriedContextExceeded = false;
+        let pendingContextRetry = false;
+
+        // Event handler for UI sync (reused across a context-overflow retry).
+        const onAdapterEvent = (event: AgentLoopEvent) => {
           switch (event.type) {
             case "assistant_message_started": {
               updateConversation((c) => {
@@ -641,6 +679,13 @@ export const useChatStore = create<ChatState>((set, get) => {
               syncToolCallToConversation(event.toolCall);
               break;
             case "loop_error":
+              // If the context overflowed and we can still retry with a
+              // tighter window, suppress the error in the UI and let the retry
+              // run; otherwise surface it.
+              if (event.errorType === "context_exceeded" && !retriedContextExceeded) {
+                pendingContextRetry = true;
+                break;
+              }
               updateConversation((c) => {
                 const lastContent = c.messages[c.messages.length - 1]?.content || "";
                 return {
@@ -653,10 +698,28 @@ export const useChatStore = create<ChatState>((set, get) => {
               });
               break;
           }
-        });
+        };
 
-        // Set current loop for UI
-        loopStore.setCurrentLoop(conversationId);
+        // Estimate the context-window budget for this send and surface it.
+        // Trimming/summarization is layered on top of this in trim.ts.
+        const budgetMessages = (isGhost
+          ? get().ghostConversation?.messages
+          : get().conversations.find((c) => c.id === conversationId)?.messages) ?? [];
+        const budget = computeContextBudget({
+          systemPrompt,
+          tools: getToolsForContext(allowedTools),
+          messages: budgetMessages,
+          contextWindow: adapterModel.contextWindow,
+          maxTokens: adapterModel.maxTokens,
+        });
+        set({ contextBudget: budget, contextWindowTrimmed: false });
+        if (!budget.withinBudget) {
+          logAgent("CONTEXT", "Estimated prompt exceeds context budget", {
+            used: budget.used,
+            available: budget.available,
+            remaining: budget.remaining,
+          });
+        }
 
         // Build adapter config
         const adapterConfig: SapioAdapterConfig = {
@@ -666,14 +729,33 @@ export const useChatStore = create<ChatState>((set, get) => {
           temperature,
           isLocal: adapterIsLocal,
           guardrailsConfig,
+          allowedTools,
           onEvent: () => {}, // Events already handled via onEvent subscription
         };
 
-        // Run the adapter
-        try {
-          await adapter.run(adapterConfig);
-        } finally {
-          unsubscribe();
+        // Run the adapter, subscribing the (reusable) event handler each attempt.
+        const runOnce = async () => {
+          const unsub = adapter!.onEvent(onAdapterEvent);
+          loopStore.setCurrentLoop(conversationId);
+          try {
+            await adapter!.run(adapterConfig);
+          } finally {
+            unsub();
+          }
+        };
+
+        await runOnce();
+
+        // If the context overflowed, retry once with a tighter sliding window
+        // and a fresh adapter (run() can't be re-entered after it finishes).
+        if (pendingContextRetry && !retriedContextExceeded) {
+          retriedContextExceeded = true;
+          pendingContextRetry = false;
+          historyBudgetFactor = 0.5;
+          logAgent("CONTEXT", "Context exceeded — retrying with a tighter window");
+          adapter = loopStore.createAdapter(conversationId, agentId);
+          adapter.setMessageProvider(messageProvider);
+          await runOnce();
         }
       };
 
@@ -845,6 +927,8 @@ export const useChatStore = create<ChatState>((set, get) => {
     model: useSettingsStore.getState().defaultModel ?? DEFAULT_MODEL_ID,
     agentId: null,
     isStreaming: false,
+    contextBudget: null,
+    contextWindowTrimmed: false,
     contextFiles: [],
     isGhostMode: false,
     ghostConversation: null,
@@ -968,7 +1052,11 @@ export const useChatStore = create<ChatState>((set, get) => {
   },
 
   setModel: (model) => set({ model }),
-  setAgentId: (agentId) => set({ agentId }),
+  setAgentId: (agentId) => {
+    set({ agentId });
+    // Persist selection so it survives restart.
+    useSettingsStore.getState().setSelectedAgentId(agentId);
+  },
 
   sendMessage: async (content) => {
     const state = get();

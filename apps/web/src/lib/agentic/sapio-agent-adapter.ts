@@ -75,6 +75,8 @@ export interface SapioAdapterConfig {
   isLocal?: boolean;
   /** Guardrails configuration */
   guardrailsConfig: GuardrailsConfig;
+  /** Optional per-agent tool allowlist (tool names). Undefined = all tools. */
+  allowedTools?: string[];
   /** Loop configuration */
   loopConfig?: Partial<SapioLoopConfig>;
   /** Callback for events */
@@ -467,6 +469,7 @@ export class SapioAgentAdapter {
       if (strategy.type === "abort" ||
           errorType === "api_error" ||
           errorType === "network_error" ||
+          errorType === "context_exceeded" ||
           errorType === "unknown" ||
           this.loopContext.consecutiveErrors >= this.loopContext.config.maxConsecutiveErrors) {
         throw error;
@@ -694,7 +697,7 @@ export class SapioAgentAdapter {
       return [];
     }
 
-    const piTools = getToolsForContext();
+    const piTools = getToolsForContext(this.config?.allowedTools);
     logAgent("TOOL", `Registered ${piTools.length} tools`, {
       names: piTools.map(t => t.name),
     });

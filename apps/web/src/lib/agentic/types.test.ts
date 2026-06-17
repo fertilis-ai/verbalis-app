@@ -49,6 +49,14 @@ describe("classifyError", () => {
     expect(classifyError(new Error("HTTP 500 internal server error"))).toBe("api_error");
   });
 
+  it("classifies context-overflow errors before api errors", () => {
+    expect(classifyError(new Error("maximum context length is 200000 tokens"))).toBe("context_exceeded");
+    expect(classifyError(new Error("prompt is too long: 250000 tokens"))).toBe("context_exceeded");
+    expect(classifyError(new Error("This model's context window exceeded"))).toBe("context_exceeded");
+    // Even when phrased as a 400, context overflow wins.
+    expect(classifyError(new Error("400 context_length_exceeded"))).toBe("context_exceeded");
+  });
+
   it("is case-insensitive", () => {
     expect(classifyError(new Error("NETWORK ERROR"))).toBe("network_error");
     expect(classifyError(new Error("Rate Limit"))).toBe("rate_limit");
@@ -99,6 +107,7 @@ describe("ERROR_STRATEGIES", () => {
       "tool_permission",
       "tool_execution",
       "api_error",
+      "context_exceeded",
       "unknown",
     ];
     for (const t of expectedTypes) {

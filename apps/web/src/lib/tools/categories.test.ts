@@ -7,6 +7,7 @@ import {
   RISK_LEVEL_CONFIG,
   CATEGORY_CONFIG,
   FILE_SYSTEM_TOOLS,
+  TOOLBOX_TOOLS,
   WEB_TOOLS,
   SYSTEM_TOOLS,
   ALL_TOOLS,
@@ -219,7 +220,7 @@ describe("ALL_TOOLS", () => {
 
   it("has the expected total count", () => {
     expect(ALL_TOOLS.length).toBe(
-      FILE_SYSTEM_TOOLS.length + WEB_TOOLS.length + SYSTEM_TOOLS.length
+      FILE_SYSTEM_TOOLS.length + TOOLBOX_TOOLS.length + WEB_TOOLS.length + SYSTEM_TOOLS.length
     );
   });
 

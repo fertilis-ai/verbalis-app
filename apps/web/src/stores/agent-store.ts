@@ -6,6 +6,8 @@ export interface Agent {
   model: string;
   temperature: number;
   systemPrompt: string;
+  /** Optional per-agent tool allowlist (tool names). Undefined = all tools. */
+  tools?: string[];
 }
 
 interface AgentState {

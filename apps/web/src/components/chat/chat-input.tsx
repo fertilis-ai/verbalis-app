@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { getActiveModels } from "@/lib/models";
 import { useChatStore, type ContextFile } from "@/stores/chat-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { expandPromptInput } from "@/lib/prompts/expand-prompt";
 
 const providerDisplayName: Record<string, string> = {
   anthropic: "Anthropic",
@@ -33,6 +34,12 @@ interface ChatInputProps {
 
 export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles = [], onAddFiles, onRemoveFile }: ChatInputProps) {
   const { model, setModel } = useChatStore();
+  const contextBudget = useChatStore((s) => s.contextBudget);
+  const contextWindowTrimmed = useChatStore((s) => s.contextWindowTrimmed);
+  const contextUsedPct =
+    contextBudget && contextBudget.available > 0
+      ? Math.min(100, Math.round((contextBudget.used / contextBudget.available) * 100))
+      : null;
   const { localLLM, selectedModels } = useSettingsStore();
   const activeModels = getActiveModels(selectedModels);
   const [input, setInput] = React.useState("");
@@ -59,13 +66,15 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles
   }, [input, adjustHeight]);
 
   const handleSubmit = () => {
-    if (!input.trim() || disabled) return;
-    onSend(input.trim());
+    const trimmed = input.trim();
+    if (!trimmed || disabled) return;
+    // Clear the input immediately for responsiveness, then expand any saved
+    // `/<prompt-name>` command before sending (no-op for ordinary messages).
     setInput("");
-    // Reset height after clearing
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+    void expandPromptInput(trimmed).then((expanded) => onSend(expanded));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -175,6 +184,24 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Context-window usage + sliding-window indicator */}
+            {contextUsedPct !== null && (
+              <span
+                className="text-xs text-muted-foreground tabular-nums"
+                title="Estimated context-window usage"
+              >
+                {contextUsedPct}%
+              </span>
+            )}
+            {contextWindowTrimmed && (
+              <span
+                className="text-xs text-amber-600 dark:text-amber-400"
+                title="Older messages were dropped to fit the context window"
+              >
+                trimmed
+              </span>
+            )}
           </div>
 
           {/* Right: Send / Stop button */}

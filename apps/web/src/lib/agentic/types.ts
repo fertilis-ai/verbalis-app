@@ -116,6 +116,7 @@ export type ErrorType =
   | "tool_permission"
   | "tool_execution"
   | "api_error"
+  | "context_exceeded"
   | "unknown";
 
 export interface ErrorRecoveryStrategy {
@@ -131,6 +132,9 @@ export const ERROR_STRATEGIES: Record<ErrorType, ErrorRecoveryStrategy> = {
   tool_permission: { type: "skip", maxRetries: 0, backoffMs: 0 },
   tool_execution: { type: "retry", maxRetries: 2, backoffMs: 500 },
   api_error: { type: "retry", maxRetries: 3, backoffMs: 2000 },
+  // Trimming the context and retrying once is handled by the caller; the
+  // strategy here governs the fallback if a retry still overflows.
+  context_exceeded: { type: "retry", maxRetries: 1, backoffMs: 0 },
   unknown: { type: "ask_user", maxRetries: 0, backoffMs: 0 },
 };
 
@@ -138,6 +142,21 @@ export function classifyError(error: unknown): ErrorType {
   if (error instanceof Error) {
     const message = error.message.toLowerCase();
 
+    // Context overflow must be checked before api_error: providers report it
+    // as a 400 whose body mentions the context length / token budget.
+    if (
+      message.includes("context length") ||
+      message.includes("context_length") ||
+      message.includes("context window") ||
+      message.includes("maximum context") ||
+      message.includes("too many tokens") ||
+      message.includes("prompt is too long") ||
+      message.includes("reduce the length") ||
+      message.includes("string too long") ||
+      message.includes("input is too long")
+    ) {
+      return "context_exceeded";
+    }
     if (message.includes("network") || message.includes("fetch") || message.includes("connection")) {
       return "network_error";
     }

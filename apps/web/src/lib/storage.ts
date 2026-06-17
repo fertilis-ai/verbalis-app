@@ -547,16 +547,22 @@ export interface AgentData {
   model: string;
   temperature: number;
   systemPrompt: string;
+  /** Optional per-agent tool allowlist (tool names). Undefined = all tools. */
+  tools?: string[];
 }
 
 export async function saveAgent(agent: AgentData): Promise<void> {
   const dir = await getAppDataDirCached();
   const path = `${dir}/agents/${agent.name}.md`;
-  const content = matter.stringify(agent.systemPrompt, {
+  const frontmatter: Record<string, unknown> = {
     name: agent.name,
     model: agent.model,
     temperature: agent.temperature,
-  });
+  };
+  if (agent.tools && agent.tools.length > 0) {
+    frontmatter.tools = agent.tools;
+  }
+  const content = matter.stringify(agent.systemPrompt, frontmatter);
   await writeFile(path, content);
 }
 
@@ -566,11 +572,15 @@ export async function loadAgent(name: string): Promise<AgentData | null> {
   if (!(await pathExists(path))) return null;
   const content = await readFile(path);
   const { data, content: systemPrompt } = matter(content);
+  const tools = Array.isArray(data.tools)
+    ? data.tools.filter((t: unknown): t is string => typeof t === "string")
+    : undefined;
   return {
     name: data.name ?? name,
     model: data.model ?? "claude-sonnet-4-20250514",
     temperature: data.temperature ?? 0.7,
     systemPrompt: systemPrompt.trim(),
+    ...(tools && tools.length > 0 ? { tools } : {}),
   };
 }
 
@@ -938,4 +948,42 @@ export async function renameToolboxItem(
   if (!item) return;
   await saveToolboxItem({ ...item, name: newName });
   await deleteToolboxItem(category, oldName);
+}
+
+const SOUL_TEMPLATE = `---
+alwaysInclude: true
+---
+
+# Soul
+
+Your enduring identity, values, and voice. This is always included in the
+agent's system prompt. Describe who the assistant is and how it should behave.
+`;
+
+const USER_TEMPLATE = `---
+alwaysInclude: true
+---
+
+# User
+
+Durable facts about the user (preferences, context, goals). This is always
+included in the agent's system prompt and is where the \`remember\` tool can
+record what it learns over time.
+`;
+
+/**
+ * Seed the well-known SOUL and USER memory files in the canonical memories
+ * store if they don't already exist, so they surface as editable items in the
+ * Toolbox. Safe to call on every startup — it only writes missing files.
+ */
+export async function ensureWellKnownMemories(): Promise<void> {
+  const dir = await getAppDataDirCached();
+  const seed = async (name: string, template: string) => {
+    const path = `${dir}/memories/${name}.md`;
+    if (!(await pathExists(path))) {
+      await writeFile(path, template);
+    }
+  };
+  await seed("SOUL", SOUL_TEMPLATE);
+  await seed("USER", USER_TEMPLATE);
 }

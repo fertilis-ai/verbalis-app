@@ -152,6 +152,19 @@ function toInventoryItem(def: ToolDefinitionV2): ToolInventoryItem {
   };
 }
 
+// Self-enhancement (Toolbox CRUD) tools. Classified as file_system so the
+// confirmation matrix gates writes (medium) and deletes (high) while leaving
+// read/list (low) un-prompted.
+export const TOOLBOX_TOOLS: ToolInventoryItem[] = [
+  { name: "list_toolbox_items", category: "file_system", riskLevel: "low", supportsUndo: false, description: "List Toolbox items" },
+  { name: "read_toolbox_item", category: "file_system", riskLevel: "low", supportsUndo: false, description: "Read a Toolbox item" },
+  { name: "write_toolbox_item", category: "file_system", riskLevel: "medium", supportsUndo: false, description: "Create/overwrite a Toolbox item" },
+  { name: "delete_toolbox_item", category: "file_system", riskLevel: "high", supportsUndo: false, description: "Delete a Toolbox item" },
+  // `remember` is a memory-category append; medium risk so it learns without
+  // a confirmation prompt on every fact (memory matrix only gates high+).
+  { name: "remember", category: "memory", riskLevel: "medium", supportsUndo: false, description: "Persist a fact to long-term memory" },
+];
+
 export const WEB_TOOLS: ToolInventoryItem[] =
   Object.values(WEB_TOOL_DEFINITIONS).map(toInventoryItem);
 
@@ -160,6 +173,7 @@ export const SYSTEM_TOOLS: ToolInventoryItem[] =
 
 export const ALL_TOOLS: ToolInventoryItem[] = [
   ...FILE_SYSTEM_TOOLS,
+  ...TOOLBOX_TOOLS,
   ...WEB_TOOLS,
   ...SYSTEM_TOOLS,
 ];

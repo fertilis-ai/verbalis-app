@@ -15,7 +15,8 @@ export type LogCategory =
   | "ADAPTER"      // Adapter lifecycle (init, run, stop)
   | "LLM_CALL"     // LLM request/response
   | "EVENT"        // Agent events emitted
-  | "TOOL";        // Tool execution flow
+  | "TOOL"         // Tool execution flow
+  | "CONTEXT";     // Context-window budgeting / trimming
 
 // In-memory flag for whether logging is enabled
 // This is updated by the settings store
