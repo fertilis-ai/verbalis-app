@@ -80,7 +80,7 @@ Built by [Fertilis.ai](https://fertilis.ai).
 | Dark Mode | next-themes |
 | Toasts | Sonner |
 | Validation | Zod |
-| AI Runtime | pi-mono (@mariozechner/pi-ai, pi-agent-core) |
+| AI Runtime | pi-mono (@earendil-works/pi-ai, pi-agent-core) |
 | Desktop Runtime | Tauri v2 (Rust backend) |
 | Secure Storage | OS keychain (keyring crate) |
 | Build Tool | Vite 6 |

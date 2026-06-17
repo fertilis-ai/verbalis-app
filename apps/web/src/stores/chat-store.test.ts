@@ -124,7 +124,7 @@ vi.mock("@/lib/message-conversion", () => ({
   messagesToPiMessages: vi.fn().mockReturnValue([]),
 }));
 
-vi.mock("@mariozechner/pi-ai", () => ({
+vi.mock("@earendil-works/pi-ai", () => ({
   streamSimple: mockStreamSimple,
   getModel: mockGetModel,
 }));

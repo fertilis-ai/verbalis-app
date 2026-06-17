@@ -4,7 +4,7 @@ import type {
   ToolResultMessage as PiToolResultMessage,
   Api,
   Usage,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import type { Message } from "@/stores/chat-store";
 
 export function buildEmptyUsage(): Usage {

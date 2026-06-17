@@ -1,4 +1,4 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import { invoke } from "@tauri-apps/api/core";
 import type { ToolDefinitionV2 } from "./categories";
 import { isTauri } from "@/lib/storage";

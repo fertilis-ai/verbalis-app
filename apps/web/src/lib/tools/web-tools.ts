@@ -1,5 +1,5 @@
-import { Type, type Static } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { Type, type Static } from "typebox";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { invoke } from "@tauri-apps/api/core";
 import type { ToolDefinitionV2 } from "./categories";
 import { isTauri } from "@/lib/storage";
@@ -17,9 +17,8 @@ export const HttpFetchParams = Type.Object({
     })
   ),
   headers: Type.Optional(
-    Type.Object({}, {
+    Type.Record(Type.String(), Type.String(), {
       description: "Request headers as key-value pairs",
-      additionalProperties: Type.String(),
     })
   ),
   body: Type.Optional(Type.String({ description: "Request body (for POST/PUT/PATCH)" })),

@@ -13,7 +13,7 @@ const mockPrepareFileDeleteUndo = vi.fn();
 const mockPrepareDirectoryCreateUndo = vi.fn();
 const mockRegisterUndo = vi.fn();
 
-vi.mock("@mariozechner/pi-agent-core", () => ({
+vi.mock("@earendil-works/pi-agent-core", () => ({
   agentLoop: (...args: unknown[]) => mockAgentLoop(...args),
 }));
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildEmptyUsage, messagesToPiMessages } from "./message-conversion";
 import type { Message } from "@/stores/chat-store";
-import type { Api } from "@mariozechner/pi-ai";
+import type { Api } from "@earendil-works/pi-ai";
 
 // ---------------------------------------------------------------------------
 // buildEmptyUsage

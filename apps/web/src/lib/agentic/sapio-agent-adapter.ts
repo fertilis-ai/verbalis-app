@@ -19,15 +19,15 @@ import {
   type AgentTool,
   type AgentToolResult,
   type AgentToolUpdateCallback,
-} from "@mariozechner/pi-agent-core";
+} from "@earendil-works/pi-agent-core";
 import type {
   Message as PiMessage,
   Model,
   Api,
   Tool,
   ToolCall,
-} from "@mariozechner/pi-ai";
-import type { Static, TSchema } from "@sinclair/typebox";
+} from "@earendil-works/pi-ai";
+import type { Static, TSchema } from "typebox";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import { getGuardrailsEvaluator } from "@/lib/guardrails/evaluator";
 import { getUndoManager } from "@/lib/guardrails/undo-manager";

@@ -1,6 +1,6 @@
-import { Type, type Static, type TSchema } from "@sinclair/typebox";
+import { Type, type Static, type TSchema } from "typebox";
 import { invoke } from "@tauri-apps/api/core";
-import type { Tool, ToolCall } from "@mariozechner/pi-ai";
+import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import type { ToolCategory, RiskLevel } from "./tools/categories";
 import {
   WEB_TOOL_DEFINITIONS,

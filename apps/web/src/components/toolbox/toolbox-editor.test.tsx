@@ -37,7 +37,10 @@ vi.mock("./toolbox-tabs", () => ({
 vi.mock("shiki", () => ({
   createHighlighter: vi.fn().mockResolvedValue({
     codeToHtml: vi.fn(() => '<pre><code>highlighted</code></pre>'),
+    getLoadedLanguages: vi.fn(() => []),
+    loadLanguage: vi.fn().mockResolvedValue(undefined),
   }),
+  bundledLanguages: { yaml: {}, markdown: {}, text: {} },
 }));
 
 vi.mock("lucide-react", () =>

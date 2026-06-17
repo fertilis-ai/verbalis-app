@@ -26,6 +26,10 @@ function nodeStubsPlugin(): Plugin {
     ...builtinModules.filter((m) => !exclude.has(m)).map((m) => `node:${m}`),
     "fs/promises",
     "util/types",
+    // Optional peer dep pulled in transitively (pi-ai → @mistralai/mistralai v2
+    // observability). It is not installed and the app never uses Mistral, so the
+    // import would otherwise leave an unresolvable named export and fail the build.
+    "@opentelemetry/api",
   ]);
 
   return {

@@ -6,7 +6,7 @@ import {
   type Context,
   type Api,
   type Model,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import {
   type ToolCallState,
   type ToolCallStatus,

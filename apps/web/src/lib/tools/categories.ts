@@ -1,4 +1,4 @@
-import type { TSchema } from "@sinclair/typebox";
+import type { TSchema } from "typebox";
 import { WEB_TOOL_DEFINITIONS } from "./web-tools";
 import { SYSTEM_TOOL_DEFINITIONS } from "./system-tools";
 

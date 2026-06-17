@@ -132,7 +132,7 @@ CLAUDE.md still says "Testing infrastructure not yet configured" — there are 6
 
 ## 5. Build, Dependencies & Rust Backend
 
-### 5.1 Pin `@mariozechner/pi-coding-agent`
+### 5.1 Pin `@earendil-works/pi-coding-agent`
 `packages/pi-sidecar/package.json:9` uses `"latest"` — every fresh install can pull a different version of the package at the heart of the agent runtime. Pin it (exact or caret) and upgrade deliberately.
 
 ### 5.2 Make filesystem Tauri commands async

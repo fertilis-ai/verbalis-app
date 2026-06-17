@@ -23,7 +23,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: vi.fn(() => false),
 }));
 vi.mock("@/lib/storage", () => ({ isTauri: vi.fn(() => false) }));
-vi.mock("@mariozechner/pi-ai", () => ({
+vi.mock("@earendil-works/pi-ai", () => ({
   StringEnum: vi.fn((values: readonly string[]) => ({ type: "string", enum: values })),
 }));
 
