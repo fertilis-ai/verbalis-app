@@ -28,6 +28,7 @@ const mockSettingsStore = {
   selectedModels: [],
   modelFetchStatus: "idle" as string,
   modelFetchError: null as string | null,
+  availableSpeechModels: [] as unknown[],
   guardrailsConfig: { enabled: true },
   setHue: mockSetHue,
   setApiKey: mockSetApiKey,

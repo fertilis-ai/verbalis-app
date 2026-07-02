@@ -102,6 +102,10 @@ vi.mock("./markdown-content", () => ({
   MarkdownContent: ({ content }: any) => <div data-testid="markdown">{content}</div>,
 }));
 
+vi.mock("./speech-button", () => ({
+  SpeechButton: ({ text }: any) => <div data-testid="speech-button">{text}</div>,
+}));
+
 vi.mock("./guardrail-confirmation-bar", () => ({
   GuardrailConfirmationBar: ({ pendingToolCalls }: any) => (
     <div data-testid="guardrail-bar" data-count={pendingToolCalls.length} />
@@ -191,6 +195,43 @@ describe("ChatView", () => {
   // -------------------------------------------------------------------------
   // Messages rendering
   // -------------------------------------------------------------------------
+
+  describe("read aloud", () => {
+    it("renders the speech button on assistant messages only", () => {
+      mockChatStoreState.currentConversation = {
+        id: "conv-1",
+        title: "Test",
+        messages: [
+          { id: "msg-1", role: "user", content: "Question", createdAt: new Date() },
+          { id: "msg-2", role: "assistant", content: "Answer", createdAt: new Date() },
+        ],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      render(<ChatView />);
+      const buttons = screen.getAllByTestId("speech-button");
+      expect(buttons).toHaveLength(1);
+      expect(buttons[0]).toHaveTextContent("Answer");
+    });
+
+    it("hides the speech button on the last message while streaming", () => {
+      mockChatStoreState.isStreaming = true;
+      mockChatStoreState.currentConversation = {
+        id: "conv-1",
+        title: "Test",
+        messages: [
+          { id: "msg-1", role: "assistant", content: "Done earlier", createdAt: new Date() },
+          { id: "msg-2", role: "assistant", content: "Still typing", createdAt: new Date() },
+        ],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      render(<ChatView />);
+      const buttons = screen.getAllByTestId("speech-button");
+      expect(buttons).toHaveLength(1);
+      expect(buttons[0]).toHaveTextContent("Done earlier");
+    });
+  });
 
   describe("messages", () => {
     it("renders user messages", () => {

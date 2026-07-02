@@ -18,6 +18,14 @@ export interface TranscriptionProviderModel {
   name: string;
 }
 
+/** An OpenRouter speech (text-to-speech) model (from /api/v1/models?output_modalities=speech). */
+export interface SpeechProviderModel {
+  id: string;
+  name: string;
+  /** Model-specific voice identifiers (from supported_voices); may be empty. */
+  voices: string[];
+}
+
 export const MODEL_OPTIONS: ProviderModel[] = [
   { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic" },
   { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "anthropic" },

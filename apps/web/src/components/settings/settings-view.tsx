@@ -349,7 +349,9 @@ function ModelsSection() {
     defaultModel, setDefaultModel, localLLM, selectedModels, modelFetchStatus, modelFetchError, fetchModels,
     apiKeys, imageModel, setImageModel, availableImageModels, imageModelFetchStatus, imageModelFetchError, fetchImageModels,
     transcriptionModel, setTranscriptionModel, availableTranscriptionModels, transcriptionModelFetchStatus, transcriptionModelFetchError, fetchTranscriptionModels,
+    speechModel, setSpeechModel, speechVoice, setSpeechVoice, availableSpeechModels, speechModelFetchStatus, speechModelFetchError, fetchSpeechModels,
   } = useSettingsStore();
+  const speechVoices = availableSpeechModels.find((m) => m.id === speechModel)?.voices ?? [];
   const activeModels = getActiveModels(selectedModels);
   const localProviderLabel = localLLM.provider === "lmstudio" ? "LM Studio" : "Ollama";
   const localModelLabel = localLLM.model.trim() || `${localProviderLabel} (default)`;
@@ -475,6 +477,69 @@ function ModelsSection() {
               {availableTranscriptionModels.length === 0
                 ? "Click Refresh to load OpenRouter transcription models."
                 : "Enables the microphone button in chat for voice input."}
+            </p>
+          </div>
+        )}
+
+        {apiKeys.openrouter.trim() && (
+          <div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Speech Model</label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchSpeechModels()}
+                disabled={!canFetch || speechModelFetchStatus === "fetching"}
+                title={!canFetch ? "Model fetching requires the desktop app" : undefined}
+                className="gap-2 h-6 text-xs"
+              >
+                {speechModelFetchStatus === "fetching" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                Refresh
+              </Button>
+              {speechModelFetchError && (
+                <span className="text-xs text-destructive">{speechModelFetchError}</span>
+              )}
+            </div>
+            <div className="mt-2">
+              <select
+                value={speechModel}
+                onChange={(e) => setSpeechModel(e.target.value)}
+                className="w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm text-foreground"
+              >
+                <option value="">None (disabled)</option>
+                {availableSpeechModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {speechVoices.length > 0 && (
+              <div className="mt-2">
+                <label className="text-sm font-medium">Voice</label>
+                <div className="mt-2">
+                  <select
+                    value={speechVoice}
+                    onChange={(e) => setSpeechVoice(e.target.value)}
+                    className="w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm text-foreground"
+                  >
+                    {speechVoices.map((voice) => (
+                      <option key={voice} value={voice}>
+                        {voice}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+              {availableSpeechModels.length === 0
+                ? "Click Refresh to load OpenRouter text-to-speech models."
+                : "Enables the read-aloud button on assistant replies."}
             </p>
           </div>
         )}

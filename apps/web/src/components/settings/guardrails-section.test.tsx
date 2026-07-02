@@ -33,6 +33,8 @@ vi.mock("@/lib/logger", () => ({ setLoggingEnabled: vi.fn() }));
 vi.mock("@/lib/provider-models", () => ({
   fetchAllProviderModels: vi.fn(async () => []),
   fetchOpenRouterImageModels: vi.fn(async () => ({ models: [] })),
+  fetchOpenRouterTranscriptionModels: vi.fn(async () => ({ models: [] })),
+  fetchOpenRouterSpeechModels: vi.fn(async () => ({ models: [] })),
 }));
 vi.mock("zustand/middleware", () => ({ persist: (fn: any) => fn }));
 

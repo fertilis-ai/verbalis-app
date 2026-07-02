@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { DEFAULT_MODEL_ID, type ChatModelId, type ImageProviderModel, type ProviderModel, type TranscriptionProviderModel } from "@/lib/models";
-import { fetchAllProviderModels, fetchOpenRouterImageModels, fetchOpenRouterTranscriptionModels } from "@/lib/provider-models";
+import { DEFAULT_MODEL_ID, type ChatModelId, type ImageProviderModel, type ProviderModel, type SpeechProviderModel, type TranscriptionProviderModel } from "@/lib/models";
+import { fetchAllProviderModels, fetchOpenRouterImageModels, fetchOpenRouterSpeechModels, fetchOpenRouterTranscriptionModels } from "@/lib/provider-models";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import { DEFAULT_GUARDRAILS_CONFIG } from "@/lib/guardrails/types";
 import { getPresetConfig, type UserModePreset } from "@/lib/guardrails/presets";
@@ -58,6 +58,13 @@ interface SettingsState {
   transcriptionModelFetchStatus: "idle" | "fetching" | "done" | "error";
   transcriptionModelFetchError: string | null;
 
+  // Text-to-speech (OpenRouter). Empty speechModel = feature disabled.
+  speechModel: string;
+  speechVoice: string;
+  availableSpeechModels: SpeechProviderModel[];
+  speechModelFetchStatus: "idle" | "fetching" | "done" | "error";
+  speechModelFetchError: string | null;
+
   // Enhanced guardrails configuration
   guardrailsConfig: GuardrailsConfig;
 
@@ -101,6 +108,12 @@ interface SettingsState {
   setTranscriptionModel: (modelId: string) => void;
   setAvailableTranscriptionModels: (models: TranscriptionProviderModel[]) => void;
   fetchTranscriptionModels: () => Promise<void>;
+
+  // Text-to-speech actions
+  setSpeechModel: (modelId: string) => void;
+  setSpeechVoice: (voice: string) => void;
+  setAvailableSpeechModels: (models: SpeechProviderModel[]) => void;
+  fetchSpeechModels: () => Promise<void>;
 
   // Guardrails config actions
   setGuardrailsConfig: (config: Partial<GuardrailsConfig>) => void;
@@ -148,6 +161,11 @@ export const useSettingsStore = create<SettingsState>()(
       availableTranscriptionModels: [],
       transcriptionModelFetchStatus: "idle" as const,
       transcriptionModelFetchError: null,
+      speechModel: "",
+      speechVoice: "",
+      availableSpeechModels: [],
+      speechModelFetchStatus: "idle" as const,
+      speechModelFetchError: null,
       guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
       agentDebugLogging: false,
       allowSelfEnhancement: false,
@@ -286,6 +304,32 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
+      // Text-to-speech actions
+      setSpeechModel: (speechModel) =>
+        set({
+          speechModel,
+          // Changing models invalidates the voice; default to the new model's first voice.
+          speechVoice:
+            get().availableSpeechModels.find((m) => m.id === speechModel)?.voices[0] ?? "",
+        }),
+      setSpeechVoice: (speechVoice) => set({ speechVoice }),
+      setAvailableSpeechModels: (availableSpeechModels) => set({ availableSpeechModels }),
+      fetchSpeechModels: async () => {
+        set({ speechModelFetchStatus: "fetching", speechModelFetchError: null });
+        try {
+          const { models, error } = await fetchOpenRouterSpeechModels(get().apiKeys.openrouter);
+          set({
+            // Keep the current list on a failed fetch; the user's speechModel
+            // selection is never touched here (their choice wins).
+            ...(models.length > 0 || !error ? { availableSpeechModels: models } : {}),
+            speechModelFetchStatus: error && models.length === 0 ? "error" : "done",
+            speechModelFetchError: error ?? null,
+          });
+        } catch (e) {
+          set({ speechModelFetchStatus: "error", speechModelFetchError: String(e) });
+        }
+      },
+
       // Guardrails config actions
       setGuardrailsConfig: (config) =>
         set((state) => ({
@@ -356,6 +400,9 @@ export const useSettingsStore = create<SettingsState>()(
         availableImageModels: state.availableImageModels,
         transcriptionModel: state.transcriptionModel,
         availableTranscriptionModels: state.availableTranscriptionModels,
+        speechModel: state.speechModel,
+        speechVoice: state.speechVoice,
+        availableSpeechModels: state.availableSpeechModels,
         guardrailsConfig: state.guardrailsConfig,
         agentDebugLogging: state.agentDebugLogging,
         allowSelfEnhancement: state.allowSelfEnhancement,

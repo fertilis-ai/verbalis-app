@@ -5,6 +5,7 @@ const mockSetLoggingEnabled = vi.fn();
 const mockFetchAllProviderModels = vi.fn();
 const mockFetchOpenRouterImageModels = vi.fn();
 const mockFetchOpenRouterTranscriptionModels = vi.fn();
+const mockFetchOpenRouterSpeechModels = vi.fn();
 const mockGetPresetConfig = vi.fn();
 
 // Mock zustand persist to be a passthrough (avoids localStorage issues in tests)
@@ -30,6 +31,7 @@ vi.mock("@/lib/provider-models", () => ({
   fetchOpenRouterImageModels: (...args: unknown[]) => mockFetchOpenRouterImageModels(...args),
   fetchOpenRouterTranscriptionModels: (...args: unknown[]) =>
     mockFetchOpenRouterTranscriptionModels(...args),
+  fetchOpenRouterSpeechModels: (...args: unknown[]) => mockFetchOpenRouterSpeechModels(...args),
 }));
 
 vi.mock("@/lib/guardrails/presets", async () => {
@@ -72,6 +74,11 @@ function resetStore() {
     availableTranscriptionModels: [],
     transcriptionModelFetchStatus: "idle" as const,
     transcriptionModelFetchError: null,
+    speechModel: "",
+    speechVoice: "",
+    availableSpeechModels: [],
+    speechModelFetchStatus: "idle" as const,
+    speechModelFetchError: null,
     guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
     agentDebugLogging: false,
   });
@@ -439,6 +446,78 @@ describe("settings-store", () => {
       expect(useSettingsStore.getState().transcriptionModelFetchError).toBe("HTTP 401");
       expect(useSettingsStore.getState().availableTranscriptionModels).toEqual(transcriptionModels);
       expect(useSettingsStore.getState().transcriptionModel).toBe("openai/whisper-large-v3");
+    });
+  });
+
+  describe("speech model", () => {
+    const speechModels = [
+      { id: "x-ai/grok-voice-tts-1.0", name: "Grok Voice TTS", voices: ["eve", "ara"] },
+      { id: "acme/voiceless-tts", name: "Voiceless TTS", voices: [] },
+    ];
+
+    it("defaults to disabled", () => {
+      expect(useSettingsStore.getState().speechModel).toBe("");
+      expect(useSettingsStore.getState().speechVoice).toBe("");
+      expect(useSettingsStore.getState().availableSpeechModels).toEqual([]);
+      expect(useSettingsStore.getState().speechModelFetchStatus).toBe("idle");
+    });
+
+    it("setSpeechModel selects the model and defaults to its first voice", () => {
+      useSettingsStore.setState({ availableSpeechModels: speechModels });
+      useSettingsStore.getState().setSpeechModel("x-ai/grok-voice-tts-1.0");
+      expect(useSettingsStore.getState().speechModel).toBe("x-ai/grok-voice-tts-1.0");
+      expect(useSettingsStore.getState().speechVoice).toBe("eve");
+    });
+
+    it("setSpeechModel clears the voice when the model has none", () => {
+      useSettingsStore.setState({ availableSpeechModels: speechModels, speechVoice: "eve" });
+      useSettingsStore.getState().setSpeechModel("acme/voiceless-tts");
+      expect(useSettingsStore.getState().speechVoice).toBe("");
+    });
+
+    it("setSpeechModel clears the voice when the feature is disabled", () => {
+      useSettingsStore.setState({ availableSpeechModels: speechModels, speechVoice: "eve" });
+      useSettingsStore.getState().setSpeechModel("");
+      expect(useSettingsStore.getState().speechModel).toBe("");
+      expect(useSettingsStore.getState().speechVoice).toBe("");
+    });
+
+    it("setSpeechVoice updates the voice", () => {
+      useSettingsStore.getState().setSpeechVoice("ara");
+      expect(useSettingsStore.getState().speechVoice).toBe("ara");
+    });
+
+    it("fetchSpeechModels stores models on success", async () => {
+      mockFetchOpenRouterSpeechModels.mockResolvedValue({ models: speechModels });
+      const promise = useSettingsStore.getState().fetchSpeechModels();
+      expect(useSettingsStore.getState().speechModelFetchStatus).toBe("fetching");
+      await promise;
+      expect(useSettingsStore.getState().speechModelFetchStatus).toBe("done");
+      expect(useSettingsStore.getState().availableSpeechModels).toEqual(speechModels);
+    });
+
+    it("fetchSpeechModels passes the OpenRouter key", async () => {
+      useSettingsStore.setState({
+        apiKeys: { anthropic: "", openai: "", google: "", openrouter: "sk-or-key" },
+      });
+      mockFetchOpenRouterSpeechModels.mockResolvedValue({ models: [] });
+      await useSettingsStore.getState().fetchSpeechModels();
+      expect(mockFetchOpenRouterSpeechModels).toHaveBeenCalledWith("sk-or-key");
+    });
+
+    it("fetchSpeechModels keeps the current list and selection on error", async () => {
+      useSettingsStore.setState({
+        availableSpeechModels: speechModels,
+        speechModel: "x-ai/grok-voice-tts-1.0",
+        speechVoice: "ara",
+      });
+      mockFetchOpenRouterSpeechModels.mockResolvedValue({ models: [], error: "HTTP 401" });
+      await useSettingsStore.getState().fetchSpeechModels();
+      expect(useSettingsStore.getState().speechModelFetchStatus).toBe("error");
+      expect(useSettingsStore.getState().speechModelFetchError).toBe("HTTP 401");
+      expect(useSettingsStore.getState().availableSpeechModels).toEqual(speechModels);
+      expect(useSettingsStore.getState().speechModel).toBe("x-ai/grok-voice-tts-1.0");
+      expect(useSettingsStore.getState().speechVoice).toBe("ara");
     });
   });
 

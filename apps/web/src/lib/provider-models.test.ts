@@ -4,6 +4,7 @@ import {
   fetchAllProviderModels,
   fetchOpenRouterImageModels,
   fetchOpenRouterTranscriptionModels,
+  fetchOpenRouterSpeechModels,
 } from "./provider-models";
 
 const mockAppFetch = vi.fn();
@@ -418,6 +419,59 @@ describe("fetchOpenRouterTranscriptionModels", () => {
   it("returns error on network failure", async () => {
     mockAppFetch.mockRejectedValue(new Error("offline"));
     const result = await fetchOpenRouterTranscriptionModels("key");
+    expect(result.error).toContain("offline");
+  });
+});
+
+describe("fetchOpenRouterSpeechModels", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetches and maps speech models with their voices", async () => {
+    mockAppFetch.mockResolvedValue(
+      jsonResponse({
+        data: [
+          { id: "x-ai/grok-voice-tts-1.0", name: "Grok Voice TTS", supported_voices: ["eve", "ara"] },
+          { id: "acme/voiceless-tts" },
+        ],
+      })
+    );
+
+    const result = await fetchOpenRouterSpeechModels("sk-or-key");
+    expect(mockAppFetch).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/models?output_modalities=speech",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer sk-or-key" }),
+      })
+    );
+    expect(result.models).toEqual([
+      { id: "x-ai/grok-voice-tts-1.0", name: "Grok Voice TTS", voices: ["eve", "ara"] },
+      { id: "acme/voiceless-tts", name: "acme/voiceless-tts", voices: [] },
+    ]);
+  });
+
+  it("omits the Authorization header when no key is provided", async () => {
+    mockAppFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    await fetchOpenRouterSpeechModels();
+    expect(mockAppFetch).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/models?output_modalities=speech",
+      { headers: {} }
+    );
+  });
+
+  it("returns error on non-OK response", async () => {
+    mockAppFetch.mockResolvedValue(
+      jsonResponse({ error: { message: "Unauthorized" } }, false, 401)
+    );
+    const result = await fetchOpenRouterSpeechModels("bad-key");
+    expect(result.models).toHaveLength(0);
+    expect(result.error).toContain("401");
+  });
+
+  it("returns error on network failure", async () => {
+    mockAppFetch.mockRejectedValue(new Error("offline"));
+    const result = await fetchOpenRouterSpeechModels("key");
     expect(result.error).toContain("offline");
   });
 });

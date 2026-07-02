@@ -8,6 +8,7 @@ import { ChatHeader } from "./chat-header";
 import { ToolCallCard } from "./tool-call-card";
 import { MarkdownContent } from "./markdown-content";
 import { GuardrailConfirmationBar } from "./guardrail-confirmation-bar";
+import { SpeechButton } from "./speech-button";
 import { useElapsedTime } from "@/lib/hooks/use-elapsed-time";
 import { getUndoManager } from "@/lib/guardrails/undo-manager";
 import { isTauri } from "@/lib/storage";
@@ -125,7 +126,7 @@ export function ChatView() {
               <div
                 key={msg.id}
                 className={cn(
-                  "flex gap-3",
+                  "group/message flex gap-3",
                   msg.role === "user" ? "justify-end" : "justify-start"
                 )}
               >
@@ -165,6 +166,13 @@ export function ChatView() {
                       )}
                     </div>
                   )}
+
+                  {/* Read aloud */}
+                  {msg.role === "assistant" &&
+                    msg.content &&
+                    !(isStreaming && msg === messages[messages.length - 1]) && (
+                      <SpeechButton text={msg.content} />
+                    )}
 
                   {/* Tool calls */}
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
