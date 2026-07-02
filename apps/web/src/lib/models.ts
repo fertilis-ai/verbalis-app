@@ -2,6 +2,8 @@ export interface ProviderModel {
   id: string;
   name: string;
   provider: string;
+  /** True when at least one OpenRouter endpoint for this model is zero-data-retention. */
+  zdr?: boolean;
 }
 
 /** An OpenRouter image-generation model (from /api/v1/images/models). */

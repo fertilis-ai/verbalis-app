@@ -16,6 +16,9 @@ vi.mock("lucide-react", () => ({
   Trash2: (props: any) => (
     <span data-testid="icon-Trash2" {...props}>Trash2</span>
   ),
+  FolderInput: (props: any) => (
+    <span data-testid="icon-FolderInput" {...props}>FolderInput</span>
+  ),
 }));
 
 // Mock the Button component
@@ -51,6 +54,15 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
     </div>
   ),
   DropdownMenuSeparator: () => <hr data-testid="dropdown-separator" />,
+  DropdownMenuSub: ({ children }: any) => (
+    <div data-testid="dropdown-sub">{children}</div>
+  ),
+  DropdownMenuSubTrigger: ({ children }: any) => (
+    <div data-testid="dropdown-sub-trigger">{children}</div>
+  ),
+  DropdownMenuSubContent: ({ children }: any) => (
+    <div data-testid="dropdown-sub-content">{children}</div>
+  ),
 }));
 
 import { FolderContextMenu, LeafContextMenu } from "./item-context-menu";
@@ -216,5 +228,50 @@ describe("LeafContextMenu", () => {
 
     const items = screen.getAllByTestId("dropdown-item");
     expect(items).toHaveLength(2);
+  });
+
+  describe("Move to folder", () => {
+    const moveTargets = [
+      { id: null, name: "Chats", depth: 0 },
+      { id: "folder-1", name: "Work", depth: 1 },
+      { id: "folder-2", name: "Archive", depth: 1 },
+    ];
+
+    it("does not render the submenu without move props", () => {
+      render(<LeafContextMenu {...defaultProps} />);
+
+      expect(screen.queryByText("Move to folder")).not.toBeInTheDocument();
+    });
+
+    it("does not render the submenu when moveTargets is empty", () => {
+      render(<LeafContextMenu {...defaultProps} moveTargets={[]} onMove={vi.fn()} />);
+
+      expect(screen.queryByText("Move to folder")).not.toBeInTheDocument();
+    });
+
+    it("renders the submenu with all targets", () => {
+      render(<LeafContextMenu {...defaultProps} moveTargets={moveTargets} onMove={vi.fn()} />);
+
+      expect(screen.getByText("Move to folder")).toBeInTheDocument();
+      expect(screen.getByText("Chats")).toBeInTheDocument();
+      expect(screen.getByText("Work")).toBeInTheDocument();
+      expect(screen.getByText("Archive")).toBeInTheDocument();
+    });
+
+    it("calls onMove with the folder id when a folder is clicked", () => {
+      const onMove = vi.fn();
+      render(<LeafContextMenu {...defaultProps} moveTargets={moveTargets} onMove={onMove} />);
+
+      fireEvent.click(screen.getByText("Work"));
+      expect(onMove).toHaveBeenCalledWith("folder-1");
+    });
+
+    it("calls onMove with null for the root target", () => {
+      const onMove = vi.fn();
+      render(<LeafContextMenu {...defaultProps} moveTargets={moveTargets} onMove={onMove} />);
+
+      fireEvent.click(screen.getByText("Chats"));
+      expect(onMove).toHaveBeenCalledWith(null);
+    });
   });
 });

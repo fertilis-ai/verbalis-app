@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitByPinned, collectTreeIds } from "./sidebar-utils";
+import { splitByPinned, collectTreeIds, collectFolders } from "./sidebar-utils";
 
 describe("splitByPinned", () => {
   it("separates pinned folders from unpinned items", () => {
@@ -150,5 +150,33 @@ describe("collectTreeIds", () => {
     ];
     const ids = collectTreeIds(nodes, "conversation");
     expect(ids).toEqual(new Set(["c1"]));
+  });
+});
+
+describe("collectFolders", () => {
+  it("collects folders with their depth, skipping leaves", () => {
+    const tree = [
+      {
+        type: "folder",
+        id: "f1",
+        name: "Work",
+        children: [
+          { type: "chat", id: "c1" },
+          { type: "folder", id: "f2", name: "Archive" },
+        ],
+      },
+      { type: "chat", id: "c2" },
+      { type: "folder", id: "f3", name: "Personal" },
+    ];
+    expect(collectFolders(tree)).toEqual([
+      { id: "f1", name: "Work", depth: 0 },
+      { id: "f2", name: "Archive", depth: 1 },
+      { id: "f3", name: "Personal", depth: 0 },
+    ]);
+  });
+
+  it("returns an empty array for a tree without folders", () => {
+    expect(collectFolders([{ type: "chat", id: "c1" }])).toEqual([]);
+    expect(collectFolders([])).toEqual([]);
   });
 });

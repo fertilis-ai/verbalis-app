@@ -3,6 +3,7 @@ import {
   Pin,
   Pencil,
   Trash2,
+  FolderInput,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,8 +11,18 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+/** A destination folder for "Move to folder"; id null = section root. */
+export interface MoveTarget {
+  id: string | null;
+  name: string;
+  depth: number;
+}
 
 interface FolderContextMenuProps {
   isPinned: boolean;
@@ -51,9 +62,11 @@ export function FolderContextMenu({ isPinned, onRename, onDelete, onTogglePin }:
 interface LeafContextMenuProps {
   onRename: () => void;
   onDelete: () => void;
+  moveTargets?: MoveTarget[];
+  onMove?: (folderId: string | null) => void;
 }
 
-export function LeafContextMenu({ onRename, onDelete }: LeafContextMenuProps) {
+export function LeafContextMenu({ onRename, onDelete, moveTargets, onMove }: LeafContextMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -67,6 +80,25 @@ export function LeafContextMenu({ onRename, onDelete }: LeafContextMenuProps) {
           <Pencil className="mr-2 h-4 w-4" />
           Rename
         </DropdownMenuItem>
+        {onMove && moveTargets && moveTargets.length > 0 && (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <FolderInput className="mr-2 h-4 w-4" />
+              Move to folder
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-44">
+              {moveTargets.map((target) => (
+                <DropdownMenuItem
+                  key={target.id ?? "__root__"}
+                  onClick={() => onMove(target.id)}
+                  style={{ paddingLeft: `${8 + target.depth * 12}px` }}
+                >
+                  {target.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onDelete} className="text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />

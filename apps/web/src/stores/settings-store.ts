@@ -45,6 +45,8 @@ interface SettingsState {
   selectedModels: ProviderModel[];
   modelFetchStatus: "idle" | "fetching" | "done" | "error";
   modelFetchError: string | null;
+  // When true, hide OpenRouter models without a zero-data-retention endpoint.
+  modelDiscoveryNoDataCollection: boolean;
 
   // Image generation (OpenRouter). Empty imageModel = feature disabled.
   imageModel: string;
@@ -98,6 +100,7 @@ interface SettingsState {
   addSelectedModels: (models: ProviderModel[]) => void;
   removeSelectedModels: (modelIds: string[]) => void;
   fetchModels: () => Promise<void>;
+  setModelDiscoveryNoDataCollection: (enabled: boolean) => void;
 
   // Image generation actions
   setImageModel: (modelId: string) => void;
@@ -153,6 +156,7 @@ export const useSettingsStore = create<SettingsState>()(
       selectedModels: [],
       modelFetchStatus: "idle" as const,
       modelFetchError: null,
+      modelDiscoveryNoDataCollection: false,
       imageModel: "",
       availableImageModels: [],
       imageModelFetchStatus: "idle" as const,
@@ -259,6 +263,8 @@ export const useSettingsStore = create<SettingsState>()(
           set({ modelFetchStatus: "error", modelFetchError: String(e) });
         }
       },
+      setModelDiscoveryNoDataCollection: (modelDiscoveryNoDataCollection) =>
+        set({ modelDiscoveryNoDataCollection }),
 
       // Image generation actions
       setImageModel: (imageModel) => set({ imageModel }),
@@ -396,6 +402,7 @@ export const useSettingsStore = create<SettingsState>()(
         selectedAgentId: state.selectedAgentId,
         availableModels: state.availableModels,
         selectedModels: state.selectedModels,
+        modelDiscoveryNoDataCollection: state.modelDiscoveryNoDataCollection,
         imageModel: state.imageModel,
         availableImageModels: state.availableImageModels,
         transcriptionModel: state.transcriptionModel,

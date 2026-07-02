@@ -73,6 +73,19 @@ vi.mock("@/lib/sidebar-utils", () => ({
     walk(nodes);
     return ids;
   },
+  collectFolders: (nodes: any[]) => {
+    const folders: any[] = [];
+    const walk = (items: any[], depth: number) => {
+      for (const node of items) {
+        if (node.type === "folder") {
+          folders.push({ id: node.id, name: node.name ?? node.id, depth });
+          if (node.children) walk(node.children, depth + 1);
+        }
+      }
+    };
+    walk(nodes, 0);
+    return folders;
+  },
 }));
 
 // Mock SidebarTreeNode to avoid deep component tree

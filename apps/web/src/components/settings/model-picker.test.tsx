@@ -17,6 +17,7 @@ const mockSettingsStore = {
   selectedModels: [] as any[],
   modelFetchStatus: "idle" as string,
   modelFetchError: null as string | null,
+  modelDiscoveryNoDataCollection: false,
   fetchModels: mockFetchModels,
   addSelectedModels: mockAddSelectedModels,
   removeSelectedModels: mockRemoveSelectedModels,
@@ -82,6 +83,7 @@ describe("ModelPicker", () => {
     mockSettingsStore.selectedModels = [];
     mockSettingsStore.modelFetchStatus = "idle";
     mockSettingsStore.modelFetchError = null;
+    mockSettingsStore.modelDiscoveryNoDataCollection = false;
   });
 
   // -------------------------------------------------------------------------
@@ -212,6 +214,30 @@ describe("ModelPicker", () => {
       await user.type(filterInputs[0], "Claude");
       expect(screen.getByText("Claude 1")).toBeInTheDocument();
       expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
+    });
+
+    it("hides non-ZDR OpenRouter models when No data collection is enabled", () => {
+      mockSettingsStore.modelDiscoveryNoDataCollection = true;
+      mockSettingsStore.availableModels = [
+        { id: "anthropic/claude-3", name: "Claude 3 (OR)", provider: "openrouter", zdr: true },
+        { id: "meta/llama-3", name: "Llama 3 (OR)", provider: "openrouter" },
+        { id: "gpt-4o", name: "GPT-4o", provider: "openai" },
+      ];
+      render(<ModelPicker />);
+      expect(screen.getByText("Claude 3 (OR)")).toBeInTheDocument();
+      expect(screen.queryByText("Llama 3 (OR)")).not.toBeInTheDocument();
+      expect(screen.getByText("GPT-4o")).toBeInTheDocument();
+    });
+
+    it("shows all models when No data collection is disabled", () => {
+      mockSettingsStore.modelDiscoveryNoDataCollection = false;
+      mockSettingsStore.availableModels = [
+        { id: "anthropic/claude-3", name: "Claude 3 (OR)", provider: "openrouter", zdr: true },
+        { id: "meta/llama-3", name: "Llama 3 (OR)", provider: "openrouter" },
+      ];
+      render(<ModelPicker />);
+      expect(screen.getByText("Claude 3 (OR)")).toBeInTheDocument();
+      expect(screen.getByText("Llama 3 (OR)")).toBeInTheDocument();
     });
   });
 

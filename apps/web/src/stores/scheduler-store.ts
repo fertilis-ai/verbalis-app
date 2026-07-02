@@ -11,6 +11,7 @@ import {
   loadSchedule,
   deleteScheduleByPath,
   getAppDataDir,
+  renamePath,
   type ScheduleData,
   type SchedulerTreeNode,
 } from "@/lib/storage";
@@ -54,6 +55,7 @@ interface SchedulerState {
   updateSchedule: (scheduleId: string, updates: Partial<ScheduleData>) => Promise<void>;
   deleteSchedule: (scheduleId: string) => Promise<void>;
   renameSchedule: (scheduleId: string, newName: string) => Promise<void>;
+  moveSchedule: (scheduleId: string, targetFolderId: string | null) => Promise<void>;
   selectSchedule: (scheduleId: string | null) => void;
   runScheduleNow: (scheduleId: string) => Promise<void>;
   stopScheduleRun: () => void;
@@ -264,6 +266,31 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
 
   renameSchedule: async (scheduleId, newName) => {
     await get().updateSchedule(scheduleId, { name: newName });
+  },
+
+  moveSchedule: async (scheduleId, targetFolderId) => {
+    try {
+      const node = findNodeInTree(get().schedulerTree, scheduleId);
+      if (node?.type !== "schedule") return;
+
+      let targetDir: string;
+      if (targetFolderId === null) {
+        targetDir = `${await getAppDataDir()}/scheduler`;
+      } else {
+        const folder = findNodeInTree(get().schedulerTree, targetFolderId);
+        if (folder?.type !== "folder") return;
+        targetDir = folder.path;
+      }
+
+      const fileName = node.path.substring(node.path.lastIndexOf("/") + 1);
+      const newPath = `${targetDir}/${fileName}`;
+      if (newPath === node.path) return;
+
+      await renamePath(node.path, newPath);
+      await get().loadSchedulersFromDisk();
+    } catch (error) {
+      console.error("Failed to move schedule:", error);
+    }
   },
 
   selectSchedule: (scheduleId) => {

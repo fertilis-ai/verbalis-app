@@ -108,18 +108,54 @@ async function fetchGoogle(apiKey: string): Promise<FetchModelsResult> {
   }
 }
 
+/** True when the model is a text/chat model (not image-gen, TTS, or transcription). */
+function isTextModel(architecture?: { input_modalities?: string[]; output_modalities?: string[] }): boolean {
+  if (!architecture) return true;
+  const inputs = architecture.input_modalities;
+  const outputs = architecture.output_modalities;
+  if (outputs && (!outputs.includes("text") || outputs.includes("image") || outputs.includes("audio"))) {
+    return false;
+  }
+  if (inputs && !inputs.includes("text")) return false;
+  return true;
+}
+
+/** Fetch the set of model ids with at least one zero-data-retention endpoint. */
+async function fetchZdrModelIds(headers: Record<string, string>): Promise<Set<string>> {
+  try {
+    const resp = await appFetch("https://openrouter.ai/api/v1/endpoints/zdr", { headers });
+    if (!resp.ok) return new Set();
+    const data = (await resp.json()) as { data?: Array<{ model_id?: string }> };
+    return new Set((data.data ?? []).map((e) => e.model_id).filter((id): id is string => !!id));
+  } catch {
+    return new Set();
+  }
+}
+
 async function fetchOpenRouter(apiKey?: string): Promise<FetchModelsResult> {
   try {
     const headers: Record<string, string> = {};
     if (apiKey?.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
-    const resp = await appFetch("https://openrouter.ai/api/v1/models", { headers });
+    const [resp, zdrIds] = await Promise.all([
+      appFetch("https://openrouter.ai/api/v1/models", { headers }),
+      fetchZdrModelIds(headers),
+    ]);
     if (!resp.ok) return { provider: "openrouter", models: [], error: await readErrorBody(resp) };
-    const data = (await resp.json()) as { data?: Array<{ id: string; name?: string }> };
-    const models: ProviderModel[] = (data.data ?? []).map((m) => ({
-      id: m.id,
-      name: m.name ?? m.id,
-      provider: "openrouter",
-    }));
+    const data = (await resp.json()) as {
+      data?: Array<{
+        id: string;
+        name?: string;
+        architecture?: { input_modalities?: string[]; output_modalities?: string[] };
+      }>;
+    };
+    const models: ProviderModel[] = (data.data ?? [])
+      .filter((m) => isTextModel(m.architecture))
+      .map((m) => ({
+        id: m.id,
+        name: m.name ?? m.id,
+        provider: "openrouter",
+        ...(zdrIds.has(m.id) ? { zdr: true } : {}),
+      }));
     return { provider: "openrouter", models };
   } catch (e) {
     return { provider: "openrouter", models: [], error: String(e) };

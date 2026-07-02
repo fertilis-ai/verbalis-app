@@ -42,6 +42,7 @@ import {
   getAppDataDir,
   isTauri,
   readFile,
+  renamePath,
   type ChatTreeNode,
   type ChatFolderMeta,
   type ChatData,
@@ -260,6 +261,7 @@ interface ChatState {
 
   // Actions - chat management
   renameChat: (chatId: string, newTitle: string) => Promise<void>;
+  moveConversation: (chatId: string, targetFolderId: string | null) => Promise<void>;
 
   // Actions - context files
   addContextFiles: (paths: string[]) => Promise<void>;
@@ -1233,6 +1235,36 @@ export const useChatStore = create<ChatState>((set, get) => {
       } catch (error) {
         console.error("Failed to rename chat:", error);
       }
+    }
+  },
+
+  moveConversation: async (chatId: string, targetFolderId: string | null) => {
+    try {
+      const conversation = get().conversations.find((c) => c.id === chatId);
+      if (!conversation?.path) return;
+
+      let targetDir: string;
+      if (targetFolderId === null) {
+        targetDir = `${await getAppDataDir()}/chats`;
+      } else {
+        const folder = findNodeInTree(get().chatTree, targetFolderId);
+        if (folder?.type !== "folder") return;
+        targetDir = folder.path;
+      }
+
+      const fileName = conversation.path.substring(conversation.path.lastIndexOf("/") + 1);
+      const newPath = `${targetDir}/${fileName}`;
+      if (newPath === conversation.path) return;
+
+      await renamePath(conversation.path, newPath);
+      set((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === chatId ? { ...c, path: newPath, folderId: targetFolderId ?? undefined } : c
+        ),
+      }));
+      await get().loadChatsFromDisk();
+    } catch (error) {
+      console.error("Failed to move conversation:", error);
     }
   },
 

@@ -49,6 +49,7 @@ const mockSchedulerStore = {
   createSchedule: vi.fn().mockResolvedValue(undefined),
   renameSchedule: vi.fn().mockResolvedValue(undefined),
   deleteSchedule: vi.fn().mockResolvedValue(undefined),
+  moveSchedule: vi.fn().mockResolvedValue(undefined),
   selectSchedule: vi.fn(),
   loadSchedulersFromDisk: vi.fn().mockResolvedValue(undefined),
 };
@@ -100,6 +101,19 @@ vi.mock("@/lib/sidebar-utils", () => ({
     };
     walk(nodes);
     return ids;
+  },
+  collectFolders: (nodes: any[]) => {
+    const folders: any[] = [];
+    const walk = (items: any[], depth: number) => {
+      for (const node of items) {
+        if (node.type === "folder") {
+          folders.push({ id: node.id, name: node.name ?? node.id, depth });
+          if (node.children) walk(node.children, depth + 1);
+        }
+      }
+    };
+    walk(nodes, 0);
+    return folders;
   },
 }));
 

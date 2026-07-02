@@ -33,6 +33,7 @@ export function ModelPicker() {
     addSelectedModels,
     removeSelectedModels,
     setSelectedModels,
+    modelDiscoveryNoDataCollection,
   } = useSettingsStore();
 
   const [leftSearch, setLeftSearch] = React.useState("");
@@ -46,8 +47,9 @@ export function ModelPicker() {
   const availableFiltered = React.useMemo(() => {
     return availableModels
       .filter((m) => !selectedIds.has(m.id))
+      .filter((m) => !modelDiscoveryNoDataCollection || m.provider !== "openrouter" || m.zdr)
       .filter((m) => !leftSearch || matchesSearch(m, leftSearch));
-  }, [availableModels, selectedIds, leftSearch]);
+  }, [availableModels, selectedIds, leftSearch, modelDiscoveryNoDataCollection]);
 
   const selectedFiltered = React.useMemo(() => {
     return selectedModels.filter((m) => !rightSearch || matchesSearch(m, rightSearch));

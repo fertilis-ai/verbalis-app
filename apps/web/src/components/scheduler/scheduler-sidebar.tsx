@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useSchedulerStore } from "@/stores/scheduler-store";
 import { usePollingLoader } from "@/lib/hooks/use-polling-loader";
 import { useInlineEditing } from "@/lib/hooks/use-inline-editing";
-import { splitByPinned, collectTreeIds } from "@/lib/sidebar-utils";
+import { splitByPinned, collectTreeIds, collectFolders } from "@/lib/sidebar-utils";
 import { SidebarTreeNode, type SidebarTreeNodeData } from "@/components/shared/sidebar-tree-node";
 
 const scheduleLeafIcon = <Clock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />;
@@ -31,6 +31,7 @@ export function SchedulerSidebar() {
     createSchedule,
     renameSchedule,
     deleteSchedule,
+    moveSchedule,
     selectSchedule,
     loadSchedulersFromDisk,
   } = useSchedulerStore();
@@ -58,6 +59,11 @@ export function SchedulerSidebar() {
 
   const { pinned: pinnedFolders, unpinned: unpinnedItems } = splitByPinned(schedulerTree);
 
+  const moveTargets = [
+    { id: null, name: "Scheduler", depth: 0 },
+    ...collectFolders(schedulerTree).map((f) => ({ ...f, depth: f.depth + 1 })),
+  ];
+
   const scheduleIdsInTree = collectTreeIds(schedulerTree, "schedule");
   const inMemoryOnlySchedules = schedules.filter((s) => !scheduleIdsInTree.has(s.id));
 
@@ -83,6 +89,8 @@ export function SchedulerSidebar() {
     onDeleteLeaf: deleteSchedule,
     onTogglePin: toggleFolderPin,
     getDisplayName: getScheduleDisplayName,
+    moveTargets,
+    onMoveLeaf: moveSchedule,
   };
 
   return (

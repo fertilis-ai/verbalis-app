@@ -219,6 +219,79 @@ describe("fetchProviderModels", () => {
       expect(result.provider).toBe("openrouter");
       expect(result.models).toEqual([]);
     });
+
+    it("filters out non-text models", async () => {
+      mockAppFetch.mockImplementation((url: string) => {
+        if (url.includes("/endpoints/zdr")) return Promise.resolve(jsonResponse({ data: [] }));
+        return Promise.resolve(
+          jsonResponse({
+            data: [
+              {
+                id: "anthropic/claude-3",
+                name: "Claude 3",
+                architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] },
+              },
+              {
+                id: "openai/gpt-image-1",
+                name: "GPT Image",
+                architecture: { input_modalities: ["text"], output_modalities: ["image", "text"] },
+              },
+              {
+                id: "openai/tts-1",
+                name: "TTS",
+                architecture: { input_modalities: ["text"], output_modalities: ["audio"] },
+              },
+              {
+                id: "openai/whisper-1",
+                name: "Whisper",
+                architecture: { input_modalities: ["audio"], output_modalities: ["text"] },
+              },
+              { id: "meta/no-architecture", name: "No Arch" },
+            ],
+          })
+        );
+      });
+
+      const result = await fetchProviderModels("openrouter", "or-key");
+      expect(result.models.map((m) => m.id)).toEqual([
+        "anthropic/claude-3",
+        "meta/no-architecture",
+      ]);
+    });
+
+    it("flags models with zero-data-retention endpoints", async () => {
+      mockAppFetch.mockImplementation((url: string) => {
+        if (url.includes("/endpoints/zdr")) {
+          return Promise.resolve(
+            jsonResponse({ data: [{ model_id: "anthropic/claude-3" }, { model_id: "other/model" }] })
+          );
+        }
+        return Promise.resolve(
+          jsonResponse({
+            data: [
+              { id: "anthropic/claude-3", name: "Claude 3" },
+              { id: "meta/llama-3", name: "Llama 3" },
+            ],
+          })
+        );
+      });
+
+      const result = await fetchProviderModels("openrouter", "or-key");
+      expect(result.models.find((m) => m.id === "anthropic/claude-3")?.zdr).toBe(true);
+      expect(result.models.find((m) => m.id === "meta/llama-3")?.zdr).toBeUndefined();
+    });
+
+    it("tolerates a failed ZDR fetch", async () => {
+      mockAppFetch.mockImplementation((url: string) => {
+        if (url.includes("/endpoints/zdr")) return Promise.reject(new Error("network down"));
+        return Promise.resolve(jsonResponse({ data: [{ id: "anthropic/claude-3", name: "Claude 3" }] }));
+      });
+
+      const result = await fetchProviderModels("openrouter", "or-key");
+      expect(result.error).toBeUndefined();
+      expect(result.models).toHaveLength(1);
+      expect(result.models[0].zdr).toBeUndefined();
+    });
   });
 
   describe("unknown provider", () => {

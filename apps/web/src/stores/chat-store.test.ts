@@ -16,6 +16,7 @@ const {
   mockDeletePath,
   mockLoadChatByPath,
   mockReadFile,
+  mockRenamePath,
   mockIsTauri,
   mockGetAppDataDir,
   mockGetToolsForContext,
@@ -42,6 +43,7 @@ const {
   mockDeletePath: vi.fn().mockResolvedValue(undefined),
   mockLoadChatByPath: vi.fn().mockResolvedValue(null),
   mockReadFile: vi.fn().mockResolvedValue("file contents"),
+  mockRenamePath: vi.fn().mockResolvedValue(undefined),
   mockIsTauri: vi.fn(() => false),
   mockGetAppDataDir: vi.fn().mockResolvedValue("/mock-data"),
   mockGetToolsForContext: vi.fn().mockReturnValue([]),
@@ -106,6 +108,7 @@ vi.mock("@/lib/storage", () => ({
   deletePath: mockDeletePath,
   loadChatByPath: mockLoadChatByPath,
   readFile: mockReadFile,
+  renamePath: mockRenamePath,
   isTauri: mockIsTauri,
 }));
 
@@ -988,6 +991,70 @@ describe("chat-store", () => {
 
       await useChatStore.getState().renameChat("c1", "New Title");
       expect(mockSaveChatToFolder).not.toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // moveConversation
+  // -----------------------------------------------------------------------
+  describe("moveConversation", () => {
+    it("moves a conversation into a folder", async () => {
+      const conv = makeConversation({ id: "c1", path: "/mock-data/chats/c1.json" });
+      const folder = makeFolderTreeNode({ id: "folder-1", path: "/mock-data/chats/Work" });
+      useChatStore.setState({ conversations: [conv], chatTree: [folder] });
+
+      await useChatStore.getState().moveConversation("c1", "folder-1");
+
+      expect(mockRenamePath).toHaveBeenCalledWith(
+        "/mock-data/chats/c1.json",
+        "/mock-data/chats/Work/c1.json"
+      );
+      expect(mockLoadChatTree).toHaveBeenCalled();
+      const updated = useChatStore.getState().conversations.find((c) => c.id === "c1");
+      expect(updated?.path).toBe("/mock-data/chats/Work/c1.json");
+      expect(updated?.folderId).toBe("folder-1");
+    });
+
+    it("moves a conversation back to the root", async () => {
+      const conv = makeConversation({
+        id: "c1",
+        path: "/mock-data/chats/Work/c1.json",
+        folderId: "folder-1",
+      });
+      useChatStore.setState({ conversations: [conv], chatTree: [] });
+
+      await useChatStore.getState().moveConversation("c1", null);
+
+      expect(mockRenamePath).toHaveBeenCalledWith(
+        "/mock-data/chats/Work/c1.json",
+        "/mock-data/chats/c1.json"
+      );
+      const updated = useChatStore.getState().conversations.find((c) => c.id === "c1");
+      expect(updated?.folderId).toBeUndefined();
+    });
+
+    it("is a no-op when the conversation has no path", async () => {
+      const conv = makeConversation({ id: "c1" });
+      useChatStore.setState({ conversations: [conv], chatTree: [] });
+
+      await useChatStore.getState().moveConversation("c1", null);
+      expect(mockRenamePath).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op when the target folder does not exist", async () => {
+      const conv = makeConversation({ id: "c1", path: "/mock-data/chats/c1.json" });
+      useChatStore.setState({ conversations: [conv], chatTree: [] });
+
+      await useChatStore.getState().moveConversation("c1", "missing-folder");
+      expect(mockRenamePath).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op when the conversation is already in the target folder", async () => {
+      const conv = makeConversation({ id: "c1", path: "/mock-data/chats/c1.json" });
+      useChatStore.setState({ conversations: [conv], chatTree: [] });
+
+      await useChatStore.getState().moveConversation("c1", null);
+      expect(mockRenamePath).not.toHaveBeenCalled();
     });
   });
 

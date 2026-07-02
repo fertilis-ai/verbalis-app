@@ -347,6 +347,7 @@ function LocalLlmSection() {
 function ModelsSection() {
   const {
     defaultModel, setDefaultModel, localLLM, selectedModels, modelFetchStatus, modelFetchError, fetchModels,
+    modelDiscoveryNoDataCollection, setModelDiscoveryNoDataCollection,
     apiKeys, imageModel, setImageModel, availableImageModels, imageModelFetchStatus, imageModelFetchError, fetchImageModels,
     transcriptionModel, setTranscriptionModel, availableTranscriptionModels, transcriptionModelFetchStatus, transcriptionModelFetchError, fetchTranscriptionModels,
     speechModel, setSpeechModel, speechVoice, setSpeechVoice, availableSpeechModels, speechModelFetchStatus, speechModelFetchError, fetchSpeechModels,
@@ -372,7 +373,51 @@ function ModelsSection() {
       <h2 className="text-lg font-medium mb-4 flex items-center gap-2"><Cpu className="h-4.5 w-4.5 text-muted-foreground" />Models</h2>
       <div className="space-y-6">
         <div>
-          <label className="text-sm font-medium">Default Model</label>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Text Model Discovery</label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fetchModels()}
+              disabled={!canFetch || isFetching}
+              title={!canFetch ? "Model fetching requires the desktop app" : undefined}
+              className="gap-2 h-6 text-xs"
+            >
+              {isFetching ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              Refresh
+            </Button>
+            {!canFetch && (
+              <span className="text-xs text-muted-foreground">Desktop app required</span>
+            )}
+            {modelFetchError && (
+              <span className="text-xs text-destructive">{modelFetchError}</span>
+            )}
+          </div>
+          <label className="mt-2 flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={modelDiscoveryNoDataCollection}
+              onChange={(e) => setModelDiscoveryNoDataCollection(e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <div>
+              <span className="text-sm">No data collection</span>
+              <p className="text-xs text-muted-foreground">
+                Only show OpenRouter models served by zero-data-retention endpoints.
+              </p>
+            </div>
+          </label>
+          <div className="mt-2">
+            <ModelPicker />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-sm font-medium">Default Text Model</label>
           <div className="mt-2">
             <select
               value={defaultModel}
@@ -544,35 +589,6 @@ function ModelsSection() {
           </div>
         )}
 
-        <div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium">Model Discovery</label>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fetchModels()}
-              disabled={!canFetch || isFetching}
-              title={!canFetch ? "Model fetching requires the desktop app" : undefined}
-              className="gap-2 h-6 text-xs"
-            >
-              {isFetching ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3" />
-              )}
-              Refresh
-            </Button>
-            {!canFetch && (
-              <span className="text-xs text-muted-foreground">Desktop app required</span>
-            )}
-            {modelFetchError && (
-              <span className="text-xs text-destructive">{modelFetchError}</span>
-            )}
-          </div>
-          <div className="mt-2">
-            <ModelPicker />
-          </div>
-        </div>
       </div>
     </section>
   );

@@ -28,6 +28,7 @@ const mockSettingsStore = {
   selectedModels: [],
   modelFetchStatus: "idle" as string,
   modelFetchError: null as string | null,
+  modelDiscoveryNoDataCollection: false,
   availableSpeechModels: [] as unknown[],
   guardrailsConfig: { enabled: true },
   setHue: mockSetHue,
@@ -38,6 +39,7 @@ const mockSettingsStore = {
   setSettingsDirectory: mockSetSettingsDirectory,
   setAgentDebugLogging: mockSetAgentDebugLogging,
   fetchModels: vi.fn(),
+  setModelDiscoveryNoDataCollection: vi.fn(),
   addSelectedModels: vi.fn(),
   removeSelectedModels: vi.fn(),
   setSelectedModels: vi.fn(),
@@ -293,7 +295,7 @@ describe("SettingsView", () => {
     it("calls setLocalLLM when toggling the enable checkbox", async () => {
       const user = userEvent.setup();
       render(<SettingsView />);
-      const checkbox = screen.getByRole("checkbox");
+      const checkbox = screen.getByRole("checkbox", { name: /Enable Local Provider/i });
       await user.click(checkbox);
       expect(mockSetLocalLLM).toHaveBeenCalledWith({ enabled: true });
     });
@@ -316,9 +318,9 @@ describe("SettingsView", () => {
   // -------------------------------------------------------------------------
 
   describe("models", () => {
-    it("renders Default Model label", () => {
+    it("renders Default Text Model label", () => {
       render(<SettingsView />);
-      expect(screen.getByText("Default Model")).toBeInTheDocument();
+      expect(screen.getByText("Default Text Model")).toBeInTheDocument();
     });
 
     it("renders model dropdown with options", () => {
@@ -327,10 +329,28 @@ describe("SettingsView", () => {
       expect(select).toBeInTheDocument();
     });
 
-    it("renders Model Discovery with ModelPicker component", () => {
+    it("renders Text Model Discovery with ModelPicker component", () => {
       render(<SettingsView />);
-      expect(screen.getByText("Model Discovery")).toBeInTheDocument();
+      expect(screen.getByText("Text Model Discovery")).toBeInTheDocument();
       expect(screen.getByTestId("model-picker")).toBeInTheDocument();
+    });
+
+    it("renders the No data collection checkbox and toggles the setting", async () => {
+      const user = userEvent.setup();
+      render(<SettingsView />);
+      const checkbox = screen.getByRole("checkbox", { name: /No data collection/i });
+      expect(checkbox).not.toBeChecked();
+      await user.click(checkbox);
+      expect(mockSettingsStore.setModelDiscoveryNoDataCollection).toHaveBeenCalledWith(true);
+    });
+
+    it("renders Text Model Discovery before Default Text Model", () => {
+      render(<SettingsView />);
+      const discovery = screen.getByText("Text Model Discovery");
+      const defaultModel = screen.getByText("Default Text Model");
+      expect(
+        discovery.compareDocumentPosition(defaultModel) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
     });
   });
 

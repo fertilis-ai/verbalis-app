@@ -18,6 +18,7 @@ const mockSaveSchedule = vi.fn().mockResolvedValue("/mock-data/scheduler/id.yaml
 const mockLoadSchedule = vi.fn().mockResolvedValue(null);
 const mockDeleteScheduleByPath = vi.fn().mockResolvedValue(undefined);
 const mockGetAppDataDir = vi.fn().mockResolvedValue("/mock-data");
+const mockRenamePath = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/lib/storage", () => ({
   loadSchedulerTree: (...args: unknown[]) => mockLoadSchedulerTree(...args),
@@ -29,6 +30,7 @@ vi.mock("@/lib/storage", () => ({
   loadSchedule: (...args: unknown[]) => mockLoadSchedule(...args),
   deleteScheduleByPath: (...args: unknown[]) => mockDeleteScheduleByPath(...args),
   getAppDataDir: (...args: unknown[]) => mockGetAppDataDir(...args),
+  renamePath: (...args: unknown[]) => mockRenamePath(...args),
 }));
 
 const mockRunScheduleNow = vi.fn().mockResolvedValue(null);
@@ -735,6 +737,61 @@ describe("scheduler-store", () => {
 
       const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
       expect(savedSchedule.name).toBe("New Name");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // moveSchedule
+  // -----------------------------------------------------------------------
+  describe("moveSchedule", () => {
+    it("moves a schedule into a folder", async () => {
+      const node = makeScheduleNode({ id: "s1", path: "/mock-data/scheduler/s1.yaml" });
+      const folder = makeFolderNode();
+      useSchedulerStore.setState({ schedulerTree: [node, folder] });
+
+      await useSchedulerStore.getState().moveSchedule("s1", "folder-1");
+
+      expect(mockRenamePath).toHaveBeenCalledWith(
+        "/mock-data/scheduler/s1.yaml",
+        "/mock-data/scheduler/folder-1/s1.yaml"
+      );
+      expect(mockLoadSchedulerTree).toHaveBeenCalled();
+    });
+
+    it("moves a schedule back to the root", async () => {
+      const node = makeScheduleNode({ id: "s1", path: "/mock-data/scheduler/folder-1/s1.yaml" });
+      const folder = makeFolderNode([node]);
+      useSchedulerStore.setState({ schedulerTree: [folder] });
+
+      await useSchedulerStore.getState().moveSchedule("s1", null);
+
+      expect(mockRenamePath).toHaveBeenCalledWith(
+        "/mock-data/scheduler/folder-1/s1.yaml",
+        "/mock-data/scheduler/s1.yaml"
+      );
+    });
+
+    it("does nothing when the schedule is not found", async () => {
+      useSchedulerStore.setState({ schedulerTree: [] });
+
+      await useSchedulerStore.getState().moveSchedule("missing", null);
+      expect(mockRenamePath).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when the target folder does not exist", async () => {
+      const node = makeScheduleNode({ id: "s1" });
+      useSchedulerStore.setState({ schedulerTree: [node] });
+
+      await useSchedulerStore.getState().moveSchedule("s1", "missing-folder");
+      expect(mockRenamePath).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when the schedule is already at the target", async () => {
+      const node = makeScheduleNode({ id: "s1", path: "/mock-data/scheduler/s1.yaml" });
+      useSchedulerStore.setState({ schedulerTree: [node] });
+
+      await useSchedulerStore.getState().moveSchedule("s1", null);
+      expect(mockRenamePath).not.toHaveBeenCalled();
     });
   });
 

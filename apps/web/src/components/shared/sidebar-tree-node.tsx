@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { FolderContextMenu, LeafContextMenu } from "@/components/shared/item-context-menu";
+import { FolderContextMenu, LeafContextMenu, type MoveTarget } from "@/components/shared/item-context-menu";
 
 export interface SidebarTreeNodeData {
   type: string;
@@ -37,6 +37,11 @@ interface SidebarTreeNodeProps {
   onDeleteLeaf: (id: string) => void;
   onTogglePin: (id: string) => void;
   getDisplayName: (node: SidebarTreeNodeData) => string;
+  /** Destination folders for "Move to folder" on leaves; omit to hide the action. */
+  moveTargets?: MoveTarget[];
+  onMoveLeaf?: (id: string, targetFolderId: string | null) => void;
+  /** Folder id containing this node; undefined at the root. */
+  parentFolderId?: string;
 }
 
 export function SidebarTreeNode({
@@ -60,6 +65,9 @@ export function SidebarTreeNode({
   onDeleteLeaf,
   onTogglePin,
   getDisplayName,
+  moveTargets,
+  onMoveLeaf,
+  parentFolderId,
 }: SidebarTreeNodeProps) {
   const isFolder = node.type === "folder";
   const isExpanded = expandedFolders.has(node.id);
@@ -164,6 +172,9 @@ export function SidebarTreeNode({
                 onDeleteLeaf={onDeleteLeaf}
                 onTogglePin={onTogglePin}
                 getDisplayName={getDisplayName}
+                moveTargets={moveTargets}
+                onMoveLeaf={onMoveLeaf}
+                parentFolderId={node.id}
               />
             ))}
           </div>
@@ -207,6 +218,12 @@ export function SidebarTreeNode({
         <LeafContextMenu
           onRename={() => onStartEditing(node.id, displayName, leafType)}
           onDelete={() => onDeleteLeaf(node.id)}
+          moveTargets={
+            onMoveLeaf
+              ? moveTargets?.filter((t) => (t.id ?? undefined) !== parentFolderId)
+              : undefined
+          }
+          onMove={onMoveLeaf ? (folderId) => onMoveLeaf(node.id, folderId) : undefined}
         />
       </div>
     </div>
