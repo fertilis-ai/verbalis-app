@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const mockStoreApiKey = vi.fn().mockResolvedValue(undefined);
 const mockSetLoggingEnabled = vi.fn();
 const mockFetchAllProviderModels = vi.fn();
+const mockFetchOpenRouterImageModels = vi.fn();
 const mockGetPresetConfig = vi.fn();
 
 // Mock zustand persist to be a passthrough (avoids localStorage issues in tests)
@@ -25,6 +26,7 @@ vi.mock("@/lib/logger", () => ({
 
 vi.mock("@/lib/provider-models", () => ({
   fetchAllProviderModels: (...args: unknown[]) => mockFetchAllProviderModels(...args),
+  fetchOpenRouterImageModels: (...args: unknown[]) => mockFetchOpenRouterImageModels(...args),
 }));
 
 vi.mock("@/lib/guardrails/presets", async () => {
@@ -59,6 +61,10 @@ function resetStore() {
     selectedModels: [],
     modelFetchStatus: "idle" as const,
     modelFetchError: null,
+    imageModel: "",
+    availableImageModels: [],
+    imageModelFetchStatus: "idle" as const,
+    imageModelFetchError: null,
     guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
     agentDebugLogging: false,
   });
@@ -332,6 +338,54 @@ describe("settings-store", () => {
       ]);
       await useSettingsStore.getState().fetchModels();
       expect(useSettingsStore.getState().modelFetchStatus).toBe("error");
+    });
+  });
+
+  describe("image model", () => {
+    const imageModels = [
+      { id: "openai/gpt-image-1", name: "GPT Image 1", supportsImageInput: true },
+    ];
+
+    it("defaults to disabled", () => {
+      expect(useSettingsStore.getState().imageModel).toBe("");
+      expect(useSettingsStore.getState().availableImageModels).toEqual([]);
+      expect(useSettingsStore.getState().imageModelFetchStatus).toBe("idle");
+    });
+
+    it("setImageModel updates the selection", () => {
+      useSettingsStore.getState().setImageModel("openai/gpt-image-1");
+      expect(useSettingsStore.getState().imageModel).toBe("openai/gpt-image-1");
+    });
+
+    it("fetchImageModels stores models on success", async () => {
+      mockFetchOpenRouterImageModels.mockResolvedValue({ models: imageModels });
+      const promise = useSettingsStore.getState().fetchImageModels();
+      expect(useSettingsStore.getState().imageModelFetchStatus).toBe("fetching");
+      await promise;
+      expect(useSettingsStore.getState().imageModelFetchStatus).toBe("done");
+      expect(useSettingsStore.getState().availableImageModels).toEqual(imageModels);
+    });
+
+    it("fetchImageModels passes the OpenRouter key", async () => {
+      useSettingsStore.setState({
+        apiKeys: { anthropic: "", openai: "", google: "", openrouter: "sk-or-key" },
+      });
+      mockFetchOpenRouterImageModels.mockResolvedValue({ models: [] });
+      await useSettingsStore.getState().fetchImageModels();
+      expect(mockFetchOpenRouterImageModels).toHaveBeenCalledWith("sk-or-key");
+    });
+
+    it("fetchImageModels keeps the current list and selection on error", async () => {
+      useSettingsStore.setState({
+        availableImageModels: imageModels,
+        imageModel: "openai/gpt-image-1",
+      });
+      mockFetchOpenRouterImageModels.mockResolvedValue({ models: [], error: "HTTP 401" });
+      await useSettingsStore.getState().fetchImageModels();
+      expect(useSettingsStore.getState().imageModelFetchStatus).toBe("error");
+      expect(useSettingsStore.getState().imageModelFetchError).toBe("HTTP 401");
+      expect(useSettingsStore.getState().availableImageModels).toEqual(imageModels);
+      expect(useSettingsStore.getState().imageModel).toBe("openai/gpt-image-1");
     });
   });
 

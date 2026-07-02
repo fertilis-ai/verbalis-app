@@ -61,11 +61,12 @@ const {
   mockGetModel: vi.fn().mockReturnValue(null),
   mockGetActiveModels: vi.fn().mockReturnValue([]),
   mockSettingsGetState: vi.fn((): Record<string, unknown> => ({
-    apiKeys: {},
+    apiKeys: { anthropic: "", openai: "", google: "", openrouter: "" },
     localLLM: { enabled: false, provider: "lmstudio", baseUrl: "", model: "" },
     guardrailsConfig: {},
     selectedModels: [],
     defaultModel: "claude-sonnet-4-20250514",
+    imageModel: "",
     setSelectedAgentId: vi.fn(),
   })),
   mockConfirmTool: vi.fn(),

@@ -40,6 +40,8 @@ const mockSetLocalLLM = vi.fn();
 const mockSetDefaultModel = vi.fn();
 const mockSetAvailableModels = vi.fn();
 const mockSetSelectedModels = vi.fn();
+const mockSetImageModel = vi.fn();
+const mockSetAvailableImageModels = vi.fn();
 const mockSetGuardrailsConfig = vi.fn();
 const mockSetGuardrails = vi.fn();
 const mockSetSandboxed = vi.fn();
@@ -57,6 +59,8 @@ const defaultStoreState = {
   defaultModel: "claude-sonnet-4-20250514",
   availableModels: [],
   selectedModels: [],
+  imageModel: "",
+  availableImageModels: [],
   guardrailsConfig: { enabled: true, sandbox: { enabled: false } },
   agentDebugLogging: false,
   apiKeys: { anthropic: "", openai: "", google: "", openrouter: "" },
@@ -69,6 +73,8 @@ const defaultStoreState = {
   setDefaultModel: mockSetDefaultModel,
   setAvailableModels: mockSetAvailableModels,
   setSelectedModels: mockSetSelectedModels,
+  setImageModel: mockSetImageModel,
+  setAvailableImageModels: mockSetAvailableImageModels,
   setGuardrailsConfig: mockSetGuardrailsConfig,
   setGuardrails: mockSetGuardrails,
   setSandboxed: mockSetSandboxed,
@@ -148,6 +154,33 @@ describe("config-sync", () => {
       expect(mockSetHue).toHaveBeenCalledWith("blue");
       expect(mockSetWorkingDirectory).toHaveBeenCalledWith("/custom/dir");
       expect(mockSetUserMode).toHaveBeenCalledWith("advanced");
+    });
+
+    it("loads image model settings into the store", async () => {
+      mockIsTauri.mockReturnValue(true);
+      mockPathExists.mockResolvedValue(true);
+
+      const imageModels = [{ id: "openai/gpt-image-1", name: "GPT Image 1", supportsImageInput: true }];
+      mockReadFile.mockResolvedValue(
+        YAML.stringify({ imageModel: "openai/gpt-image-1", availableImageModels: imageModels })
+      );
+
+      await initConfigSync();
+
+      expect(mockSetImageModel).toHaveBeenCalledWith("openai/gpt-image-1");
+      expect(mockSetAvailableImageModels).toHaveBeenCalledWith(imageModels);
+    });
+
+    it("persists image model settings when writing config", async () => {
+      mockIsTauri.mockReturnValue(true);
+      mockPathExists.mockResolvedValue(false);
+
+      await initConfigSync();
+
+      const writtenContent = mockWriteFile.mock.calls[0][1] as string;
+      const parsed = YAML.parse(writtenContent);
+      expect(parsed.imageModel).toBe("");
+      expect(parsed.availableImageModels).toEqual([]);
     });
 
     it("loads guardrails config and syncs legacy fields", async () => {

@@ -546,6 +546,9 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (settings.allowSelfEnhancement) {
         systemPrompt += `\n\n## Self-Enhancement\nYou may improve your own Toolbox using \`list_toolbox_items\`, \`read_toolbox_item\`, \`write_toolbox_item\`, and \`delete_toolbox_item\` (categories: prompts, memories, agents, skills, workflows). Writes and deletes require user confirmation. Prefer small, well-scoped edits.`;
       }
+      if (settings.apiKeys.openrouter?.trim() && settings.imageModel) {
+        systemPrompt += `\n\n## Image Generation\nWhen the user asks you to create, draw, or generate an image or picture, use the \`generate_image\` tool. To edit or vary a previously generated image, pass its file path (the "Saved to:" line of the earlier tool result) as \`source_image\`. Generated images are saved to ~/.sapio/images and shown to the user automatically — after the tool succeeds, just briefly describe the image; never embed image data in your reply.`;
+      }
 
       // Helper: run a model through the SapioAgentAdapter (Tauri only)
       // Shared by both local and cloud models for consistent tool execution,

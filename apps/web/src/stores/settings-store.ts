@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { DEFAULT_MODEL_ID, type ChatModelId, type ProviderModel } from "@/lib/models";
-import { fetchAllProviderModels } from "@/lib/provider-models";
+import { DEFAULT_MODEL_ID, type ChatModelId, type ImageProviderModel, type ProviderModel } from "@/lib/models";
+import { fetchAllProviderModels, fetchOpenRouterImageModels } from "@/lib/provider-models";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import { DEFAULT_GUARDRAILS_CONFIG } from "@/lib/guardrails/types";
 import { getPresetConfig, type UserModePreset } from "@/lib/guardrails/presets";
@@ -46,6 +46,12 @@ interface SettingsState {
   modelFetchStatus: "idle" | "fetching" | "done" | "error";
   modelFetchError: string | null;
 
+  // Image generation (OpenRouter). Empty imageModel = feature disabled.
+  imageModel: string;
+  availableImageModels: ImageProviderModel[];
+  imageModelFetchStatus: "idle" | "fetching" | "done" | "error";
+  imageModelFetchError: string | null;
+
   // Enhanced guardrails configuration
   guardrailsConfig: GuardrailsConfig;
 
@@ -79,6 +85,11 @@ interface SettingsState {
   addSelectedModels: (models: ProviderModel[]) => void;
   removeSelectedModels: (modelIds: string[]) => void;
   fetchModels: () => Promise<void>;
+
+  // Image generation actions
+  setImageModel: (modelId: string) => void;
+  setAvailableImageModels: (models: ImageProviderModel[]) => void;
+  fetchImageModels: () => Promise<void>;
 
   // Guardrails config actions
   setGuardrailsConfig: (config: Partial<GuardrailsConfig>) => void;
@@ -118,6 +129,10 @@ export const useSettingsStore = create<SettingsState>()(
       selectedModels: [],
       modelFetchStatus: "idle" as const,
       modelFetchError: null,
+      imageModel: "",
+      availableImageModels: [],
+      imageModelFetchStatus: "idle" as const,
+      imageModelFetchError: null,
       guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
       agentDebugLogging: false,
       allowSelfEnhancement: false,
@@ -212,6 +227,25 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
+      // Image generation actions
+      setImageModel: (imageModel) => set({ imageModel }),
+      setAvailableImageModels: (availableImageModels) => set({ availableImageModels }),
+      fetchImageModels: async () => {
+        set({ imageModelFetchStatus: "fetching", imageModelFetchError: null });
+        try {
+          const { models, error } = await fetchOpenRouterImageModels(get().apiKeys.openrouter);
+          set({
+            // Keep the current list on a failed fetch; the user's imageModel
+            // selection is never touched here (their choice wins).
+            ...(models.length > 0 || !error ? { availableImageModels: models } : {}),
+            imageModelFetchStatus: error && models.length === 0 ? "error" : "done",
+            imageModelFetchError: error ?? null,
+          });
+        } catch (e) {
+          set({ imageModelFetchStatus: "error", imageModelFetchError: String(e) });
+        }
+      },
+
       // Guardrails config actions
       setGuardrailsConfig: (config) =>
         set((state) => ({
@@ -278,6 +312,8 @@ export const useSettingsStore = create<SettingsState>()(
         selectedAgentId: state.selectedAgentId,
         availableModels: state.availableModels,
         selectedModels: state.selectedModels,
+        imageModel: state.imageModel,
+        availableImageModels: state.availableImageModels,
         guardrailsConfig: state.guardrailsConfig,
         agentDebugLogging: state.agentDebugLogging,
         allowSelfEnhancement: state.allowSelfEnhancement,

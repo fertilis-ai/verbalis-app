@@ -4,6 +4,14 @@ export interface ProviderModel {
   provider: string;
 }
 
+/** An OpenRouter image-generation model (from /api/v1/images/models). */
+export interface ImageProviderModel {
+  id: string;
+  name: string;
+  /** True when the model accepts image input (supports editing via reference images). */
+  supportsImageInput: boolean;
+}
+
 export const MODEL_OPTIONS: ProviderModel[] = [
   { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic" },
   { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "anthropic" },

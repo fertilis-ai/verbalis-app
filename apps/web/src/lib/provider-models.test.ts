@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchProviderModels, fetchAllProviderModels } from "./provider-models";
+import { fetchProviderModels, fetchAllProviderModels, fetchOpenRouterImageModels } from "./provider-models";
 
 const mockAppFetch = vi.fn();
 
@@ -298,5 +298,68 @@ describe("fetchAllProviderModels", () => {
     const providers = results.map((r) => r.provider);
     expect(providers).toContain("google");
     expect(providers).toContain("openrouter");
+  });
+});
+
+describe("fetchOpenRouterImageModels", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetches and maps image models with editing capability", async () => {
+    mockAppFetch.mockResolvedValue(
+      jsonResponse({
+        data: [
+          {
+            id: "openai/gpt-image-1",
+            name: "GPT Image 1",
+            architecture: { input_modalities: ["text", "image"], output_modalities: ["image"] },
+          },
+          {
+            id: "some/text-to-image",
+            architecture: { input_modalities: ["text"], output_modalities: ["image"] },
+          },
+        ],
+      })
+    );
+
+    const result = await fetchOpenRouterImageModels("sk-or-key");
+    expect(mockAppFetch).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/images/models",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer sk-or-key" }),
+      })
+    );
+    expect(result.models).toEqual([
+      { id: "openai/gpt-image-1", name: "GPT Image 1", supportsImageInput: true },
+      { id: "some/text-to-image", name: "some/text-to-image", supportsImageInput: false },
+    ]);
+  });
+
+  it("filters out models without image output", async () => {
+    mockAppFetch.mockResolvedValue(
+      jsonResponse({
+        data: [
+          { id: "text/model", architecture: { input_modalities: ["text"], output_modalities: ["text"] } },
+        ],
+      })
+    );
+    const result = await fetchOpenRouterImageModels("key");
+    expect(result.models).toHaveLength(0);
+  });
+
+  it("returns error on non-OK response", async () => {
+    mockAppFetch.mockResolvedValue(
+      jsonResponse({ error: { message: "Unauthorized" } }, false, 401)
+    );
+    const result = await fetchOpenRouterImageModels("bad-key");
+    expect(result.models).toHaveLength(0);
+    expect(result.error).toContain("401");
+  });
+
+  it("returns error on network failure", async () => {
+    mockAppFetch.mockRejectedValue(new Error("offline"));
+    const result = await fetchOpenRouterImageModels("key");
+    expect(result.error).toContain("offline");
   });
 });

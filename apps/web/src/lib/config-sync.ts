@@ -12,7 +12,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { loadAllApiKeys } from "@/lib/keychain";
 import { setLoggingEnabled } from "@/lib/logger";
 import type { HueId } from "@/lib/hue-presets";
-import type { ChatModelId, ProviderModel } from "@/lib/models";
+import type { ChatModelId, ImageProviderModel, ProviderModel } from "@/lib/models";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import type { UserMode, Theme, LocalLlmProvider } from "@/stores/settings-store";
 
@@ -32,6 +32,8 @@ interface ConfigYaml {
   defaultModel: ChatModelId;
   availableModels: ProviderModel[];
   selectedModels: ProviderModel[];
+  imageModel: string;
+  availableImageModels: ImageProviderModel[];
   guardrailsConfig: GuardrailsConfig;
   agentDebugLogging: boolean;
 }
@@ -49,6 +51,8 @@ function extractConfigFromStore(): ConfigYaml {
     defaultModel: s.defaultModel,
     availableModels: s.availableModels,
     selectedModels: s.selectedModels,
+    imageModel: s.imageModel,
+    availableImageModels: s.availableImageModels,
     guardrailsConfig: s.guardrailsConfig,
     agentDebugLogging: s.agentDebugLogging,
   };
@@ -117,6 +121,8 @@ async function loadConfigFromFile(providedContent?: string): Promise<void> {
       if (parsed.defaultModel !== undefined) store.setDefaultModel(parsed.defaultModel);
       if (parsed.availableModels !== undefined) store.setAvailableModels(parsed.availableModels);
       if (parsed.selectedModels !== undefined) store.setSelectedModels(parsed.selectedModels);
+      if (parsed.imageModel !== undefined) store.setImageModel(parsed.imageModel);
+      if (parsed.availableImageModels !== undefined) store.setAvailableImageModels(parsed.availableImageModels);
       if (parsed.guardrailsConfig !== undefined) {
         store.setGuardrailsConfig(parsed.guardrailsConfig);
         // Re-sync legacy derived fields

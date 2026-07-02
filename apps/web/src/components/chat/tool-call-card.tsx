@@ -22,9 +22,11 @@ import {
   ShieldX,
   ShieldCheck,
   Square,
+  Image as ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { GeneratedImage } from "./generated-image";
 import { normalizeToolCallStatus, type ToolCallState } from "@/lib/tools";
 import type { RiskLevel, ToolCategory } from "@/lib/tools/categories";
 import { RISK_LEVEL_CONFIG, CATEGORY_CONFIG } from "@/lib/tools/categories";
@@ -49,7 +51,14 @@ const TOOL_ICONS: Record<string, React.ElementType> = {
   clipboard_read: FileText,
   clipboard_write: FileText,
   notification_send: AlertCircle,
+  generate_image: ImageIcon,
 };
+
+/** Extract saved image paths from a generate_image tool result. */
+export function extractImagePaths(result?: string): string[] {
+  if (!result) return [];
+  return [...result.matchAll(/^Saved to: (.+)$/gm)].map((m) => m[1].trim());
+}
 
 const CATEGORY_ICONS: Record<ToolCategory, React.ElementType> = {
   file_system: Folder,
@@ -204,7 +213,8 @@ export function ToolCallCard({
       toolCall.arguments.old_path ||
       toolCall.arguments.dir ||
       toolCall.arguments.url ||
-      toolCall.arguments.command;
+      toolCall.arguments.command ||
+      toolCall.arguments.prompt;
 
     if (path && typeof path === "string") {
       // Show just the filename or last path component
@@ -315,6 +325,15 @@ export function ToolCallCard({
           )}
         </div>
       </div>
+
+      {/* Generated image preview (always visible on success) */}
+      {toolCall.name === "generate_image" &&
+        normalizedStatus === "success" &&
+        extractImagePaths(toolCall.result).map((imagePath) => (
+          <div key={imagePath} className="px-3 pb-3">
+            <GeneratedImage path={imagePath} />
+          </div>
+        ))}
 
       {/* Expanded content */}
       {isExpanded && (

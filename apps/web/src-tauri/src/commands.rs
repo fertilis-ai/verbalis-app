@@ -116,6 +116,7 @@ pub fn init_app_data_dir() -> Result<(), String> {
         "tasks",
         "scheduler",
         "logs",
+        "images",
     ];
 
     // Create main directory and subdirectories
@@ -239,6 +240,74 @@ pub async fn write_file(path: String, content: String) -> Result<(), String> {
     }
 
     fs::write(path, content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+/// Write binary data (base64-encoded) to a file
+#[tauri::command]
+pub async fn write_file_base64(path: String, data_base64: String) -> Result<(), String> {
+    use base64::Engine;
+    let path = expand_tilde(&path);
+    let path = Path::new(&path);
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create parent directories: {}", e))?;
+    }
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_base64.as_bytes())
+        .map_err(|e| format!("Failed to decode base64 data: {}", e))?;
+    fs::write(path, bytes).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+/// Read a file and return its contents base64-encoded
+#[tauri::command]
+pub async fn read_file_base64(path: String) -> Result<String, String> {
+    use base64::Engine;
+    let path = expand_tilde(&path);
+    let bytes = fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
+/// Reveal a file in the OS file manager (Finder/Explorer)
+#[tauri::command]
+pub async fn reveal_in_folder(path: String) -> Result<(), String> {
+    let path = expand_tilde(&path);
+
+    #[cfg(target_os = "macos")]
+    let result = Command::new("open").arg("-R").arg(&path).spawn();
+
+    #[cfg(target_os = "windows")]
+    let result = Command::new("explorer").arg(format!("/select,{}", path)).spawn();
+
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let result = {
+        // No standard "reveal" on Linux — open the containing directory
+        let parent = Path::new(&path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or(path.clone());
+        Command::new("xdg-open").arg(parent).spawn()
+    };
+
+    result.map_err(|e| format!("Failed to reveal in folder: {}", e))?;
+    Ok(())
+}
+
+/// Copy a file to a new location (creates parent directories)
+#[tauri::command]
+pub async fn copy_file(source_path: String, dest_path: String) -> Result<(), String> {
+    let source = expand_tilde(&source_path);
+    let dest = expand_tilde(&dest_path);
+    let dest = Path::new(&dest);
+
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create parent directories: {}", e))?;
+    }
+
+    fs::copy(&source, dest).map_err(|e| format!("Failed to copy file: {}", e))?;
+    Ok(())
 }
 
 /// Delete a file or directory

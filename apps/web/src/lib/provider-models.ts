@@ -1,5 +1,5 @@
 import { appFetch } from "@/lib/http";
-import type { ProviderModel } from "@/lib/models";
+import type { ImageProviderModel, ProviderModel } from "@/lib/models";
 
 export interface FetchModelsResult {
   provider: string;
@@ -118,6 +118,38 @@ async function fetchOpenRouter(apiKey?: string): Promise<FetchModelsResult> {
     return { provider: "openrouter", models };
   } catch (e) {
     return { provider: "openrouter", models: [], error: String(e) };
+  }
+}
+
+export interface FetchImageModelsResult {
+  models: ImageProviderModel[];
+  error?: string;
+}
+
+/** Fetch image-generation models from OpenRouter's dedicated Image API. */
+export async function fetchOpenRouterImageModels(apiKey?: string): Promise<FetchImageModelsResult> {
+  try {
+    const headers: Record<string, string> = {};
+    if (apiKey?.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
+    const resp = await appFetch("https://openrouter.ai/api/v1/images/models", { headers });
+    if (!resp.ok) return { models: [], error: await readErrorBody(resp) };
+    const data = (await resp.json()) as {
+      data?: Array<{
+        id: string;
+        name?: string;
+        architecture?: { input_modalities?: string[]; output_modalities?: string[] };
+      }>;
+    };
+    const models: ImageProviderModel[] = (data.data ?? [])
+      .filter((m) => m.architecture?.output_modalities?.includes("image") ?? true)
+      .map((m) => ({
+        id: m.id,
+        name: m.name ?? m.id,
+        supportsImageInput: m.architecture?.input_modalities?.includes("image") ?? false,
+      }));
+    return { models };
+  } catch (e) {
+    return { models: [], error: String(e) };
   }
 }
 

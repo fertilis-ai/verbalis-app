@@ -14,6 +14,8 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { getAppDataDir } from "@/lib/storage";
 import { executeToolboxTool, TOOLBOX_TOOL_NAMES as TOOLBOX_TOOL_NAME_LIST } from "./tools/toolbox-tools";
 import { executeRemember } from "./tools/memory-tools";
+import { IMAGE_TOOL_DEFINITIONS, GenerateImageParams, executeGenerateImage } from "./tools/image-tools";
+import { isTauri } from "@/lib/storage";
 
 const TOOLBOX_TOOL_NAMES = new Set<string>(TOOLBOX_TOOL_NAME_LIST);
 
@@ -278,6 +280,12 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     parameters: ScrapeWebpageParams,
     requiresConfirmation: false,
   },
+  // Only offered when an OpenRouter key and image model are configured
+  generate_image: {
+    ...IMAGE_TOOL_DEFINITIONS.generate_image,
+    parameters: GenerateImageParams,
+    requiresConfirmation: false,
+  },
   // Self-enhancement tools (only offered when allowSelfEnhancement is enabled)
   list_toolbox_items: {
     name: "list_toolbox_items",
@@ -341,13 +349,17 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
 // Convert to pi-ai Tool format for context.
 // - Self-enhancement (Toolbox CRUD) tools are only included when the
 //   allowSelfEnhancement setting is enabled, given the autonomy implications.
+// - generate_image is only included when an OpenRouter key and image model
+//   are configured (desktop only).
 // - When `allowedTools` is provided (a per-agent allowlist), only those tools
 //   are exposed.
 export function getToolsForContext(allowedTools?: string[]): Tool[] {
-  const allowSelfEnhancement = useSettingsStore.getState().allowSelfEnhancement;
+  const { allowSelfEnhancement, apiKeys, imageModel } = useSettingsStore.getState();
+  const imageToolEnabled = isTauri() && !!apiKeys.openrouter.trim() && !!imageModel;
   const allowSet = allowedTools && allowedTools.length > 0 ? new Set(allowedTools) : null;
   return Object.values(TOOL_DEFINITIONS)
     .filter((def) => allowSelfEnhancement || !TOOLBOX_TOOL_NAMES.has(def.name))
+    .filter((def) => def.name !== "generate_image" || imageToolEnabled)
     .filter((def) => !allowSet || allowSet.has(def.name))
     .map((def) => ({
       name: def.name,
@@ -381,6 +393,7 @@ const TOOL_PATH_PARAMS: Record<string, string[]> = {
   path_exists: ["path"],
   list_files: ["dir"],
   rename_path: ["old_path", "new_path"],
+  generate_image: ["source_image"],
 };
 
 /**
@@ -514,6 +527,10 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       }
       case "remember": {
         result = await executeRemember(args as Record<string, unknown>);
+        break;
+      }
+      case "generate_image": {
+        result = await executeGenerateImage(args as Static<typeof GenerateImageParams>);
         break;
       }
       default:

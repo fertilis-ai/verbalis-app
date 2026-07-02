@@ -7,6 +7,12 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: vi.fn(() => false),
 }));
 
+// Passthrough mock so gating tests can flip isTauri
+vi.mock("@/lib/storage", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/storage")>();
+  return { ...actual, isTauri: vi.fn(() => false) };
+});
+
 // Mock web-tools
 vi.mock("./tools/web-tools", () => ({
   WEB_TOOL_DEFINITIONS: {
@@ -45,6 +51,7 @@ vi.mock("./tools/web-tools", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
+import { isTauri as storageIsTauri } from "@/lib/storage";
 import { executeWebTool } from "./tools/web-tools";
 import {
   TOOL_DEFINITIONS,
@@ -110,10 +117,17 @@ describe("tools", () => {
       vi.restoreAllMocks();
     });
 
-    function setSelfEnhancement(enabled: boolean) {
+    function mockSettings(overrides: Record<string, unknown> = {}) {
       vi.spyOn(useSettingsStore, "getState").mockReturnValue({
-        allowSelfEnhancement: enabled,
-      } as ReturnType<typeof useSettingsStore.getState>);
+        allowSelfEnhancement: false,
+        apiKeys: { anthropic: "", openai: "", google: "", openrouter: "" },
+        imageModel: "",
+        ...overrides,
+      } as unknown as ReturnType<typeof useSettingsStore.getState>);
+    }
+
+    function setSelfEnhancement(enabled: boolean) {
+      mockSettings({ allowSelfEnhancement: enabled });
     }
 
     it("returns an array of tool objects with name, description, and parameters", () => {
@@ -152,6 +166,36 @@ describe("tools", () => {
       expect(names).toContain("read_file");
       expect(names).toContain("write_file");
       expect(names).toContain("http_fetch");
+    });
+
+    it("excludes generate_image without an OpenRouter key and image model", () => {
+      vi.mocked(storageIsTauri).mockReturnValue(true);
+      mockSettings();
+      expect(getToolsForContext().map((t) => t.name)).not.toContain("generate_image");
+    });
+
+    it("excludes generate_image when only the key is set", () => {
+      vi.mocked(storageIsTauri).mockReturnValue(true);
+      mockSettings({ apiKeys: { anthropic: "", openai: "", google: "", openrouter: "sk-or-key" } });
+      expect(getToolsForContext().map((t) => t.name)).not.toContain("generate_image");
+    });
+
+    it("excludes generate_image outside Tauri even when configured", () => {
+      vi.mocked(storageIsTauri).mockReturnValue(false);
+      mockSettings({
+        apiKeys: { anthropic: "", openai: "", google: "", openrouter: "sk-or-key" },
+        imageModel: "google/gemini-2.5-flash-image",
+      });
+      expect(getToolsForContext().map((t) => t.name)).not.toContain("generate_image");
+    });
+
+    it("includes generate_image when key and model are configured in Tauri", () => {
+      vi.mocked(storageIsTauri).mockReturnValue(true);
+      mockSettings({
+        apiKeys: { anthropic: "", openai: "", google: "", openrouter: "sk-or-key" },
+        imageModel: "google/gemini-2.5-flash-image",
+      });
+      expect(getToolsForContext().map((t) => t.name)).toContain("generate_image");
     });
   });
 

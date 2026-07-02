@@ -21,7 +21,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 log = "0.4"
 dirs = "5.0"
-tauri = { version = "2.9.5", features = [] }
+tauri = { version = "2.9.5", features = ["protocol-asset"] }
 tauri-plugin-log = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-http = "2"
@@ -32,3 +32,4 @@ reqwest = { version = "0.12", features = ["json"] }
 arboard = "3"
 notify-rust = "4"
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
+base64 = "0.22"

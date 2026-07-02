@@ -1,6 +1,7 @@
 import type { TSchema } from "typebox";
 import { WEB_TOOL_DEFINITIONS } from "./web-tools";
 import { SYSTEM_TOOL_DEFINITIONS } from "./system-tools";
+import { IMAGE_TOOL_DEFINITIONS } from "./image-tools";
 
 // ============================================================================
 // Tool Categories
@@ -171,11 +172,15 @@ export const WEB_TOOLS: ToolInventoryItem[] =
 export const SYSTEM_TOOLS: ToolInventoryItem[] =
   Object.values(SYSTEM_TOOL_DEFINITIONS).map(toInventoryItem);
 
+export const IMAGE_TOOLS: ToolInventoryItem[] =
+  Object.values(IMAGE_TOOL_DEFINITIONS).map(toInventoryItem);
+
 export const ALL_TOOLS: ToolInventoryItem[] = [
   ...FILE_SYSTEM_TOOLS,
   ...TOOLBOX_TOOLS,
   ...WEB_TOOLS,
   ...SYSTEM_TOOLS,
+  ...IMAGE_TOOLS,
 ];
 
 // ============================================================================

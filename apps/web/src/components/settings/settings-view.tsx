@@ -345,7 +345,10 @@ function LocalLlmSection() {
 }
 
 function ModelsSection() {
-  const { defaultModel, setDefaultModel, localLLM, selectedModels, modelFetchStatus, modelFetchError, fetchModels } = useSettingsStore();
+  const {
+    defaultModel, setDefaultModel, localLLM, selectedModels, modelFetchStatus, modelFetchError, fetchModels,
+    apiKeys, imageModel, setImageModel, availableImageModels, imageModelFetchStatus, imageModelFetchError, fetchImageModels,
+  } = useSettingsStore();
   const activeModels = getActiveModels(selectedModels);
   const localProviderLabel = localLLM.provider === "lmstudio" ? "LM Studio" : "Ollama";
   const localModelLabel = localLLM.model.trim() || `${localProviderLabel} (default)`;
@@ -384,6 +387,51 @@ function ModelsSection() {
             Used when the app starts and for new chats unless you change it in the model selector.
           </p>
         </div>
+
+        {apiKeys.openrouter.trim() && (
+          <div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Image Model</label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchImageModels()}
+                disabled={!canFetch || imageModelFetchStatus === "fetching"}
+                title={!canFetch ? "Model fetching requires the desktop app" : undefined}
+                className="gap-2 h-6 text-xs"
+              >
+                {imageModelFetchStatus === "fetching" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                Refresh
+              </Button>
+              {imageModelFetchError && (
+                <span className="text-xs text-destructive">{imageModelFetchError}</span>
+              )}
+            </div>
+            <div className="mt-2">
+              <select
+                value={imageModel}
+                onChange={(e) => setImageModel(e.target.value)}
+                className="w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm text-foreground"
+              >
+                <option value="">None (disabled)</option>
+                {availableImageModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}{model.supportsImageInput ? " · supports editing" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {availableImageModels.length === 0
+                ? "Click Refresh to load OpenRouter image models."
+                : "Enables the generate_image chat tool. Images are saved to ~/.sapio/images."}
+            </p>
+          </div>
+        )}
 
         <div>
           <div className="flex items-center gap-2">

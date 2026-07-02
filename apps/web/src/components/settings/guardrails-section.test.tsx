@@ -30,7 +30,10 @@ vi.mock("@earendil-works/pi-ai", () => ({
 // Mock transitive deps for settings-store
 vi.mock("@/lib/keychain", () => ({ storeApiKey: vi.fn(async () => {}) }));
 vi.mock("@/lib/logger", () => ({ setLoggingEnabled: vi.fn() }));
-vi.mock("@/lib/provider-models", () => ({ fetchAllProviderModels: vi.fn(async () => []) }));
+vi.mock("@/lib/provider-models", () => ({
+  fetchAllProviderModels: vi.fn(async () => []),
+  fetchOpenRouterImageModels: vi.fn(async () => ({ models: [] })),
+}));
 vi.mock("zustand/middleware", () => ({ persist: (fn: any) => fn }));
 
 import { DEFAULT_GUARDRAILS_CONFIG } from "@/lib/guardrails/types";
