@@ -12,6 +12,12 @@ export interface ImageProviderModel {
   supportsImageInput: boolean;
 }
 
+/** An OpenRouter transcription model (from /api/v1/models?output_modalities=transcription). */
+export interface TranscriptionProviderModel {
+  id: string;
+  name: string;
+}
+
 export const MODEL_OPTIONS: ProviderModel[] = [
   { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic" },
   { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "anthropic" },

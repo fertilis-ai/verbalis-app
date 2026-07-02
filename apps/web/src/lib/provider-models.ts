@@ -1,5 +1,5 @@
 import { appFetch } from "@/lib/http";
-import type { ImageProviderModel, ProviderModel } from "@/lib/models";
+import type { ImageProviderModel, ProviderModel, TranscriptionProviderModel } from "@/lib/models";
 
 export interface FetchModelsResult {
   provider: string;
@@ -147,6 +147,34 @@ export async function fetchOpenRouterImageModels(apiKey?: string): Promise<Fetch
         name: m.name ?? m.id,
         supportsImageInput: m.architecture?.input_modalities?.includes("image") ?? false,
       }));
+    return { models };
+  } catch (e) {
+    return { models: [], error: String(e) };
+  }
+}
+
+export interface FetchTranscriptionModelsResult {
+  models: TranscriptionProviderModel[];
+  error?: string;
+}
+
+/** Fetch transcription-capable (speech-to-text) models from OpenRouter. */
+export async function fetchOpenRouterTranscriptionModels(
+  apiKey?: string
+): Promise<FetchTranscriptionModelsResult> {
+  try {
+    const headers: Record<string, string> = {};
+    if (apiKey?.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
+    const resp = await appFetch(
+      "https://openrouter.ai/api/v1/models?output_modalities=transcription",
+      { headers }
+    );
+    if (!resp.ok) return { models: [], error: await readErrorBody(resp) };
+    const data = (await resp.json()) as { data?: Array<{ id: string; name?: string }> };
+    const models: TranscriptionProviderModel[] = (data.data ?? []).map((m) => ({
+      id: m.id,
+      name: m.name ?? m.id,
+    }));
     return { models };
   } catch (e) {
     return { models: [], error: String(e) };

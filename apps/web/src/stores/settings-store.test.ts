@@ -4,6 +4,7 @@ const mockStoreApiKey = vi.fn().mockResolvedValue(undefined);
 const mockSetLoggingEnabled = vi.fn();
 const mockFetchAllProviderModels = vi.fn();
 const mockFetchOpenRouterImageModels = vi.fn();
+const mockFetchOpenRouterTranscriptionModels = vi.fn();
 const mockGetPresetConfig = vi.fn();
 
 // Mock zustand persist to be a passthrough (avoids localStorage issues in tests)
@@ -27,6 +28,8 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/provider-models", () => ({
   fetchAllProviderModels: (...args: unknown[]) => mockFetchAllProviderModels(...args),
   fetchOpenRouterImageModels: (...args: unknown[]) => mockFetchOpenRouterImageModels(...args),
+  fetchOpenRouterTranscriptionModels: (...args: unknown[]) =>
+    mockFetchOpenRouterTranscriptionModels(...args),
 }));
 
 vi.mock("@/lib/guardrails/presets", async () => {
@@ -65,6 +68,10 @@ function resetStore() {
     availableImageModels: [],
     imageModelFetchStatus: "idle" as const,
     imageModelFetchError: null,
+    transcriptionModel: "",
+    availableTranscriptionModels: [],
+    transcriptionModelFetchStatus: "idle" as const,
+    transcriptionModelFetchError: null,
     guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
     agentDebugLogging: false,
   });
@@ -386,6 +393,52 @@ describe("settings-store", () => {
       expect(useSettingsStore.getState().imageModelFetchError).toBe("HTTP 401");
       expect(useSettingsStore.getState().availableImageModels).toEqual(imageModels);
       expect(useSettingsStore.getState().imageModel).toBe("openai/gpt-image-1");
+    });
+  });
+
+  describe("transcription model", () => {
+    const transcriptionModels = [{ id: "openai/whisper-large-v3", name: "Whisper Large V3" }];
+
+    it("defaults to disabled", () => {
+      expect(useSettingsStore.getState().transcriptionModel).toBe("");
+      expect(useSettingsStore.getState().availableTranscriptionModels).toEqual([]);
+      expect(useSettingsStore.getState().transcriptionModelFetchStatus).toBe("idle");
+    });
+
+    it("setTranscriptionModel updates the selection", () => {
+      useSettingsStore.getState().setTranscriptionModel("openai/whisper-large-v3");
+      expect(useSettingsStore.getState().transcriptionModel).toBe("openai/whisper-large-v3");
+    });
+
+    it("fetchTranscriptionModels stores models on success", async () => {
+      mockFetchOpenRouterTranscriptionModels.mockResolvedValue({ models: transcriptionModels });
+      const promise = useSettingsStore.getState().fetchTranscriptionModels();
+      expect(useSettingsStore.getState().transcriptionModelFetchStatus).toBe("fetching");
+      await promise;
+      expect(useSettingsStore.getState().transcriptionModelFetchStatus).toBe("done");
+      expect(useSettingsStore.getState().availableTranscriptionModels).toEqual(transcriptionModels);
+    });
+
+    it("fetchTranscriptionModels passes the OpenRouter key", async () => {
+      useSettingsStore.setState({
+        apiKeys: { anthropic: "", openai: "", google: "", openrouter: "sk-or-key" },
+      });
+      mockFetchOpenRouterTranscriptionModels.mockResolvedValue({ models: [] });
+      await useSettingsStore.getState().fetchTranscriptionModels();
+      expect(mockFetchOpenRouterTranscriptionModels).toHaveBeenCalledWith("sk-or-key");
+    });
+
+    it("fetchTranscriptionModels keeps the current list and selection on error", async () => {
+      useSettingsStore.setState({
+        availableTranscriptionModels: transcriptionModels,
+        transcriptionModel: "openai/whisper-large-v3",
+      });
+      mockFetchOpenRouterTranscriptionModels.mockResolvedValue({ models: [], error: "HTTP 401" });
+      await useSettingsStore.getState().fetchTranscriptionModels();
+      expect(useSettingsStore.getState().transcriptionModelFetchStatus).toBe("error");
+      expect(useSettingsStore.getState().transcriptionModelFetchError).toBe("HTTP 401");
+      expect(useSettingsStore.getState().availableTranscriptionModels).toEqual(transcriptionModels);
+      expect(useSettingsStore.getState().transcriptionModel).toBe("openai/whisper-large-v3");
     });
   });
 

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { DEFAULT_MODEL_ID, type ChatModelId, type ImageProviderModel, type ProviderModel } from "@/lib/models";
-import { fetchAllProviderModels, fetchOpenRouterImageModels } from "@/lib/provider-models";
+import { DEFAULT_MODEL_ID, type ChatModelId, type ImageProviderModel, type ProviderModel, type TranscriptionProviderModel } from "@/lib/models";
+import { fetchAllProviderModels, fetchOpenRouterImageModels, fetchOpenRouterTranscriptionModels } from "@/lib/provider-models";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import { DEFAULT_GUARDRAILS_CONFIG } from "@/lib/guardrails/types";
 import { getPresetConfig, type UserModePreset } from "@/lib/guardrails/presets";
@@ -52,6 +52,12 @@ interface SettingsState {
   imageModelFetchStatus: "idle" | "fetching" | "done" | "error";
   imageModelFetchError: string | null;
 
+  // Voice transcription (OpenRouter). Empty transcriptionModel = feature disabled.
+  transcriptionModel: string;
+  availableTranscriptionModels: TranscriptionProviderModel[];
+  transcriptionModelFetchStatus: "idle" | "fetching" | "done" | "error";
+  transcriptionModelFetchError: string | null;
+
   // Enhanced guardrails configuration
   guardrailsConfig: GuardrailsConfig;
 
@@ -90,6 +96,11 @@ interface SettingsState {
   setImageModel: (modelId: string) => void;
   setAvailableImageModels: (models: ImageProviderModel[]) => void;
   fetchImageModels: () => Promise<void>;
+
+  // Voice transcription actions
+  setTranscriptionModel: (modelId: string) => void;
+  setAvailableTranscriptionModels: (models: TranscriptionProviderModel[]) => void;
+  fetchTranscriptionModels: () => Promise<void>;
 
   // Guardrails config actions
   setGuardrailsConfig: (config: Partial<GuardrailsConfig>) => void;
@@ -133,6 +144,10 @@ export const useSettingsStore = create<SettingsState>()(
       availableImageModels: [],
       imageModelFetchStatus: "idle" as const,
       imageModelFetchError: null,
+      transcriptionModel: "",
+      availableTranscriptionModels: [],
+      transcriptionModelFetchStatus: "idle" as const,
+      transcriptionModelFetchError: null,
       guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
       agentDebugLogging: false,
       allowSelfEnhancement: false,
@@ -246,6 +261,31 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
+      // Voice transcription actions
+      setTranscriptionModel: (transcriptionModel) => set({ transcriptionModel }),
+      setAvailableTranscriptionModels: (availableTranscriptionModels) =>
+        set({ availableTranscriptionModels }),
+      fetchTranscriptionModels: async () => {
+        set({ transcriptionModelFetchStatus: "fetching", transcriptionModelFetchError: null });
+        try {
+          const { models, error } = await fetchOpenRouterTranscriptionModels(
+            get().apiKeys.openrouter
+          );
+          set({
+            // Keep the current list on a failed fetch; the user's transcriptionModel
+            // selection is never touched here (their choice wins).
+            ...(models.length > 0 || !error ? { availableTranscriptionModels: models } : {}),
+            transcriptionModelFetchStatus: error && models.length === 0 ? "error" : "done",
+            transcriptionModelFetchError: error ?? null,
+          });
+        } catch (e) {
+          set({
+            transcriptionModelFetchStatus: "error",
+            transcriptionModelFetchError: String(e),
+          });
+        }
+      },
+
       // Guardrails config actions
       setGuardrailsConfig: (config) =>
         set((state) => ({
@@ -314,6 +354,8 @@ export const useSettingsStore = create<SettingsState>()(
         selectedModels: state.selectedModels,
         imageModel: state.imageModel,
         availableImageModels: state.availableImageModels,
+        transcriptionModel: state.transcriptionModel,
+        availableTranscriptionModels: state.availableTranscriptionModels,
         guardrailsConfig: state.guardrailsConfig,
         agentDebugLogging: state.agentDebugLogging,
         allowSelfEnhancement: state.allowSelfEnhancement,

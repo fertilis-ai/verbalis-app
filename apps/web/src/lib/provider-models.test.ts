@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fetchProviderModels, fetchAllProviderModels, fetchOpenRouterImageModels } from "./provider-models";
+import {
+  fetchProviderModels,
+  fetchAllProviderModels,
+  fetchOpenRouterImageModels,
+  fetchOpenRouterTranscriptionModels,
+} from "./provider-models";
 
 const mockAppFetch = vi.fn();
 
@@ -360,6 +365,59 @@ describe("fetchOpenRouterImageModels", () => {
   it("returns error on network failure", async () => {
     mockAppFetch.mockRejectedValue(new Error("offline"));
     const result = await fetchOpenRouterImageModels("key");
+    expect(result.error).toContain("offline");
+  });
+});
+
+describe("fetchOpenRouterTranscriptionModels", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetches and maps transcription models", async () => {
+    mockAppFetch.mockResolvedValue(
+      jsonResponse({
+        data: [
+          { id: "openai/whisper-large-v3", name: "Whisper Large V3" },
+          { id: "openai/gpt-4o-mini-transcribe" },
+        ],
+      })
+    );
+
+    const result = await fetchOpenRouterTranscriptionModels("sk-or-key");
+    expect(mockAppFetch).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/models?output_modalities=transcription",
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer sk-or-key" }),
+      })
+    );
+    expect(result.models).toEqual([
+      { id: "openai/whisper-large-v3", name: "Whisper Large V3" },
+      { id: "openai/gpt-4o-mini-transcribe", name: "openai/gpt-4o-mini-transcribe" },
+    ]);
+  });
+
+  it("omits the Authorization header when no key is provided", async () => {
+    mockAppFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    await fetchOpenRouterTranscriptionModels();
+    expect(mockAppFetch).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/models?output_modalities=transcription",
+      { headers: {} }
+    );
+  });
+
+  it("returns error on non-OK response", async () => {
+    mockAppFetch.mockResolvedValue(
+      jsonResponse({ error: { message: "Unauthorized" } }, false, 401)
+    );
+    const result = await fetchOpenRouterTranscriptionModels("bad-key");
+    expect(result.models).toHaveLength(0);
+    expect(result.error).toContain("401");
+  });
+
+  it("returns error on network failure", async () => {
+    mockAppFetch.mockRejectedValue(new Error("offline"));
+    const result = await fetchOpenRouterTranscriptionModels("key");
     expect(result.error).toContain("offline");
   });
 });

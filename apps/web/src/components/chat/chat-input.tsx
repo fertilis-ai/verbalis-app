@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Send, Square, Plus, ChevronDown, X } from "lucide-react";
+import { Send, Square, Plus, ChevronDown, X, Mic, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import { getActiveModels } from "@/lib/models";
 import { useChatStore, type ContextFile } from "@/stores/chat-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { expandPromptInput } from "@/lib/prompts/expand-prompt";
+import { useVoiceTranscription } from "@/lib/hooks/use-voice-transcription";
 
 const providerDisplayName: Record<string, string> = {
   anthropic: "Anthropic",
@@ -40,7 +41,7 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles
     contextBudget && contextBudget.available > 0
       ? Math.min(100, Math.round((contextBudget.used / contextBudget.available) * 100))
       : null;
-  const { localLLM, selectedModels } = useSettingsStore();
+  const { localLLM, selectedModels, transcriptionModel, apiKeys } = useSettingsStore();
   const activeModels = getActiveModels(selectedModels);
   const [input, setInput] = React.useState("");
   const [modelMenuOpen, setModelMenuOpen] = React.useState(false);
@@ -85,6 +86,18 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles
   };
 
   const hasContent = input.trim().length > 0;
+
+  const voiceEnabled = Boolean(transcriptionModel && apiKeys.openrouter.trim());
+  const { status: voiceStatus, toggle: toggleVoice } = useVoiceTranscription({
+    onText: (text) =>
+      setInput((prev) => (prev && !prev.endsWith(" ") ? `${prev} ${text}` : prev + text)),
+  });
+  const voiceTitles: Record<string, string> = {
+    idle: "Record voice message",
+    starting: "Starting microphone...",
+    recording: "Stop recording",
+    transcribing: "Transcribing...",
+  };
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-4">
@@ -204,27 +217,47 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles
             )}
           </div>
 
-          {/* Right: Send / Stop button */}
-          {isLoopActive ? (
-            <Button
-              variant="destructive"
-              size="icon"
-              className="h-7 w-7 rounded-lg"
-              onClick={onStop}
-            >
-              <Square className="h-3.5 w-3.5 fill-current" />
-            </Button>
-          ) : (
-            <Button
-              variant={hasContent ? "default" : "ghost"}
-              size="icon"
-              className="h-7 w-7 rounded-lg"
-              onClick={handleSubmit}
-              disabled={!hasContent || disabled}
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          )}
+          {/* Right: Mic + Send / Stop buttons */}
+          <div className="flex items-center gap-1">
+            {voiceEnabled && (
+              <Button
+                variant={voiceStatus === "recording" ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7 rounded-lg"
+                onClick={toggleVoice}
+                disabled={disabled || voiceStatus === "starting" || voiceStatus === "transcribing"}
+                title={voiceTitles[voiceStatus]}
+              >
+                {voiceStatus === "recording" ? (
+                  <Square className="h-3.5 w-3.5 fill-current animate-pulse" />
+                ) : voiceStatus === "starting" || voiceStatus === "transcribing" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+            {isLoopActive ? (
+              <Button
+                variant="destructive"
+                size="icon"
+                className="h-7 w-7 rounded-lg"
+                onClick={onStop}
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+              </Button>
+            ) : (
+              <Button
+                variant={hasContent ? "default" : "ghost"}
+                size="icon"
+                className="h-7 w-7 rounded-lg"
+                onClick={handleSubmit}
+                disabled={!hasContent || disabled}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

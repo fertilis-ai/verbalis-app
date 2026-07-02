@@ -348,6 +348,7 @@ function ModelsSection() {
   const {
     defaultModel, setDefaultModel, localLLM, selectedModels, modelFetchStatus, modelFetchError, fetchModels,
     apiKeys, imageModel, setImageModel, availableImageModels, imageModelFetchStatus, imageModelFetchError, fetchImageModels,
+    transcriptionModel, setTranscriptionModel, availableTranscriptionModels, transcriptionModelFetchStatus, transcriptionModelFetchError, fetchTranscriptionModels,
   } = useSettingsStore();
   const activeModels = getActiveModels(selectedModels);
   const localProviderLabel = localLLM.provider === "lmstudio" ? "LM Studio" : "Ollama";
@@ -429,6 +430,51 @@ function ModelsSection() {
               {availableImageModels.length === 0
                 ? "Click Refresh to load OpenRouter image models."
                 : "Enables the generate_image chat tool. Images are saved to ~/.sapio/images."}
+            </p>
+          </div>
+        )}
+
+        {apiKeys.openrouter.trim() && (
+          <div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium">Transcription Model</label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchTranscriptionModels()}
+                disabled={!canFetch || transcriptionModelFetchStatus === "fetching"}
+                title={!canFetch ? "Model fetching requires the desktop app" : undefined}
+                className="gap-2 h-6 text-xs"
+              >
+                {transcriptionModelFetchStatus === "fetching" ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3" />
+                )}
+                Refresh
+              </Button>
+              {transcriptionModelFetchError && (
+                <span className="text-xs text-destructive">{transcriptionModelFetchError}</span>
+              )}
+            </div>
+            <div className="mt-2">
+              <select
+                value={transcriptionModel}
+                onChange={(e) => setTranscriptionModel(e.target.value)}
+                className="w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm text-foreground"
+              >
+                <option value="">None (disabled)</option>
+                {availableTranscriptionModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {availableTranscriptionModels.length === 0
+                ? "Click Refresh to load OpenRouter transcription models."
+                : "Enables the microphone button in chat for voice input."}
             </p>
           </div>
         )}

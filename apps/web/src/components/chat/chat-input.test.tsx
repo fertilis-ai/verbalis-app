@@ -17,11 +17,25 @@ vi.mock("@/stores/chat-store", () => ({
   useChatStore: () => mockChatStore,
 }));
 
+const mockSettingsStore = {
+  localLLM: { enabled: false, provider: "lmstudio", baseUrl: "", model: "" },
+  selectedModels: [],
+  transcriptionModel: "",
+  apiKeys: { anthropic: "", openai: "", google: "", openrouter: "" },
+};
+
 vi.mock("@/stores/settings-store", () => ({
-  useSettingsStore: () => ({
-    localLLM: { enabled: false, provider: "lmstudio", baseUrl: "", model: "" },
-    selectedModels: [],
-  }),
+  useSettingsStore: () => mockSettingsStore,
+}));
+
+const mockToggleVoice = vi.fn();
+const mockVoiceTranscription = {
+  status: "idle" as "idle" | "starting" | "recording" | "transcribing",
+  toggle: mockToggleVoice,
+};
+
+vi.mock("@/lib/hooks/use-voice-transcription", () => ({
+  useVoiceTranscription: () => mockVoiceTranscription,
 }));
 
 vi.mock("@/lib/models", () => ({
@@ -37,6 +51,8 @@ vi.mock("lucide-react", () => ({
   Plus: () => <span data-testid="icon-Plus">Plus</span>,
   ChevronDown: () => <span data-testid="icon-ChevronDown">ChevronDown</span>,
   X: () => <span data-testid="icon-X">X</span>,
+  Mic: () => <span data-testid="icon-Mic">Mic</span>,
+  Loader2: () => <span data-testid="icon-Loader2">Loader2</span>,
 }));
 
 vi.mock("@/components/ui/dropdown-menu", () => ({
@@ -102,6 +118,9 @@ describe("ChatInput", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockChatStore.model = "claude-sonnet-4-20250514";
+    mockSettingsStore.transcriptionModel = "";
+    mockSettingsStore.apiKeys = { anthropic: "", openai: "", google: "", openrouter: "" };
+    mockVoiceTranscription.status = "idle";
   });
 
   // -------------------------------------------------------------------------
@@ -271,6 +290,74 @@ describe("ChatInput", () => {
     const sendIcon = screen.getByTestId("icon-Send");
     const sendButton = sendIcon.closest("button")!;
     expect(sendButton).toHaveAttribute("data-variant", "default");
+  });
+
+  // -------------------------------------------------------------------------
+  // Microphone button
+  // -------------------------------------------------------------------------
+
+  const enableVoice = () => {
+    mockSettingsStore.transcriptionModel = "openai/whisper-large-v3";
+    mockSettingsStore.apiKeys = { anthropic: "", openai: "", google: "", openrouter: "sk-or-key" };
+  };
+
+  it("hides the mic button when no transcription model is configured", () => {
+    mockSettingsStore.apiKeys = { anthropic: "", openai: "", google: "", openrouter: "sk-or-key" };
+    render(<ChatInput {...defaultProps} />);
+    expect(screen.queryByTestId("icon-Mic")).not.toBeInTheDocument();
+  });
+
+  it("hides the mic button when no OpenRouter key is configured", () => {
+    mockSettingsStore.transcriptionModel = "openai/whisper-large-v3";
+    render(<ChatInput {...defaultProps} />);
+    expect(screen.queryByTestId("icon-Mic")).not.toBeInTheDocument();
+  });
+
+  it("shows the mic button when transcription is configured", () => {
+    enableVoice();
+    render(<ChatInput {...defaultProps} />);
+    expect(screen.getByTestId("icon-Mic")).toBeInTheDocument();
+  });
+
+  it("toggles voice transcription when the mic button is clicked", async () => {
+    const user = userEvent.setup();
+    enableVoice();
+    render(<ChatInput {...defaultProps} />);
+    const micButton = screen.getByTestId("icon-Mic").closest("button")!;
+    await user.click(micButton);
+    expect(mockToggleVoice).toHaveBeenCalledOnce();
+  });
+
+  it("shows a primary-colored stop indicator while recording", () => {
+    enableVoice();
+    mockVoiceTranscription.status = "recording";
+    render(<ChatInput {...defaultProps} />);
+    expect(screen.queryByTestId("icon-Mic")).not.toBeInTheDocument();
+    const stopIcon = screen.getByTestId("icon-Square");
+    // Same filled style as the active send button (bg-primary follows the hue).
+    expect(stopIcon.closest("button")).toHaveAttribute("data-variant", "default");
+  });
+
+  it("shows a disabled spinner while starting the microphone", () => {
+    enableVoice();
+    mockVoiceTranscription.status = "starting";
+    render(<ChatInput {...defaultProps} />);
+    const spinner = screen.getByTestId("icon-Loader2");
+    expect(spinner.closest("button")).toBeDisabled();
+  });
+
+  it("shows a disabled spinner while transcribing", () => {
+    enableVoice();
+    mockVoiceTranscription.status = "transcribing";
+    render(<ChatInput {...defaultProps} />);
+    const spinner = screen.getByTestId("icon-Loader2");
+    expect(spinner.closest("button")).toBeDisabled();
+  });
+
+  it("disables the mic button when the input is disabled", () => {
+    enableVoice();
+    render(<ChatInput {...defaultProps} disabled />);
+    expect(screen.getByTestId("icon-Mic").closest("button")).toBeDisabled();
   });
 
   // -------------------------------------------------------------------------
