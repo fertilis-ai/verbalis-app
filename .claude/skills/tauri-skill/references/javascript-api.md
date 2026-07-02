@@ -9,6 +9,7 @@
 - [Path](#path)
 - [Dialog](#dialog)
 - [File System](#file-system)
+- [Opener](#opener)
 - [Shell](#shell)
 - [Clipboard](#clipboard)
 - [Notification](#notification)
@@ -362,18 +363,32 @@ const info = await stat('/path/to/file');
 console.log(info.isFile, info.isDirectory, info.size);
 ```
 
-## Shell
+## Opener
 
-Requires: `@tauri-apps/plugin-shell`
+Requires: `@tauri-apps/plugin-opener` (preferred for opening URLs/files; replaces `shell.open` from v1)
 
 ```typescript
-import { open, Command } from '@tauri-apps/plugin-shell';
+import { openUrl, openPath, revealItemInDir } from '@tauri-apps/plugin-opener';
 
-// Open URL in browser
-await open('https://tauri.app');
+// Open URL in default browser
+await openUrl('https://tauri.app');
 
 // Open file with default app
-await open('/path/to/file.pdf');
+await openPath('/path/to/file.pdf');
+
+// Open with a specific app
+await openPath('/path/to/file.txt', 'code');
+
+// Reveal a file in the system file manager (Finder/Explorer)
+await revealItemInDir('/path/to/file.pdf');
+```
+
+## Shell
+
+Requires: `@tauri-apps/plugin-shell` (for executing commands / sidecars; use `opener` for opening URLs)
+
+```typescript
+import { Command } from '@tauri-apps/plugin-shell';
 
 // Run command (must be configured in tauri.conf.json)
 const command = Command.create('my-sidecar', ['arg1', 'arg2']);

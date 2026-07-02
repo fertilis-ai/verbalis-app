@@ -5,7 +5,9 @@ description: Build cross-platform desktop and mobile applications with Tauri v2.
 
 # Tauri v2 Application Development
 
-Build tiny, fast, secure cross-platform apps using web frontends (HTML/JS/CSS) with a Rust backend. Apps leverage the system's native webview for minimal bundle sizes (<600KB).
+Build tiny, fast, secure cross-platform apps using web frontends (HTML/JS/CSS) with a Rust backend. Apps leverage the system's native webview for minimal bundle sizes (<600KB). Targets desktop (Windows, macOS, Linux) and mobile (Android, iOS) from one frontend codebase.
+
+Current stable line: **Tauri 2.11.x** (`tauri`/`@tauri-apps/cli` 2.11, `@tauri-apps/api` 2.11). Verify with `cargo tauri --version`.
 
 ## Quick Start
 
@@ -16,7 +18,13 @@ npm create tauri-app@latest
 
 # Initialize in existing project
 npx tauri init
+
+# Add an official plugin (installs npm + cargo deps AND wires default permissions)
+npm run tauri add opener
+npm run tauri add fs dialog store
 ```
+
+Prefer `tauri add <plugin>` over manual `npm install` + `cargo add` — it edits `Cargo.toml`, installs the JS package, registers the plugin in `lib.rs`, and adds the plugin's default permission to your capability file in one step.
 
 ## Project Structure
 
@@ -224,7 +232,7 @@ Tauri v2 uses a capability-based security model. Define permissions in `src-taur
     "core:tray:default",
     "fs:default",
     "fs:allow-write-text-file",
-    "shell:allow-open"
+    "opener:allow-open-url"
   ]
 }
 ```
@@ -244,20 +252,45 @@ Tauri v2 uses a capability-based security model. Define permissions in `src-taur
 
 ## Official Plugins
 
-Install via npm/cargo, add permissions in capabilities:
+Add with `npm run tauri add <name>` (handles deps + permissions). The names below are the `tauri add` slug; JS package is `@tauri-apps/plugin-<name>`, Rust crate is `tauri-plugin-<name>`.
+
+### Cross-platform
 
 | Plugin | Permission | Purpose |
 |--------|------------|---------|
-| `@tauri-apps/plugin-fs` | `fs:default` | File system access |
-| `@tauri-apps/plugin-shell` | `shell:allow-open` | Shell commands, open URLs |
-| `@tauri-apps/plugin-dialog` | `dialog:default` | Native dialogs |
-| `@tauri-apps/plugin-store` | `store:default` | Key-value storage |
-| `@tauri-apps/plugin-http` | `http:default` | HTTP client |
-| `@tauri-apps/plugin-websocket` | `websocket:default` | WebSocket connections |
-| `@tauri-apps/plugin-notification` | `notification:default` | System notifications |
-| `@tauri-apps/plugin-clipboard` | `clipboard:default` | Clipboard access |
-| `@tauri-apps/plugin-autostart` | `autostart:allow-*` | Launch on startup |
-| `@tauri-apps/plugin-upload` | `upload:default` | File uploads |
+| `opener` | `opener:default` | **Open URLs/files in default app, reveal in file manager (replaces shell's `open`)** |
+| `fs` | `fs:default` | File system access |
+| `shell` | `shell:allow-execute` | Execute commands / spawn sidecars (use `opener` for opening URLs) |
+| `dialog` | `dialog:default` | Native file/message dialogs |
+| `store` | `store:default` | Persistent key-value storage |
+| `sql` | `sql:default` | SQL databases via sqlx (SQLite/MySQL/Postgres) |
+| `http` | `http:default` | HTTP client |
+| `websocket` | `websocket:default` | WebSocket connections |
+| `notification` | `notification:default` | System notifications |
+| `clipboard-manager` | `clipboard-manager:default` | Clipboard read/write |
+| `os` | `os:default` | OS info (platform, arch, version) |
+| `log` | `log:default` | Structured logging to stdout/file/webview |
+| `global-shortcut` | `global-shortcut:default` | System-wide keyboard shortcuts (desktop) |
+| `updater` | `updater:default` | In-app auto-updates (desktop) |
+| `deep-link` | `deep-link:default` | Register custom URL scheme handler |
+| `single-instance` | n/a (Rust-only) | Enforce a single running instance (desktop) |
+| `window-state` | n/a | Persist/restore window size & position |
+| `positioner` | `positioner:default` | Move windows to preset screen locations |
+| `autostart` | `autostart:allow-*` | Launch on system startup (desktop) |
+| `stronghold` | `stronghold:default` | Encrypted secret storage |
+| `upload` | `upload:default` | File upload/download over HTTP |
+| `cli` | `cli:default` | Parse CLI arguments (desktop) |
+| `process` | `process:default` | Exit/restart the app |
+
+### Mobile-only
+
+| Plugin | Permission | Purpose |
+|--------|------------|---------|
+| `biometric` | `biometric:default` | Fingerprint / Face auth (iOS + Android) |
+| `nfc` | `nfc:default` | Read/write NFC tags |
+| `barcode-scanner` | `barcode-scanner:default` | Scan QR/barcodes via camera |
+| `geolocation` | `geolocation:default` | Device location |
+| `haptics` | `haptics:default` | Vibration / tactile feedback |
 
 ## Plugin Structure (Custom)
 
@@ -312,6 +345,24 @@ npm run tauri build
 [workspace]
 members = ["src-tauri"]
 ```
+
+### Mobile (Android / iOS)
+
+```bash
+# One-time: scaffold the native projects
+npm run tauri android init
+npm run tauri ios init          # macOS + Xcode required
+
+# Dev (live reload on device/emulator)
+npm run tauri android dev
+npm run tauri ios dev
+
+# Build release artifacts (.apk/.aab, .ipa)
+npm run tauri android build
+npm run tauri ios build
+```
+
+Mobile capability files use the `mobile-schema.json` (`$schema` in the capability) and you can gate permissions per platform with a `"platforms": ["android", "iOS"]` field. The `#[cfg_attr(mobile, tauri::mobile_entry_point)]` attribute on `run()` is required for mobile targets.
 
 ## Documentation
 

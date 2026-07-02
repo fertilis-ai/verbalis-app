@@ -18,26 +18,31 @@ npm install @tanstack/react-query @tanstack/react-router @tanstack/react-table
 # Additional libraries
 npm install @tanstack/react-form @tanstack/react-virtual @tanstack/react-ranger
 
+# Router code generation (Vite/Rspack/Webpack/Esbuild plugin)
+npm install -D @tanstack/router-plugin
+
 # Devtools (development only)
-npm install @tanstack/react-query-devtools @tanstack/react-router-devtools
+npm install -D @tanstack/react-query-devtools @tanstack/react-router-devtools
 ```
 
 ## Library Ecosystem
 
-| Library | Package | Status | Purpose |
-|---------|---------|--------|---------|
-| **Query** | `@tanstack/react-query` | Stable | Server state, data fetching, caching |
-| **Router** | `@tanstack/react-router` | Stable | Type-safe routing, file-based routes |
-| **Table** | `@tanstack/react-table` | Stable | Headless data tables, sorting, filtering |
-| **Form** | `@tanstack/react-form` | Stable | Type-safe forms, validation |
-| **Virtual** | `@tanstack/react-virtual` | Stable | Virtualize large lists at 60FPS |
-| **Start** | `@tanstack/react-start` | RC | Full-stack framework with SSR |
-| **Ranger** | `@tanstack/react-ranger` | Stable | Range/multi-range sliders |
-| **DB** | `@tanstack/react-db` | Beta | Reactive client-first data store |
-| **AI** | `@tanstack/ai` | Alpha | Multi-provider AI SDK |
-| **Pacer** | `@tanstack/pacer` | Beta | Debounce, throttle, rate limiting |
-| **Store** | `@tanstack/react-store` | Alpha | Reactive state management |
-| **Config** | `@tanstack/config` | Stable | Package build/publish tooling |
+Versions below were the latest as of June 2026 — check npm for the current release. Statuses use TanStack's own terms: a stable major (1.x/5.x/8.x) is production-ready; a `0.x` library is still pre-1.0 and may have breaking changes between minors.
+
+| Library | Package | Version | Status | Purpose |
+|---------|---------|---------|--------|---------|
+| **Query** | `@tanstack/react-query` | 5.x | Stable | Server state, data fetching, caching |
+| **Router** | `@tanstack/react-router` | 1.x | Stable | Type-safe routing, file-based routes |
+| **Table** | `@tanstack/react-table` | 8.x | Stable | Headless data tables, sorting, filtering |
+| **Form** | `@tanstack/react-form` | 1.x | Stable | Type-safe forms, validation |
+| **Virtual** | `@tanstack/react-virtual` | 3.x | Stable | Virtualize large lists at 60FPS |
+| **Start** | `@tanstack/react-start` | 1.x | RC | Full-stack SSR framework (Vite plugin) |
+| **Store** | `@tanstack/react-store` | 0.x | Pre-1.0 | Reactive state core (used by other libs) |
+| **Pacer** | `@tanstack/pacer` | 0.x | Pre-1.0 | Debounce, throttle, rate limit, queue |
+| **DB** | `@tanstack/react-db` | 0.x | Pre-1.0 | Reactive client-first collections + live queries |
+| **AI** | `@tanstack/ai` | 0.x | Alpha | Multi-provider AI SDK (chat, tools, streaming) |
+| **Ranger** | `@tanstack/react-ranger` | 0.x | Pre-1.0 | Headless range/multi-range sliders |
+| **Config** | `@tanstack/config` | 0.x | Stable | Build/publish tooling for libraries |
 
 ## Common Provider Setup
 
@@ -284,12 +289,12 @@ Read these for detailed API documentation:
 | List virtualization | `references/virtual.md` |
 | Full-stack SSR framework | `references/start.md` |
 | Range sliders | `references/ranger.md` |
-| Package tooling | `references/config.md` |
-| Development tools | `references/devtools.md` |
-| Reactive data store (beta) | `references/db.md` |
-| AI integrations (alpha) | `references/ai.md` |
-| Debounce/throttle (beta) | `references/pacer.md` |
-| State management (alpha) | `references/store.md` |
+| Package build/publish tooling | `references/config.md` |
+| Devtools (Query, Router, unified panel) | `references/devtools.md` |
+| Reactive collections + live queries (0.x) | `references/db.md` |
+| AI SDK — chat, tools, streaming (alpha) | `references/ai.md` |
+| Debounce/throttle/rate-limit/queue (0.x) | `references/pacer.md` |
+| Reactive state core (0.x) | `references/store.md` |
 
 ## Sources
 

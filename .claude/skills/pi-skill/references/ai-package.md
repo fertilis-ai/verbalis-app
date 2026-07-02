@@ -1,17 +1,17 @@
 # Pi AI Package Reference
 
-Complete reference for `@mariozechner/pi-ai` - unified LLM API with 25+ providers.
+Complete reference for `@earendil-works/pi-ai` — unified multi-provider LLM API (the foundation package; binary `pi-ai`). TypeBox's `Type`, `Static`, and `TSchema` are re-exported from this package.
 
 ## Installation
 
 ```bash
-npm install @mariozechner/pi-ai
+npm install @earendil-works/pi-ai
 ```
 
 ## Quick Start
 
 ```typescript
-import { Type, getModel, stream, complete, Context, Tool, StringEnum } from '@mariozechner/pi-ai';
+import { Type, getModel, stream, complete, Context, Tool, StringEnum } from '@earendil-works/pi-ai';
 
 const model = getModel('openai', 'gpt-4o-mini');
 
@@ -101,7 +101,7 @@ interface Model<Api> {
 ## Querying Models
 
 ```typescript
-import { getProviders, getModels, getModel } from '@mariozechner/pi-ai';
+import { getProviders, getModels, getModel } from '@earendil-works/pi-ai';
 
 const providers = getProviders();  // ['openai', 'anthropic', ...]
 const models = getModels('anthropic');
@@ -201,7 +201,7 @@ const finalMessage = await s.result();
 ## Tool Definition
 
 ```typescript
-import { Type, Tool, StringEnum } from '@mariozechner/pi-ai';
+import { Type, Tool, StringEnum } from '@earendil-works/pi-ai';
 
 const weatherTool: Tool = {
   name: 'get_weather',
@@ -245,7 +245,7 @@ if (response.stopReason === 'toolUse') {
 ## Tool Argument Validation
 
 ```typescript
-import { validateToolCall } from '@mariozechner/pi-ai';
+import { validateToolCall } from '@earendil-works/pi-ai';
 
 try {
   const validatedArgs = validateToolCall(tools, toolCall);
@@ -285,7 +285,7 @@ if (model.input.includes('image')) {
 ### Unified Interface
 
 ```typescript
-import { streamSimple, completeSimple } from '@mariozechner/pi-ai';
+import { streamSimple, completeSimple } from '@earendil-works/pi-ai';
 
 const response = await completeSimple(model, context, {
   reasoning: 'medium'  // 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
@@ -425,9 +425,9 @@ restored.messages.push({ role: 'user', content: 'Continue' });
 ### CLI Login
 
 ```bash
-npx @mariozechner/pi-ai login              # Interactive
-npx @mariozechner/pi-ai login anthropic    # Specific provider
-npx @mariozechner/pi-ai list               # List providers
+npx @earendil-works/pi-ai login              # Interactive
+npx @earendil-works/pi-ai login anthropic    # Specific provider
+npx @earendil-works/pi-ai list               # List providers
 ```
 
 ### Programmatic OAuth
@@ -437,7 +437,7 @@ import {
   loginGitHubCopilot,
   refreshOAuthToken,
   getOAuthApiKey,
-} from '@mariozechner/pi-ai';
+} from '@earendil-works/pi-ai/oauth';   // OAuth helpers live under the /oauth subpath
 
 // Login
 const credentials = await loginGitHubCopilot({

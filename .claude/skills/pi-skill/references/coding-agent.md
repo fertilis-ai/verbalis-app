@@ -1,659 +1,199 @@
-# Pi Coding Agent Reference
+# Pi Coding Agent — CLI & Usage Reference
 
-Complete reference for `@mariozechner/pi-coding-agent` - the main CLI tool.
+Reference for `@earendil-works/pi-coding-agent` (binary: `pi`). For the extension API see `extension-api.md`; for embedding see `sdk-and-modes.md`.
 
-## Installation
+## Install
 
 ```bash
-npm install -g @mariozechner/pi-coding-agent
+npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+# or
+curl -fsSL https://pi.dev/install.sh | sh
 ```
 
-## Architecture
+`--ignore-scripts` skips dependency lifecycle scripts (not needed by pi). Uninstall preserves data in `~/.pi/agent/`:
 
-### Three Modes of Operation
-
-1. **Interactive Mode** (default) - Full TUI with streaming, tool execution, session management
-2. **Print Mode** (`-p`) - Single response, exit
-3. **RPC/JSON Mode** - Process integration via stdin/stdout with event stream
-
-### Directory Structure
-
-```
-packages/coding-agent/
-├── src/
-│   ├── cli.ts                    # CLI entry point
-│   ├── cli/                      # CLI utilities
-│   │   ├── args.ts               # Argument parsing
-│   │   ├── config-selector.ts    # Configuration UI
-│   │   ├── file-processor.ts     # File handling
-│   │   ├── list-models.ts        # Model listing
-│   │   └── session-picker.ts     # Session selection
-│   ├── core/
-│   │   ├── extensions/           # Extension system
-│   │   │   ├── loader.ts         # Extension loading
-│   │   │   ├── runner.ts         # Event dispatch
-│   │   │   ├── types.ts          # Extension types
-│   │   │   └── wrapper.ts        # API wrapper
-│   │   ├── compaction/           # Context compaction
-│   │   ├── tools/                # Built-in tools
-│   │   │   ├── bash.ts
-│   │   │   ├── read.ts
-│   │   │   ├── write.ts
-│   │   │   ├── edit.ts
-│   │   │   ├── grep.ts
-│   │   │   ├── find.ts
-│   │   │   └── ls.ts
-│   │   ├── session-manager.ts    # Session persistence
-│   │   ├── model-resolver.ts     # Model selection
-│   │   ├── system-prompt.ts      # System prompt building
-│   │   └── sdk.ts                # Programmatic API
-│   └── modes/
-│       ├── interactive/          # TUI mode
-│       ├── print-mode.ts         # Print mode
-│       └── rpc/                   # RPC mode
-└── examples/
-    └── extensions/               # 58+ example extensions
+```bash
+npm uninstall -g @earendil-works/pi-coding-agent   # pnpm remove / yarn global remove / bun uninstall
 ```
 
-## Extension System
-
-### Extension Locations (Auto-Discovery)
-
-| Location | Scope |
-|----------|-------|
-| `~/.pi/agent/extensions/*.ts` | Global |
-| `~/.pi/agent/extensions/*/index.ts` | Global (subdirectory) |
-| `.pi/extensions/*.ts` | Project-local |
-| `.pi/extensions/*/index.ts` | Project-local (subdirectory) |
-
-### Extension API (ExtensionAPI)
-
-```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-
-export default function (pi: ExtensionAPI) {
-  // All registration and event subscriptions happen here
-}
-```
-
-#### Tool Registration
-
-```typescript
-pi.registerTool({
-  name: "my_tool",
-  label: "My Tool",                    // Display name
-  description: "What this tool does",  // LLM sees this
-  parameters: Type.Object({
-    action: StringEnum(["list", "add"] as const),
-    text: Type.Optional(Type.String()),
-  }),
-
-  async execute(toolCallId, params, onUpdate, ctx, signal) {
-    // Stream progress
-    onUpdate?.({ content: [...], details: {} });
-
-    // Check cancellation
-    if (signal?.aborted) return { content: [...] };
-
-    return {
-      content: [{ type: "text", text: "..." }],  // Sent to LLM
-      details: { ... }                            // For rendering & state
-    };
-  },
-
-  // Optional: Custom rendering
-  renderCall(args, theme) {
-    return new Text(theme.fg("toolTitle", "my_tool ") + args.action, 0, 0);
-  },
-
-  renderResult(result, { expanded, isPartial }, theme) {
-    if (isPartial) return new Text("Processing...", 0, 0);
-    return new Text(theme.fg("success", "Done"), 0, 0);
-  }
-});
-```
-
-#### Command Registration
-
-```typescript
-pi.registerCommand("stats", {
-  description: "Show session statistics",
-  handler: async (args, ctx) => {
-    const count = ctx.sessionManager.getEntries().length;
-    ctx.ui.notify(`${count} entries`, "info");
-  },
-  // Optional: argument completion
-  getArgumentCompletions: (prefix) => {
-    return [{ value: "verbose", label: "verbose" }];
-  }
-});
-```
-
-#### Shortcut Registration
-
-```typescript
-pi.registerShortcut("ctrl+shift+p", {
-  description: "Toggle plan mode",
-  handler: async (ctx) => {
-    ctx.ui.notify("Toggled!");
-  },
-});
-```
-
-#### Flag Registration
-
-```typescript
-pi.registerFlag("plan", {
-  description: "Start in plan mode",
-  type: "boolean",
-  default: false,
-});
-
-// Check value
-if (pi.getFlag("--plan")) {
-  // Plan mode enabled
-}
-```
-
-#### Provider Registration
-
-```typescript
-pi.registerProvider("my-proxy", {
-  baseUrl: "https://proxy.example.com",
-  apiKey: "PROXY_API_KEY",  // env var name or literal
-  api: "anthropic-messages",
-  models: [{
-    id: "claude-sonnet-4-20250514",
-    name: "Claude 4 Sonnet (proxy)",
-    reasoning: false,
-    input: ["text", "image"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 200000,
-    maxTokens: 16384
-  }],
-  // Optional: OAuth for /login
-  oauth: {
-    name: "Corporate AI",
-    async login(callbacks) { ... },
-    async refreshToken(credentials) { ... },
-    getApiKey(credentials) { return credentials.access; }
-  }
-});
-```
-
-#### Message Control
-
-```typescript
-// Inject custom message
-pi.sendMessage({
-  customType: "my-extension",
-  content: "Message text",
-  display: true,
-  details: { ... },
-}, {
-  deliverAs: "steer",      // "steer" | "followUp" | "nextTurn"
-  triggerTurn: true,       // Trigger LLM response if idle
-});
-
-// Send user message
-pi.sendUserMessage("What is 2+2?");
-pi.sendUserMessage([
-  { type: "text", text: "Describe:" },
-  { type: "image", source: { type: "base64", mediaType: "image/png", data: "..." } },
-]);
-
-// Persist state outside LLM context
-pi.appendEntry("my-state", { count: 42 });
-```
-
-#### Tool Management
-
-```typescript
-const active = pi.getActiveTools();    // ["read", "bash", "edit", "write"]
-const all = pi.getAllTools();          // [{ name, description }, ...]
-pi.setActiveTools(["read", "bash"]);   // Switch to read-only mode
-```
-
-#### Model Control
-
-```typescript
-const model = ctx.modelRegistry.find("anthropic", "claude-sonnet-4-5");
-await pi.setModel(model);
-
-const level = pi.getThinkingLevel();  // "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
-pi.setThinkingLevel("high");
-```
-
-#### Session Control
-
-```typescript
-pi.setSessionName("Refactor auth module");
-const name = pi.getSessionName();
-
-pi.setLabel(entryId, "checkpoint-before-refactor");
-```
-
-#### Inter-Extension Communication
-
-```typescript
-pi.events.on("my:event", (data) => { ... });
-pi.events.emit("my:event", { payload: "..." });
-```
-
-#### Shell Execution
-
-```typescript
-const result = await pi.exec("git", ["status"], { signal, timeout: 5000 });
-// result.stdout, result.stderr, result.code, result.killed
-```
-
-### Event System
-
-#### Session Events
-
-```typescript
-// Initial load
-pi.on("session_start", async (_event, ctx) => {
-  // Reconstruct state from ctx.sessionManager.getBranch()
-});
-
-// New session or resume
-pi.on("session_before_switch", async (event, ctx) => {
-  // event.reason: "new" | "resume"
-  // event.targetSessionFile (for resume)
-  return { cancel: true };  // Optional: cancel
-});
-pi.on("session_switch", async (event, ctx) => {
-  // event.previousSessionFile
-});
-
-// Fork
-pi.on("session_before_fork", async (event, ctx) => {
-  // event.entryId
-  return { cancel: true };
-  // OR: return { skipConversationRestore: true };
-});
-pi.on("session_fork", async (event, ctx) => {});
-
-// Compaction
-pi.on("session_before_compact", async (event, ctx) => {
-  const { preparation, branchEntries, customInstructions, signal } = event;
-  return { cancel: true };
-  // OR: return { compaction: { summary, firstKeptEntryId, tokensBefore } };
-});
-pi.on("session_compact", async (event, ctx) => {
-  // event.compactionEntry, event.fromExtension
-});
-
-// Tree navigation
-pi.on("session_before_tree", async (event, ctx) => {
-  return { cancel: true };
-  // OR: return { summary: { summary: "...", details: {} } };
-});
-pi.on("session_tree", async (event, ctx) => {
-  // event.newLeafId, event.oldLeafId
-});
-
-// Shutdown
-pi.on("session_shutdown", async (_event, ctx) => {
-  // Cleanup, save state
-});
-```
-
-#### Agent Events
-
-```typescript
-// Before agent loop
-pi.on("before_agent_start", async (event, ctx) => {
-  // event.prompt, event.images, event.systemPrompt
-  return {
-    message: { customType: "...", content: "...", display: true },
-    systemPrompt: event.systemPrompt + "\n\nExtra instructions...",
-  };
-});
-
-pi.on("agent_start", async (_event, ctx) => {});
-pi.on("agent_end", async (event, ctx) => {
-  // event.messages - messages from this prompt
-});
-
-// Per turn
-pi.on("turn_start", async (event, ctx) => {
-  // event.turnIndex, event.timestamp
-});
-pi.on("turn_end", async (event, ctx) => {
-  // event.turnIndex, event.message, event.toolResults
-});
-
-// Context modification (before each LLM call)
-pi.on("context", async (event, ctx) => {
-  // event.messages is a deep copy, safe to modify
-  const filtered = event.messages.filter(m => !shouldPrune(m));
-  return { messages: filtered };
-});
-```
-
-#### Tool Events
-
-```typescript
-// Before tool execution (can block)
-pi.on("tool_call", async (event, ctx) => {
-  // event.toolName, event.toolCallId, event.input
-  if (shouldBlock(event)) {
-    return { block: true, reason: "Not allowed" };
-  }
-});
-
-// After tool execution (can modify)
-pi.on("tool_result", async (event, ctx) => {
-  // event.toolName, event.toolCallId, event.input
-  // event.content, event.details, event.isError
-  return { content: [...], details: {...}, isError: false };
-});
-```
-
-#### Other Events
-
-```typescript
-// Model change
-pi.on("model_select", async (event, ctx) => {
-  // event.model, event.previousModel, event.source
-});
-
-// User bash (! or !! commands)
-pi.on("user_bash", (event, ctx) => {
-  // event.command, event.excludeFromContext, event.cwd
-  return { operations: remoteBashOps };
-  // OR: return { result: { output, exitCode, cancelled, truncated } };
-});
-
-// Raw input (before skill/template expansion)
-pi.on("input", async (event, ctx) => {
-  // event.text, event.images, event.source
-  return { action: "transform", text: newText };
-  // OR: return { action: "handled" };
-  // OR: return { action: "continue" };
-});
-```
-
-### Extension Context (ExtensionContext)
-
-Available in all event handlers:
-
-```typescript
-// UI methods
-ctx.ui.select("Pick one:", options)
-ctx.ui.confirm("Title", "Message", { timeout? })
-ctx.ui.input("Prompt:", "placeholder")
-ctx.ui.editor("Edit:", "prefilled")
-ctx.ui.notify("Message", "info|warning|error")
-ctx.ui.setStatus("key", "text")
-ctx.ui.setWidget("key", lines, { placement })
-ctx.ui.setFooter(renderer)
-ctx.ui.setHeader(renderer)
-ctx.ui.setEditorText("prefill")
-ctx.ui.setEditorComponent(customEditor)
-ctx.ui.custom<T>((tui, theme, kb, done) => component)
-
-// Session access (read-only)
-ctx.sessionManager.getEntries()
-ctx.sessionManager.getBranch()
-ctx.sessionManager.getLeafId()
-ctx.sessionManager.getLabel(entryId)
-
-// Model access
-ctx.modelRegistry.find(provider, modelId)
-ctx.model  // Current model
-
-// Control
-ctx.hasUI           // false in non-interactive modes
-ctx.cwd             // Working directory
-ctx.isIdle()        // Agent status
-ctx.abort()         // Abort agent
-ctx.shutdown()      // Request graceful exit
-ctx.getContextUsage()  // Token count
-ctx.compact(options)   // Trigger compaction
-ctx.getSystemPrompt()  // Current system prompt
-```
-
-### Extension Command Context (ExtensionCommandContext)
-
-Available only in command handlers (extends ExtensionContext):
-
-```typescript
-ctx.waitForIdle()        // Wait for agent to finish streaming
-ctx.newSession(options)  // Create new session
-ctx.fork(entryId)        // Fork from entry
-ctx.navigateTree(id, options)  // Navigate session tree
-```
-
-## Built-in Tools
-
-### Tool Details Types
-
-Each built-in tool has a typed `details` object:
-
-```typescript
-import {
-  BashToolDetails,
-  ReadToolDetails,
-  GrepToolDetails,
-  FindToolDetails,
-  LsToolDetails,
-  isBashToolResult,
-} from "@mariozechner/pi-coding-agent";
-
-pi.on("tool_result", async (event, ctx) => {
-  if (isBashToolResult(event)) {
-    // event.details is BashToolDetails
-    console.log(event.details.exitCode);
-  }
-});
-```
-
-### Overriding Built-in Tools
-
-Register a tool with the same name to override:
-
-```typescript
-pi.registerTool({
-  name: "read",  // Overrides built-in read
-  // ...
-});
-```
-
-### Creating Tools with Custom Operations
-
-For remote execution (SSH, containers):
-
-```typescript
-import { createReadTool, createBashTool, type ReadOperations } from "@mariozechner/pi-coding-agent";
-
-const remoteRead = createReadTool(cwd, {
-  operations: {
-    readFile: (path) => sshExec(remote, `cat ${path}`),
-    access: (path) => sshExec(remote, `test -r ${path}`).then(() => {}),
-  }
-});
-
-pi.registerTool(remoteRead);
-```
-
-## Output Truncation
-
-Tools must truncate output to avoid context overflow:
-
-```typescript
-import {
-  truncateHead,      // Keep first N lines/bytes
-  truncateTail,      // Keep last N lines/bytes
-  truncateLine,      // Truncate single line
-  formatSize,        // Human-readable size
-  DEFAULT_MAX_BYTES, // 50KB
-  DEFAULT_MAX_LINES, // 2000
-} from "@mariozechner/pi-coding-agent";
-
-const truncation = truncateHead(output, {
-  maxLines: DEFAULT_MAX_LINES,
-  maxBytes: DEFAULT_MAX_BYTES,
-});
-
-if (truncation.truncated) {
-  result += `\n[Truncated: ${truncation.outputLines}/${truncation.totalLines} lines]`;
-}
-```
-
-## UI Components
-
-### Custom Components
-
-```typescript
-const result = await ctx.ui.custom<boolean>((tui, theme, keybindings, done) => {
-  class MyComponent {
-    handleInput(data: string) {
-      if (matchesKey(data, "enter")) done(true);
-      if (matchesKey(data, "escape")) done(false);
-    }
-    render(width: number): string[] {
-      return ["Press Enter or Escape"];
-    }
-  }
-  return new MyComponent();
-});
-```
-
-### Overlay Mode
-
-```typescript
-const result = await ctx.ui.custom<string | null>(
-  (tui, theme, keybindings, done) => new MyOverlay({ onClose: done }),
-  {
-    overlay: true,
-    overlayOptions: { anchor: "top-right", width: "50%", margin: 2 }
-  }
-);
-```
-
-### Custom Editor
-
-```typescript
-import { CustomEditor } from "@mariozechner/pi-coding-agent";
-import { matchesKey } from "@mariozechner/pi-tui";
-
-class VimEditor extends CustomEditor {
-  private mode: "normal" | "insert" = "insert";
-
-  handleInput(data: string): void {
-    if (matchesKey(data, "escape") && this.mode === "insert") {
-      this.mode = "normal";
-      return;
-    }
-    if (this.mode === "normal" && data === "i") {
-      this.mode = "insert";
-      return;
-    }
-    super.handleInput(data);
-  }
-}
-
-pi.on("session_start", (_event, ctx) => {
-  ctx.ui.setEditorComponent((_tui, theme, keybindings) =>
-    new VimEditor(theme, keybindings)
-  );
-});
-```
-
-### Message Rendering
-
-```typescript
-import { Text } from "@mariozechner/pi-tui";
-
-pi.registerMessageRenderer("my-extension", (message, options, theme) => {
-  const { expanded } = options;
-  let text = theme.fg("accent", `[${message.customType}] `) + message.content;
-  if (expanded && message.details) {
-    text += "\n" + theme.fg("dim", JSON.stringify(message.details, null, 2));
-  }
-  return new Text(text, 0, 0);
-});
-```
-
-### Theme Colors
-
-```typescript
-theme.fg("toolTitle", text)   // Tool names
-theme.fg("accent", text)      // Highlights
-theme.fg("success", text)     // Success (green)
-theme.fg("error", text)       // Errors (red)
-theme.fg("warning", text)     // Warnings (yellow)
-theme.fg("muted", text)       // Secondary text
-theme.fg("dim", text)         // Tertiary text
-
-theme.bold(text)
-theme.italic(text)
-theme.strikethrough(text)
-```
-
-### Syntax Highlighting
-
-```typescript
-import { highlightCode, getLanguageFromPath } from "@mariozechner/pi-coding-agent";
-
-const lang = getLanguageFromPath("/path/to/file.rs");  // "rust"
-const highlighted = highlightCode(code, lang, theme);
-```
-
-## SDK Usage
-
-```typescript
-import { AuthStorage, createAgentSession, ModelRegistry, SessionManager } from "@mariozechner/pi-coding-agent";
-
-const { session } = await createAgentSession({
-  sessionManager: SessionManager.inMemory(),
-  authStorage: new AuthStorage(),
-  modelRegistry: new ModelRegistry(authStorage),
-});
-
-await session.prompt("What files are in the current directory?");
-```
+## Modes of Operation
+
+| Mode | Flag | Behavior |
+|------|------|----------|
+| Interactive (default) | – | Full TUI: streaming, tool execution, sessions, slash commands |
+| Print | `-p` / `--print` | Single response, then exit |
+| JSON event stream | `--mode json` | All events emitted as JSON lines (see `sdk-and-modes.md`) |
+| RPC | `--mode rpc` | Process integration over stdin/stdout JSONL (see `sdk-and-modes.md`) |
+| Export | `--export <in> [out]` | Export a session to HTML |
+
+## Authentication
+
+- **Subscription (OAuth):** run `/login` — supports Claude Pro/Max, ChatGPT Plus/Pro (Codex), GitHub Copilot. Stored in `~/.pi/agent/auth.json`.
+- **API key:** `export ANTHROPIC_API_KEY=…` (or any provider's env var) before launching. See `ai-package.md` / `references/customization.md` for the full provider/env-var list.
 
 ## CLI Reference
 
 ```bash
 pi [options] [@files...] [messages...]
-
-# Modes
--p, --print              # Print response and exit
---mode json              # Output all events as JSON lines
---mode rpc               # RPC mode for process integration
-
-# Model options
---provider <name>        # Provider (anthropic, openai, google, etc.)
---model <id>             # Model ID
---thinking <level>       # off, minimal, low, medium, high, xhigh
-
-# Session options
--c, --continue           # Continue most recent session
--r, --resume             # Browse and select session
---session <path>         # Use specific session file
---no-session             # Ephemeral mode
-
-# Tool options
---tools <list>           # Enable specific tools (read,bash,edit,write)
---no-tools               # Disable all built-in tools
-
-# Resource options
--e, --extension <path>   # Load extension
---no-extensions          # Disable extension discovery
---skill <path>           # Load skill
---no-skills              # Disable skill discovery
 ```
+
+### Package management
+```bash
+pi install <source> [-l]      # install a pi package (extensions/skills/prompts/themes)
+pi remove <source> [-l]       # remove an installed package
+pi uninstall <source> [-l]    # alias of remove
+pi update [source|self|pi]    # update a package, or pi itself
+pi update --extensions        # update all installed packages
+pi update --self              # update pi
+pi list                       # list installed packages
+pi config                     # open/inspect config
+```
+Sources: `npm:@scope/pkg@1.2.3`, `git:github.com/user/repo@v1`, `https://…`, absolute/relative paths. `-l` targets the local project. `pi -e npm:@foo/bar` loads a package for a single run.
+
+### Model options
+```bash
+--provider <name>             # anthropic, openai, google, deepseek, groq, xai, ...
+--model <pattern>             # accepts provider/id and optional :<thinking>
+--api-key <key>
+--thinking <level>            # off | minimal | low | medium | high | xhigh
+--models <patterns>           # comma-separated; Ctrl+P cycles between them
+--list-models [search]
+```
+
+### Session options
+```bash
+-c, --continue                # resume most recent session
+-r, --resume                  # browse & select a session
+--session <path|id>           # use a specific session
+--fork <path|id>              # fork from a session
+--session-dir <dir>
+--no-session                  # ephemeral (no persistence)
+-n, --name <name>             # name the session
+```
+
+### Tool options
+```bash
+-t,   --tools <list>          # enable only these tools
+-xt,  --exclude-tools <list>
+-nbt, --no-builtin-tools      # drop the built-in tools
+-nt,  --no-tools              # disable all tools
+```
+Built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`.
+
+### Resource options
+```bash
+-e, --extension <source>      # load an extension (repeatable)
+    --no-extensions
+    --skill <path>            # load a skill (repeatable, additive)
+    --no-skills
+    --prompt-template <path>  # load a prompt template (repeatable)
+    --no-prompt-templates
+    --theme <path>            # load a theme (repeatable)
+    --no-themes
+-nc, --no-context-files       # skip AGENTS.md / CLAUDE.md
+```
+
+### Other
+```bash
+--system-prompt <text>        # replace the system prompt
+--append-system-prompt <text>
+--verbose
+-a,  --approve                # trust project resources for this run
+-na, --no-approve             # decline project resources for this run
+-h, --help / -v, --version
+```
+
+## Slash Commands
+
+`/login`, `/logout`, `/model`, `/scoped-models`, `/settings`, `/resume`, `/new`, `/name <name>`, `/session`, `/tree`, `/fork`, `/clone`, `/compact [prompt]`, `/copy`, `/export [file]`, `/share` (private GitHub gist), `/reload`, `/hotkeys`, `/changelog`, `/trust`, `/debug`, `/quit`. Skills register as `/skill:name` when `enableSkillCommands` is on.
+
+## Editor & Input
+
+- `@` — fuzzy file search; `Tab` — path completion
+- `Shift+Enter` / `Ctrl+Enter` — newline (multi-line)
+- `Ctrl+V` (`Alt+V` on Windows) / drag — paste image
+- `!command` — run shell, send output to the model; `!!command` — run silently (excluded from context)
+- `Ctrl+G` — edit in `$VISUAL` / `$EDITOR`
+- `Enter` queues a **steering** message (interrupts streaming); `Alt+Enter` queues a **follow-up**; `Escape` aborts/restores; `Alt+Up` retrieves queued messages
+- `Ctrl+L` model select, `Ctrl+P` cycle models, `Shift+Tab` cycle thinking level, `Ctrl+T` toggle thinking, `Ctrl+O` expand tools
+
+## Sessions
+
+Stored as tree-structured **JSONL** under `~/.pi/agent/sessions/`, organized by working directory. Each session is a tree of entries linked by `id`/`parentId`, supporting branching and fork. See `sdk-and-modes.md` for the exact on-disk format.
+
+- `pi -c` continue, `pi -r` browse, `pi --no-session` ephemeral, `pi --name "task"`, `pi --fork <id>`
+- `/tree` — navigate branches (↑/↓ move, `Ctrl+←`/`Ctrl+→` fold/unfold, `Shift+L` label, `Enter` switch)
+- `/clone` duplicates the active branch; `/share` uploads a private gist; `/export` writes HTML
+- `treeFilterMode` setting: `default | no-tools | user-only | labeled-only | all`
+
+## Compaction
+
+When `contextTokens > contextWindow − reserveTokens`, pi summarizes older content while preserving recent work:
+
+1. Walk back accumulating tokens until `keepRecentTokens` is reached → cut point.
+2. Messages from the previous kept boundary to the cut point are summarized by the LLM (iteratively, prior summary as context).
+3. A `CompactionEntry` is appended with the `summary` + `firstKeptEntryId`; reloads use the summary plus messages from `firstKeptEntryId` forward.
+
+Cut points are valid at user/assistant/BashExecution/custom messages — **never at tool results**. `/compact [instructions]` triggers it manually; `/tree` offers to summarize abandoned branches (`BranchSummaryEntry`).
+
+```json
+{ "compaction": { "enabled": true, "reserveTokens": 16384, "keepRecentTokens": 20000 } }
+```
+
+## Security & Trust
+
+Pi runs with the **permissions of the user who starts it** and has **no built-in sandbox**; built-in tools and extensions run with full process permissions.
+
+Trust-gated resources (loaded only after trust): `.pi/settings.json`, `.pi/extensions`, `.pi/skills`, `.pi/prompts`, `.pi/themes`, `.pi/SYSTEM.md`, `.pi/APPEND_SYSTEM.md`, project `.agents/skills`. Decisions are stored in `~/.pi/agent/trust.json` keyed by canonical directory; global `defaultProjectTrust` ∈ `"ask" | "never" | "always"` (default `"ask"`). `--approve`/`--no-approve` override for one run.
+
+Trust only guards *loading* repo-provided code — it does not prevent prompt injection via file contents, comments, build output, or context. For untrusted code, isolate with a container/VM (see `references/customization.md` → Containerization).
+
+## settings.json
+
+Global `~/.pi/agent/settings.json`, project `.pi/settings.json`. Selected keys (defaults in parens):
+
+**Model/thinking:** `defaultProvider`, `defaultModel`, `defaultThinkingLevel`, `hideThinkingBlock` (`false`), `thinkingBudgets` (object), `enabledModels` (array, Ctrl+P cycle), `scopedModels`.
+
+**UI:** `theme` (`"dark"`), `quietStartup` (`false`), `collapseChangelog` (`false`), `doubleEscapeAction` (`"tree"`; `tree|fork|none`), `treeFilterMode` (`"default"`), `editorPaddingX` (`0`), `autocompleteMaxVisible` (`5`), `showHardwareCursor` (`false`).
+
+**Trust/telemetry:** `defaultProjectTrust` (`"ask"`, global only), `enableInstallTelemetry` (`true`), `enableAnalytics` (`false`), `trackingId`.
+
+**Compaction/branch:** `compaction.{enabled,reserveTokens,keepRecentTokens}`, `branchSummary.{reserveTokens,skipPrompt}`.
+
+**Retry:** `retry.{enabled,maxRetries,baseDelayMs}`, `retry.provider.{timeoutMs,maxRetries,maxRetryDelayMs}`.
+
+**Delivery/transport:** `steeringMode`/`followUpMode` (`"one-at-a-time"`; `all|one-at-a-time`), `transport` (`"auto"`; `sse|websocket|websocket-cached|auto`), `httpIdleTimeoutMs` (`300000`), `websocketConnectTimeoutMs` (`15000`).
+
+**Terminal/images:** `terminal.{showImages,imageWidthCells,clearOnShrink}`, `images.{autoResize,blockImages}`, `markdown.codeBlockIndent`.
+
+**Shell/network:** `shellPath`, `shellCommandPrefix`, `npmCommand` (array), `httpProxy` (global only), `sessionDir`.
+
+**Resources:** `packages`, `extensions`, `skills`, `prompts`, `themes` (arrays of paths/sources; object form supports `+include`/`-exclude`/`!pattern` filtering), `enableSkillCommands` (`true`).
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `PI_CODING_AGENT_DIR` | Override config directory (default: `~/.pi/agent`) |
-| `PI_SKIP_VERSION_CHECK` | Skip version check at startup |
-| `PI_CACHE_RETENTION` | Set to `long` for extended prompt cache |
-| `VISUAL`, `EDITOR` | External editor for Ctrl+G |
+| Variable | Purpose |
+|----------|---------|
+| `PI_CODING_AGENT_DIR` | Override config dir (default `~/.pi/agent`) |
+| `PI_CODING_AGENT_SESSION_DIR` | Override session dir |
+| `PI_PACKAGE_DIR` | Override package install dir |
+| `PI_OFFLINE` | Offline mode (also `--offline`) |
+| `PI_SKIP_VERSION_CHECK` | Skip startup version check |
+| `PI_TELEMETRY` | Telemetry toggle |
+| `PI_CACHE_RETENTION` | `long` for extended prompt cache (Anthropic 5min→1h, OpenAI in-memory→24h) |
+| `PI_EXPERIMENTAL` | Enable experimental features |
+| `VISUAL`, `EDITOR` | External editor for `Ctrl+G` |
+
+## Keybindings
+
+Config: `~/.pi/agent/keybindings.json` (namespaced ids; `/reload` to apply). Format `modifier+key` (`ctrl`/`shift`/`alt`); each action takes a key or array; user config overrides defaults.
+
+```json
+{
+  "tui.editor.cursorUp": ["up", "ctrl+p"],
+  "tui.editor.cursorDown": ["down", "ctrl+n"],
+  "tui.editor.deleteWordBackward": ["ctrl+w", "alt+backspace"]
+}
+```
+
+Notable defaults: submit `enter`, newline `shift+enter`, interrupt `escape`, exit `ctrl+d`, external editor `ctrl+g`, paste image `ctrl+v`, model select `ctrl+l`, cycle models `ctrl+p`/`shift+ctrl+p`, thinking cycle `shift+tab` / toggle `ctrl+t`, expand tools `ctrl+o`, follow-up `alt+enter`, dequeue `alt+up`. Run `/hotkeys` to view the live set.

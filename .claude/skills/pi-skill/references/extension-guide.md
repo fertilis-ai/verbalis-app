@@ -1,6 +1,8 @@
 # Pi Extension Development Guide
 
-Step-by-step guide for creating extensions for the pi coding agent.
+Step-by-step guide for creating extensions for the pi coding agent. For the exhaustive API surface (every method, event payload, and `ctx` member) see `extension-api.md`.
+
+> **Tool `execute` parameter order is `(toolCallId, params, signal, onUpdate, ctx)`.** Import `Type` from `typebox` (or `@earendil-works/pi-ai`), and `StringEnum` from `@earendil-works/pi-ai`.
 
 ## Getting Started
 
@@ -21,8 +23,8 @@ Create a TypeScript file in one of the auto-discovery locations:
 ### 2. Basic Structure
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 
 export default function (pi: ExtensionAPI) {
   // All registration happens here
@@ -46,8 +48,8 @@ For extensions in auto-discovered locations, use `/reload` command to reload wit
 A tool the LLM can call to perform actions.
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
@@ -57,7 +59,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({
       expression: Type.String({ description: "Math expression to evaluate" }),
     }),
-    async execute(toolCallId, params, onUpdate, ctx, signal) {
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
       try {
         // Never use eval in production - this is just an example
         const result = eval(params.expression);
@@ -81,9 +83,9 @@ export default function (pi: ExtensionAPI) {
 A tool that prompts the user during execution.
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { StringEnum } from "@mariozechner/pi-ai";
-import { Type } from "@sinclair/typebox";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
@@ -93,7 +95,7 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({
       env: StringEnum(["dev", "staging", "prod"] as const),
     }),
-    async execute(toolCallId, params, onUpdate, ctx, signal) {
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
       if (params.env === "prod") {
         const confirmed = await ctx.ui.confirm(
           "Production Deploy",
@@ -129,9 +131,9 @@ export default function (pi: ExtensionAPI) {
 A tool that maintains state across session reloads.
 
 ```typescript
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { StringEnum } from "@mariozechner/pi-ai";
-import { Type } from "@sinclair/typebox";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
 
 interface Note {
   id: number;
@@ -176,7 +178,7 @@ export default function (pi: ExtensionAPI) {
       text: Type.Optional(Type.String({ description: "Note text for add" })),
       id: Type.Optional(Type.Number({ description: "Note ID for delete" })),
     }),
-    async execute(toolCallId, params, onUpdate, ctx, signal) {
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
       switch (params.action) {
         case "list":
           return {
@@ -233,7 +235,7 @@ export default function (pi: ExtensionAPI) {
 Block or confirm dangerous operations.
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const DANGEROUS_PATTERNS = [
   /rm\s+-rf\s+[/~]/,
@@ -269,7 +271,7 @@ export default function (pi: ExtensionAPI) {
 Modify tool results before they're sent to the LLM.
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.on("tool_result", async (event, ctx) => {
@@ -293,7 +295,7 @@ export default function (pi: ExtensionAPI) {
 Add a command users can invoke with `/name`.
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("stats", {
@@ -338,7 +340,7 @@ export default function (pi: ExtensionAPI) {
 ### Pattern 7: Custom Shortcut
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   let planMode = false;
@@ -357,7 +359,7 @@ export default function (pi: ExtensionAPI) {
 ### Pattern 8: System Prompt Modification
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event, ctx) => {
@@ -377,7 +379,7 @@ export default function (pi: ExtensionAPI) {
 ### Pattern 9: Input Transformation
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.on("input", async (event, ctx) => {
@@ -403,8 +405,8 @@ export default function (pi: ExtensionAPI) {
 ### Pattern 10: Custom UI Component
 
 ```typescript
-import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
-import { matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import { matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 
 class FilePickerComponent {
   private files: string[];
@@ -494,7 +496,7 @@ For larger extensions, use a directory:
 
 **index.ts:**
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerDeployTool } from "./tools/deploy.js";
 import { registerMonitorTool } from "./tools/monitor.js";
 import { registerGates } from "./events/gates.js";
@@ -545,3 +547,5 @@ Run `npm install` in the extension directory.
 6. **Call invalidate()** when caching render output and state changes
 7. **Reconstruct state on all session events** (start, switch, fork, tree)
 8. **Provide custom renderers** for better tool output display
+9. **Mind the `execute` parameter order**: `(toolCallId, params, signal, onUpdate, ctx)` — `signal` comes before `onUpdate`
+10. **Never use inline `await import()`** and prefer `pi.exec(...)` over spawning shells directly

@@ -1,88 +1,173 @@
 # Theming Guide
 
 ## Table of Contents
-- [CSS Variables](#css-variables)
+- [How Theming Works (Tailwind v4)](#how-theming-works-tailwind-v4)
+- [Full globals.css Scaffold](#full-globalscss-scaffold)
 - [Color System](#color-system)
 - [Dark Mode](#dark-mode)
 - [Custom Themes](#custom-themes)
 - [Typography](#typography)
-- [Tailwind CSS v4](#tailwind-css-v4)
+- [Migrating from HSL / Tailwind v3](#migrating-from-hsl--tailwind-v3)
 
 ---
 
-## CSS Variables
+## How Theming Works (Tailwind v4)
 
-shadcn/ui uses CSS variables (HSL format) for colors. All variables are defined in your global CSS file.
+shadcn/ui (current) uses **CSS variables in the OKLCH color space** and wires them to
+Tailwind utilities with the **`@theme inline`** directive — directly in your CSS entry
+file. There is **no color configuration in `tailwind.config.js`**.
 
-### Base Variables
+Three pieces work together:
+
+1. **`:root` / `.dark`** define raw theme values (`--background: oklch(1 0 0)`).
+2. **`@theme inline`** maps each value to a Tailwind color token
+   (`--color-background: var(--background)`), which generates `bg-background`,
+   `text-background`, `border-background`, etc.
+3. **`@custom-variant dark`** enables the `dark:` variant against the `.dark` class.
+
+Because tokens are real Tailwind colors, you use them as plain utilities and **never
+wrap them in `hsl(...)`**:
+
+```tsx
+<div className="bg-background text-foreground" />
+<div className="bg-primary text-primary-foreground" />
+<div className="border-border" />
+```
+
+When you need a raw value in custom CSS, reference the variable directly:
 
 ```css
-@layer base {
-  :root {
-    /* Background and text */
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    /* Card surfaces */
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    /* Popover surfaces */
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    /* Primary action color */
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    /* Secondary action color */
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    /* Muted backgrounds */
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    /* Accent highlights */
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    /* Destructive actions */
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    /* Borders and inputs */
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    /* Border radius */
-    --radius: 0.5rem;
-
-    /* Charts (optional) */
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-  }
+.custom-element {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
 }
 ```
 
-### Using Variables in Components
+---
 
-Variables are accessed via `hsl()`:
+## Full globals.css Scaffold
 
-```tsx
-// In Tailwind classes
-<div className="bg-background text-foreground" />
-<div className="border-border" />
-<div className="bg-primary text-primary-foreground" />
+This is the complete default `neutral` theme produced by `shadcn init` on Tailwind v4.
 
-// In custom CSS
-.custom-element {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
+```css
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
 ```
 
@@ -92,51 +177,50 @@ Variables are accessed via `hsl()`:
 
 ### Base Colors
 
-shadcn/ui offers several base color palettes:
+`shadcn init` scaffolds from one of these neutral base palettes (chosen by `baseColor`
+in `components.json`):
 
 | Base Color | Description |
 |------------|-------------|
-| `slate` | Cool gray with blue undertones |
-| `gray` | Pure neutral gray |
-| `zinc` | Warm gray with slight warmth |
-| `neutral` | True neutral (default) |
-| `stone` | Warm gray with brown undertones |
+| `neutral`  | True neutral (default) |
+| `stone`    | Warm gray with brown undertones |
+| `zinc`     | Cool neutral gray |
+| `gray`     | Pure neutral gray |
+| `slate`    | Cool gray with blue undertones |
 
-### Semantic Colors
+### Semantic Tokens
 
-| Variable | Usage |
-|----------|-------|
+| Token | Usage |
+|-------|-------|
+| `background` / `foreground` | Page surface and default text |
+| `card` / `popover` | Raised surfaces (each with `-foreground`) |
 | `primary` | Main action buttons, links |
 | `secondary` | Secondary buttons, less emphasis |
-| `muted` | Subdued backgrounds, disabled states |
+| `muted` | Subdued backgrounds, helper text (`muted-foreground`) |
 | `accent` | Highlights, hover states |
 | `destructive` | Delete, error, danger actions |
+| `border` / `input` / `ring` | Borders, input borders, focus rings |
+| `chart-1`…`chart-5` | Chart series colors |
+| `sidebar*` | Sidebar surface, text, primary, accent, border, ring |
 
-### Color Pairing
-
-Each semantic color has a `-foreground` variant for text:
+Each surface color pairs with a `-foreground` token for readable text:
 
 ```tsx
-// Button uses primary + primary-foreground
-<Button>Primary Action</Button>
-
-// Custom usage
-<div className="bg-secondary text-secondary-foreground">
-  Secondary content
-</div>
+<div className="bg-secondary text-secondary-foreground">Secondary content</div>
 ```
 
 ---
 
 ## Dark Mode
 
-### Setup with next-themes (Recommended)
+Dark mode is driven by a `.dark` class on `<html>`. The `@custom-variant dark` line in
+your CSS enables `dark:` utilities, and the `.dark` block overrides the theme values.
+
+### Next.js — next-themes (Recommended)
 
 ```bash
 bun add next-themes
 ```
-
-#### 1. Create Theme Provider
 
 ```tsx
 // components/theme-provider.tsx
@@ -153,10 +237,8 @@ export function ThemeProvider({
 }
 ```
 
-#### 2. Wrap App in Provider
-
 ```tsx
-// app/layout.tsx (Next.js App Router)
+// app/layout.tsx
 import { ThemeProvider } from "@/components/theme-provider"
 
 export default function RootLayout({ children }) {
@@ -177,13 +259,10 @@ export default function RootLayout({ children }) {
 }
 ```
 
-#### 3. Create Theme Toggle
-
 ```tsx
 // components/theme-toggle.tsx
 "use client"
 
-import * as React from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
@@ -207,69 +286,20 @@ export function ThemeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
-          Light
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
-          Dark
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")}>
-          System
-        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("light")}>Light</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("dark")}>Dark</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setTheme("system")}>System</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
 ```
 
-### Dark Mode CSS Variables
+### Vite / TanStack Start — manual toggle
 
-Add dark mode values to your CSS:
-
-```css
-.dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
-
-  --chart-1: 220 70% 50%;
-  --chart-2: 160 60% 45%;
-  --chart-3: 30 80% 55%;
-  --chart-4: 280 65% 60%;
-  --chart-5: 340 75% 55%;
-}
-```
-
-### Vite/TanStack Start Dark Mode
-
-For non-Next.js projects, manually handle the class:
+For non-Next.js projects, toggle the `.dark` class yourself:
 
 ```tsx
-// Simple toggle without next-themes
 import { useEffect, useState } from 'react'
 
 function useTheme() {
@@ -278,7 +308,7 @@ function useTheme() {
   useEffect(() => {
     const stored = localStorage.getItem('theme') as 'light' | 'dark' | null
     const system = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-    setTheme(stored || system)
+    setTheme(stored ?? system)
   }, [])
 
   useEffect(() => {
@@ -286,7 +316,7 @@ function useTheme() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
-  return { theme, setTheme, toggle: () => setTheme(t => t === 'dark' ? 'light' : 'dark') }
+  return { theme, setTheme, toggle: () => setTheme(t => (t === 'dark' ? 'light' : 'dark')) }
 }
 ```
 
@@ -294,89 +324,60 @@ function useTheme() {
 
 ## Custom Themes
 
-### Creating a Custom Color Palette
-
-1. Choose your primary color (HSL format)
-2. Generate complementary values
-3. Update CSS variables
+To customize, edit the OKLCH values in `:root` and `.dark`. OKLCH is
+`oklch(lightness chroma hue)` — lightness `0`–`1`, chroma `0`+ (0 = gray), hue
+`0`–`360`.
 
 ```css
 :root {
-  /* Blue theme */
-  --primary: 221.2 83.2% 53.3%;
-  --primary-foreground: 210 40% 98%;
+  /* Blue primary */
+  --primary: oklch(0.55 0.18 255);
+  --primary-foreground: oklch(0.985 0 0);
+}
 
-  /* Or green theme */
-  --primary: 142.1 76.2% 36.3%;
-  --primary-foreground: 355.7 100% 97.3%;
-
-  /* Or orange theme */
-  --primary: 24.6 95% 53.1%;
-  --primary-foreground: 60 9.1% 97.8%;
+.dark {
+  --primary: oklch(0.7 0.16 255);
+  --primary-foreground: oklch(0.205 0 0);
 }
 ```
 
 ### Theme Generator
 
-Use the official theme generator: https://ui.shadcn.com/themes
+Use the official generator to produce a full OKLCH palette:
+https://ui.shadcn.com/themes — or browse community themes at https://tweakcn.com.
 
-Or programmatically:
+### Multiple Theme Classes
 
-```tsx
-// Generate shades from a base color
-function generateTheme(baseHue: number) {
-  return {
-    primary: `${baseHue} 70% 50%`,
-    primaryForeground: `${baseHue} 10% 98%`,
-    secondary: `${baseHue} 20% 95%`,
-    secondaryForeground: `${baseHue} 70% 20%`,
-    accent: `${baseHue} 30% 90%`,
-    accentForeground: `${baseHue} 70% 15%`,
-  }
-}
-```
-
-### Multiple Theme Support
+Layer additional theme classes for runtime switching. Because tokens are plain CSS
+variables, overriding a class is enough:
 
 ```css
-/* Rose theme */
 .theme-rose {
-  --primary: 346.8 77.2% 49.8%;
-  --primary-foreground: 355.7 100% 97.3%;
+  --primary: oklch(0.55 0.22 17);
+  --primary-foreground: oklch(0.985 0 0);
 }
-
-/* Green theme */
 .theme-green {
-  --primary: 142.1 76.2% 36.3%;
-  --primary-foreground: 355.7 100% 97.3%;
-}
-
-/* Blue theme */
-.theme-blue {
-  --primary: 221.2 83.2% 53.3%;
-  --primary-foreground: 210 40% 98%;
+  --primary: oklch(0.55 0.16 150);
+  --primary-foreground: oklch(0.985 0 0);
 }
 ```
 
 ```tsx
-// Theme selector
 function ThemeSelector() {
   const [color, setColor] = useState('default')
-
   return (
     <select
       value={color}
       onChange={(e) => {
-        document.documentElement.className = e.target.value === 'default'
-          ? ''
-          : `theme-${e.target.value}`
-        setColor(e.target.value)
+        const v = e.target.value
+        document.documentElement.classList.remove('theme-rose', 'theme-green')
+        if (v !== 'default') document.documentElement.classList.add(`theme-${v}`)
+        setColor(v)
       }}
     >
       <option value="default">Default</option>
       <option value="rose">Rose</option>
       <option value="green">Green</option>
-      <option value="blue">Blue</option>
     </select>
   )
 }
@@ -386,7 +387,9 @@ function ThemeSelector() {
 
 ## Typography
 
-### Font Setup
+### Font Setup (Tailwind v4)
+
+Expose a font as a CSS variable, then register it in `@theme inline`:
 
 ```tsx
 // app/layout.tsx (Next.js)
@@ -396,116 +399,48 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" })
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable} font-sans`}>
-        {children}
-      </body>
+    <html lang="en" className={inter.variable}>
+      <body>{children}</body>
     </html>
   )
 }
 ```
 
-```js
-// tailwind.config.js
-const { fontFamily } = require("tailwindcss/defaultTheme")
-
-module.exports = {
-  theme: {
-    extend: {
-      fontFamily: {
-        sans: ["var(--font-sans)", ...fontFamily.sans],
-      },
-    },
-  },
+```css
+/* globals.css */
+@theme inline {
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
 }
 ```
 
+For Vite/TanStack, load the font via `@font-face` or a `<link>` and set `--font-sans`
+the same way.
+
 ### Typography Utilities
 
-shadcn/ui components use Tailwind's typography classes:
-
 ```tsx
-// Headings
-<h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">
-  Heading 1
-</h1>
-<h2 className="scroll-m-20 text-3xl font-semibold tracking-tight">
-  Heading 2
-</h2>
-
-// Body text
-<p className="leading-7 [&:not(:first-child)]:mt-6">
-  Paragraph text
-</p>
-
-// Muted text
-<p className="text-sm text-muted-foreground">
-  Muted helper text
-</p>
-
-// Large text
-<div className="text-lg font-semibold">Large text</div>
-
-// Small text
+<h1 className="scroll-m-20 text-4xl font-extrabold tracking-tight lg:text-5xl">Heading 1</h1>
+<h2 className="scroll-m-20 text-3xl font-semibold tracking-tight">Heading 2</h2>
+<p className="leading-7 [&:not(:first-child)]:mt-6">Paragraph text</p>
+<p className="text-sm text-muted-foreground">Muted helper text</p>
 <small className="text-sm font-medium leading-none">Small</small>
 ```
 
 ---
 
-## Tailwind CSS v4
+## Migrating from HSL / Tailwind v3
 
-shadcn/ui supports Tailwind CSS v4 with the updated configuration format.
+If you have an older shadcn project on Tailwind v3 + HSL variables:
 
-### v4 Configuration
+| Old (v3 / HSL) | New (v4 / OKLCH) |
+|----------------|------------------|
+| `@tailwind base; @tailwind components; @tailwind utilities;` | `@import "tailwindcss";` |
+| Colors in `tailwind.config.js` `theme.extend.colors` | `@theme inline` in CSS; `tailwind.config: ""` |
+| `--primary: 222.2 47.4% 11.2%` (HSL triplet) | `--primary: oklch(0.205 0 0)` |
+| `bg-primary` → `hsl(var(--primary))` | `bg-primary` reads the variable directly |
+| `darkMode: ["class"]` in config | `@custom-variant dark (&:is(.dark *));` |
+| `tailwindcss-animate` plugin | `tw-animate-css` (imported in CSS) |
 
-```js
-// tailwind.config.js (v4)
-export default {
-  content: ["./src/**/*.{js,ts,jsx,tsx}"],
-  theme: {
-    extend: {
-      colors: {
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        // ... rest of colors
-      },
-    },
-  },
-}
-```
-
-### v4 CSS Import
-
-```css
-/* globals.css */
-@import "tailwindcss";
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    /* ... variables */
-  }
-}
-```
-
-### Key Differences from v3
-
-| v3 | v4 |
-|----|----|
-| `@tailwind base;` | `@import "tailwindcss";` |
-| `darkMode: ["class"]` | Built-in, use `.dark` class |
-| Separate `postcss.config.js` | Often integrated |
-
-### Updating to v4
-
-```bash
-# Install v4
-bun add -D tailwindcss@next @tailwindcss/postcss@next
-
-# Update imports in CSS
-# Change @tailwind directives to @import
-```
+The CLI can assist parts of this: `npx shadcn@latest add` against a v4 project writes
+the new format. Review the official Tailwind v4 upgrade guide for the build-tool changes
+(PostCSS plugin → `@tailwindcss/vite` or `@tailwindcss/postcss`).

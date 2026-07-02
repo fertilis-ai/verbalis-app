@@ -1,580 +1,229 @@
 # Pi TUI Package Reference
 
-Complete reference for `@mariozechner/pi-tui` - terminal UI framework with differential rendering.
-
-## Installation
+`@earendil-works/pi-tui` — terminal UI library with differential rendering. Used for tool/message renderers, custom commands (`ctx.ui.custom`), and custom editors inside coding-agent extensions, and standalone for terminal apps.
 
 ```bash
-npm install @mariozechner/pi-tui
+npm install @earendil-works/pi-tui
 ```
 
-## Quick Start
+> The signatures below follow the official TUI docs page. Some constructors are positional; verify against the package's TypeScript types when in doubt.
 
-```typescript
-import { TUI, Text, Container, Editor, SelectList, matchesKey } from '@mariozechner/pi-tui';
+## Rendering Model
 
-const tui = new TUI();
+Three strategies, applied automatically: full redraw (fallback), differential updates (only changed lines), and synchronized output (CSI 2026, flicker-free) when the terminal supports it.
 
-// Set main content
-const mainContent = new Text('Hello, TUI!', 1, 1);
-tui.setMain(mainContent);
-
-// Run TUI
-await tui.run();
-```
-
-## Architecture
-
-### Three-Strategy Rendering
-
-1. **Full Redraw** - Fallback, clears and redraws everything
-2. **Differential Updates** - Only sends changed lines
-3. **Synchronized Output** - CSI 2026 for flicker-free rendering (when terminal supports it)
-
-### Component Model
+### Component interface
 
 ```typescript
 interface Component {
-  render(width: number): string[];  // Return array of lines
-  handleInput?(data: string): void; // Handle keyboard input
-  invalidate?(): void;              // Clear render cache
-}
-
-interface Focusable extends Component {
-  focused: boolean;  // For IME cursor support
+  render(width: number): string[];   // return one string per line
+  handleInput?(data: string): void;  // raw input bytes
+  wantsKeyRelease?: boolean;
+  invalidate(): void;                 // clear any render cache
 }
 ```
 
-## TUI Class
-
-### Constructor
+### Focusable (IME / cursor)
 
 ```typescript
-const tui = new TUI(options?: {
-  stdin?: NodeJS.ReadStream;
-  stdout?: NodeJS.WriteStream;
-});
-```
+import { CURSOR_MARKER, type Component, type Focusable } from "@earendil-works/pi-tui";
 
-### Core Methods
-
-```typescript
-// Set main component
-tui.setMain(component);
-
-// Run (starts input loop)
-await tui.run();
-
-// Stop
-tui.stop();
-
-// Force redraw
-tui.render();
-
-// Get dimensions
-const { width, height } = tui;
-```
-
-### Overlays
-
-```typescript
-// Show overlay
-const handle = tui.showOverlay(component, options);
-
-// Overlay options
-interface OverlayOptions {
-  // Size
-  width?: number | `${number}%`;       // Fixed or percentage
-  maxWidth?: number | `${number}%`;
-  maxHeight?: number | `${number}%`;
-
-  // Position
-  anchor?: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' |
-           'top-center' | 'bottom-center' | 'left-center' | 'right-center';
-  row?: number | `${number}%`;          // Absolute row
-  col?: number | `${number}%`;          // Absolute column
-  offsetX?: number;                      // Offset from anchor
-  offsetY?: number;
-
-  // Spacing
-  margin?: number | { top, right, bottom, left };
-
-  // Responsive
-  visible?: (width: number, height: number) => boolean;
+class MyInput implements Component, Focusable {
+  focused = false;
+  render(width: number): string[] {
+    const marker = this.focused ? CURSOR_MARKER : "";
+    return [`> ${before}${marker}\x1b[7m${at}\x1b[27m${after}`];
+  }
+  invalidate() {}
 }
-
-// Handle methods
-handle.hide();
-handle.setHidden(true | false);
-const isHidden = handle.hidden;
-
-// Hide all overlays
-tui.hideOverlay();
-
-// Check for overlay
-tui.hasOverlay();
-```
-
-### Focus Management
-
-```typescript
-// Set focused component (for cursor positioning)
-tui.setFocused(component);
 ```
 
 ## Built-in Components
 
-### Text
-
-Simple text content with optional padding:
-
 ```typescript
-import { Text } from '@mariozechner/pi-tui';
+import { Text, Box, Container, Spacer, Markdown, Image } from "@earendil-works/pi-tui";
 
-// Basic
-const text = new Text('Hello World', 0, 0);
+// Text — multi-line, word-wrapping. (content, paddingX=1, paddingY=1, bgFn?)
+const text = new Text("Hello World", 1, 1, (s) => bgGray(s));
+text.setText("Updated");
 
-// With padding (top, right, bottom, left)
-const padded = new Text('Content', 1, 2, 1, 2);
+// Box — single child + optional background
+const box = new Box(1, 1, (s) => bgGray(s));
+box.addChild(new Text("Content", 0, 0));
+box.setBgFn((s) => bgBlue(s));
 
-// ANSI colors are safe
-const colored = new Text('\x1b[31mRed text\x1b[0m', 0, 0);
-```
+// Container — stacks children vertically
+const container = new Container();
+container.addChild(componentA);
+container.removeChild(componentA);
 
-### Editor
+// Spacer — N blank lines
+const spacer = new Spacer(2);
 
-Multi-line text editor:
+// Markdown — (content, paddingX, paddingY, markdownTheme)
+const md = new Markdown("# Title\n\n**bold**", 1, 1, theme);
+md.setText("Updated");
 
-```typescript
-import { Editor, EditorConfig } from '@mariozechner/pi-tui';
-
-const config: EditorConfig = {
-  theme: myTheme,              // Required: theme for styling
-  keybindings: keybindings,    // Required: keybinding manager
-  history?: [],                // Optional: command history
-  historyIndex?: -1,
-  placeholder?: 'Type here...',
-  onSubmit: (text) => {},      // Called on Enter
-  onFileRequest?: () => file,  // For @file completion
-  onAbort?: () => {},          // Called on Escape
-  highlightRegex?: /pattern/,  // Highlight matches
-};
-
-const editor = new Editor(config);
-
-// Properties
-editor.text = 'Set text';
-const content = editor.text;
-editor.focused = true;
-
-// Methods
-editor.addLine('New line');
-editor.clear();
-```
-
-### Input
-
-Single-line text input:
-
-```typescript
-import { Input } from '@mariozechner/pi-tui';
-
-const input = new Input({
-  theme: myTheme,
-  prompt: 'Search: ',
-  placeholder: 'Enter query...',
-  value: '',
-  onSubmit: (value) => {},
-  onCancel?: () => {},
-  autoFocus?: true,
-  maxWidth?: 50,
-});
-
-input.focused = true;
-const value = input.value;
+// Image — base64 (iTerm2/Kitty protocols)
+const image = new Image(base64Data, "image/png", imageTheme, { maxWidthCells: 80, maxHeightCells: 24 });
 ```
 
 ### SelectList
 
-Option selector:
-
 ```typescript
-import { SelectList } from '@mariozechner/pi-tui';
+import { SelectList, type SelectItem } from "@earendil-works/pi-tui";
 
-const list = new SelectList({
-  theme: myTheme,
-  items: [
-    { label: 'Option 1', value: 'opt1' },
-    { label: 'Option 2', value: 'opt2' },
-    { label: 'Disabled', value: 'opt3', disabled: true },
-  ],
-  selected?: 0,                    // Initial selection
-  onSelect: (item) => {},          // On Enter
-  onCancel?: () => {},             // On Escape
-  showSearch?: true,               // Enable filtering
-  searchPlaceholder?: 'Search...',
-  maxVisibleItems?: 10,
+const items: SelectItem[] = [
+  { value: "opt1", label: "Option 1", description: "First option" },
+  { value: "opt2", label: "Option 2", description: "Second option" },
+];
+
+const list = new SelectList(items, Math.min(items.length, 10), {
+  selectedPrefix: (t) => theme.fg("accent", t),
+  selectedText:   (t) => theme.fg("accent", t),
+  description:    (t) => theme.fg("muted", t),
+  scrollInfo:     (t) => theme.fg("dim", t),
+  noMatch:        (t) => theme.fg("warning", t),
 });
-
-// Selection
-list.selected = 1;
-const item = list.getSelectedItem();
-list.selectNext();
-list.selectPrevious();
+list.onSelect = (item) => done(item.value);
+list.onCancel = () => done(null);
 ```
 
 ### SettingsList
 
-Toggle/radio settings:
-
 ```typescript
-import { SettingsList, Setting } from '@mariozechner/pi-tui';
+import { SettingsList, type SettingItem, getSettingsListTheme } from "@earendil-works/pi-tui";
 
-const settings: Setting[] = [
-  {
-    label: 'Enable Feature',
-    type: 'toggle',
-    value: true,
-    onChange: (value) => {}
-  },
-  {
-    label: 'Mode',
-    type: 'radio',
-    options: ['Fast', 'Normal', 'Slow'],
-    value: 'Normal',
-    onChange: (value) => {}
-  }
+const items: SettingItem[] = [
+  { id: "verbose", label: "Verbose mode", currentValue: "off", values: ["on", "off"] },
+  { id: "color",   label: "Color output", currentValue: "on",  values: ["on", "off"] },
 ];
 
-const list = new SettingsList({
-  theme: myTheme,
-  settings,
-  onClose?: () => {},
-});
+const settings = new SettingsList(
+  items,
+  Math.min(items.length + 2, 15),
+  getSettingsListTheme(),
+  (id, newValue) => { /* handle change */ },
+  () => done(undefined),          // on close
+  { enableSearch: true }
+);
 ```
 
-### Container
-
-Groups children vertically:
+## Keyboard Input
 
 ```typescript
-import { Container } from '@mariozechner/pi-tui';
-
-const container = new Container([
-  new Text('Header', 0, 0),
-  new Text('Body', 0, 0),
-  new Text('Footer', 0, 0),
-]);
-
-// Dynamic children
-container.children = [newChild1, newChild2];
-```
-
-### Box
-
-Adds padding/border:
-
-```typescript
-import { Box } from '@mariozechner/pi-tui';
-
-const box = new Box({
-  child: new Text('Content', 0, 0),
-  padding?: { top: 1, right: 2, bottom: 1, left: 2 },
-  border?: {
-    style: 'single' | 'double' | 'rounded',
-    color: 'dim'
-  },
-  background?: 'bgMuted',
-});
-```
-
-### Markdown
-
-Rendered markdown:
-
-```typescript
-import { Markdown } from '@mariozechner/pi-tui';
-
-const md = new Markdown({
-  content: '# Hello\n\nThis is **markdown**.',
-  theme: myTheme,
-  maxWidth?: 80,
-});
-```
-
-### Image
-
-Display images (iTerm2/Kitty protocols):
-
-```typescript
-import { Image } from '@mariozechner/pi-tui';
-
-// From file
-const img = new Image({ path: '/path/to/image.png' });
-
-// From buffer
-const img = new Image({ buffer: imageBuffer, mimeType: 'image/png' });
-
-// With size constraints
-const img = new Image({
-  path: '/path/to/image.png',
-  maxWidth: 40,
-  maxHeight: 20,
-});
-```
-
-## Key Handling
-
-### matchesKey
-
-Check if input matches a key:
-
-```typescript
-import { matchesKey } from '@mariozechner/pi-tui';
+import { matchesKey, Key } from "@earendil-works/pi-tui";
 
 handleInput(data: string) {
-  if (matchesKey(data, 'enter')) { ... }
-  if (matchesKey(data, 'escape')) { ... }
-  if (matchesKey(data, 'ctrl+c')) { ... }
-  if (matchesKey(data, 'ctrl+shift+p')) { ... }
-  if (matchesKey(data, 'up')) { ... }
-  if (matchesKey(data, 'down')) { ... }
-  if (matchesKey(data, 'tab')) { ... }
-  if (matchesKey(data, 'shift+tab')) { ... }
+  if (matchesKey(data, Key.up)) { /* … */ }
+  else if (matchesKey(data, Key.enter)) { /* … */ }
+  else if (matchesKey(data, Key.escape)) { /* … */ }
+  else if (matchesKey(data, Key.ctrl("c"))) { /* … */ }
 }
 ```
 
-### Key Names
+`Key` identifiers: `Key.enter`, `Key.escape`, `Key.tab`, `Key.space`, `Key.backspace`, `Key.delete`, `Key.home`, `Key.end`, `Key.up`, `Key.down`, `Key.left`, `Key.right`, `Key.ctrl(x)`, `Key.shift(x)`, `Key.alt(x)`, `Key.ctrlShift(x)`. `matchesKey` also accepts string forms like `"ctrl+shift+p"`.
 
-- Letters: `a`, `b`, ..., `z`
-- Numbers: `0`, `1`, ..., `9`
-- Modifiers: `ctrl+`, `shift+`, `alt+`, `meta+`
-- Special: `enter`, `return`, `escape`, `tab`, `backspace`, `delete`
-- Arrows: `up`, `down`, `left`, `right`
-- Navigation: `home`, `end`, `pageup`, `pagedown`
+## Width Utilities
+
+```typescript
+import { visibleWidth, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+
+visibleWidth(str);                  // display width, ignoring ANSI codes
+truncateToWidth(str, width, "…");   // truncate with optional ellipsis, ANSI-safe
+wrapTextWithAnsi(str, width);       // word wrap preserving ANSI codes
+```
+
+## Differential Rendering (caching)
+
+Cache by width; invalidate on state change, then request a re-render.
+
+```typescript
+class Cached {
+  private cachedWidth?: number;
+  private cachedLines?: string[];
+  render(width: number): string[] {
+    if (this.cachedLines && this.cachedWidth === width) return this.cachedLines;
+    const lines = /* compute */ [];
+    this.cachedWidth = width; this.cachedLines = lines;
+    return lines;
+  }
+  invalidate() { this.cachedWidth = undefined; this.cachedLines = undefined; }
+}
+```
+
+In extensions, after mutating component state call `invalidate()` then trigger a render (e.g. the render handle's `requestRender()`).
 
 ## Theme
 
 ```typescript
-interface Theme {
-  fg(color: string, text: string): string;
-  bg(color: string, text: string): string;
-  bold(text: string): string;
-  italic(text: string): string;
-  underline(text: string): string;
-  strikethrough(text: string): string;
-}
-
-// Usage
-theme.fg('accent', 'Highlighted text');
-theme.fg('success', '✓ Done');
-theme.fg('error', 'Failed');
-theme.fg('warning', 'Warning');
-theme.fg('muted', 'Secondary');
-theme.fg('dim', 'Tertiary');
-theme.fg('text', 'Primary');
-theme.fg('toolTitle', 'Tool Name');
-
-theme.bg('bgMuted', 'Background');
-theme.bold(theme.fg('accent', 'Bold accent'));
+theme.fg("accent" | "success" | "error" | "warning" | "muted" | "dim" | "text" | "toolTitle" | …, text);
+theme.bold(text); theme.italic(text); theme.strikethrough(text);
 ```
 
-## Utility Functions
+The full set of 51 theme color tokens (and how to define a theme) is in `customization.md`.
 
-### Text Manipulation
-
-```typescript
-import {
-  stripAnsi,           // Remove ANSI codes
-  truncateToWidth,     // Truncate preserving ANSI
-  padToWidth,          // Pad to width
-  visualWidth,         // Get visual width (handles ANSI, emoji)
-  wrapText,            // Word wrap
-} from '@mariozechner/pi-tui';
-
-const plain = stripAnsi('\x1b[31mRed\x1b[0m');  // 'Red'
-const truncated = truncateToWidth('Long text', 5);  // 'Long…'
-const width = visualWidth('\x1b[31mRed\x1b[0m');  // 3
-const lines = wrapText('Long paragraph...', 40);
-```
-
-### Terminal Info
+## Using TUI in an extension
 
 ```typescript
-import {
-  isKitty,          // Kitty terminal
-  isIterm2,         // iTerm2
-  supportsUnicode,  // Unicode support
-  supportsTrueColor,// 24-bit color
-} from '@mariozechner/pi-tui';
-```
-
-## Creating Custom Components
-
-### Basic Component
-
-```typescript
-class MyComponent {
-  private cachedWidth?: number;
-  private cachedLines?: string[];
-
-  constructor(private theme: Theme) {}
-
-  handleInput(data: string): void {
-    if (matchesKey(data, 'enter')) {
-      // Handle enter
-    }
-  }
-
-  render(width: number): string[] {
-    if (this.cachedLines && this.cachedWidth === width) {
-      return this.cachedLines;
-    }
-
-    const lines: string[] = [];
-    lines.push(this.theme.fg('accent', 'My Component'));
-    lines.push(this.theme.fg('dim', '─'.repeat(width)));
-    lines.push('Content here');
-
-    this.cachedWidth = width;
-    this.cachedLines = lines;
-    return lines;
-  }
-
-  invalidate(): void {
-    this.cachedWidth = undefined;
-    this.cachedLines = undefined;
-  }
-}
-```
-
-### Focusable Component
-
-```typescript
-class FocusableComponent {
-  focused = false;
-
-  handleInput(data: string): void {
-    if (!this.focused) return;
-    // Handle input only when focused
-  }
-
-  render(width: number): string[] {
-    const prefix = this.focused ? '> ' : '  ';
-    return [`${prefix}Focusable content`];
-  }
-}
-```
-
-### Component with State
-
-```typescript
-class Counter {
-  private count = 0;
-  private cache?: string[];
-
-  handleInput(data: string): void {
-    if (matchesKey(data, 'up')) {
-      this.count++;
-      this.cache = undefined;  // Invalidate on state change
-    }
-    if (matchesKey(data, 'down')) {
-      this.count--;
-      this.cache = undefined;
-    }
-  }
-
-  render(width: number): string[] {
-    if (this.cache) return this.cache;
-    this.cache = [`Count: ${this.count}`, '↑/↓ to change'];
-    return this.cache;
-  }
-
-  invalidate(): void {
-    this.cache = undefined;
-  }
-}
-```
-
-## Overlay Examples
-
-### Centered Modal
-
-```typescript
-tui.showOverlay(new MyModal(), {
-  anchor: 'center',
-  width: 60,
-  maxHeight: '80%',
-  margin: 2,
-});
-```
-
-### Bottom Sheet
-
-```typescript
-tui.showOverlay(new BottomSheet(), {
-  anchor: 'bottom-center',
-  width: '100%',
-  maxHeight: '50%',
-});
-```
-
-### Side Panel
-
-```typescript
-tui.showOverlay(new SidePanel(), {
-  anchor: 'right-center',
-  width: 40,
-  maxHeight: '100%',
-});
-```
-
-### Responsive Overlay
-
-```typescript
-tui.showOverlay(new ResponsivePanel(), {
-  anchor: 'center',
-  width: '80%',
-  maxWidth: 100,
-  maxHeight: '90%',
-  visible: (w, h) => w >= 60,  // Hide if terminal too narrow
-});
-```
-
-## Integration with coding-agent Extensions
-
-```typescript
-import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
-import { Text, SelectList, matchesKey } from "@mariozechner/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { SelectList, type SelectItem } from "@earendil-works/pi-tui";
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("picker", {
-    description: "Show a picker",
-    handler: async (args, ctx) => {
+    description: "Pick an option",
+    handler: async (_args, ctx) => {
+      const items: SelectItem[] = [
+        { value: "a", label: "Option A" },
+        { value: "b", label: "Option B" },
+      ];
       const result = await ctx.ui.custom<string | null>((tui, theme, kb, done) => {
-        return new SelectList({
-          theme,
-          items: [
-            { label: 'Option A', value: 'a' },
-            { label: 'Option B', value: 'b' },
-          ],
-          onSelect: (item) => done(item.value),
-          onCancel: () => done(null),
+        const list = new SelectList(items, Math.min(items.length, 10), {
+          selectedPrefix: (t) => theme.fg("accent", t),
+          selectedText:   (t) => theme.fg("accent", t),
         });
+        list.onSelect = (item) => done(item.value);
+        list.onCancel = () => done(null);
+        return list;
       });
-
-      if (result) {
-        ctx.ui.notify(`Selected: ${result}`, "info");
-      }
-    }
+      if (result) ctx.ui.notify(`Selected: ${result}`, "info");
+    },
   });
 }
 ```
 
-## Performance Tips
+## Custom Editor (vim-style example)
 
-1. **Cache render output** - Recalculate only when content changes
-2. **Use `invalidate()`** - Clear cache when state changes externally
-3. **Minimize `render()` calls** - TUI handles diffing, but avoid unnecessary work
-4. **Batch updates** - Change state, then call `invalidate()` once
-5. **Use `truncateToWidth`** - Prevents lines from wrapping unexpectedly
+```typescript
+import { CustomEditor } from "@earendil-works/pi-coding-agent";
+import { matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
+
+class VimEditor extends CustomEditor {
+  private mode: "normal" | "insert" = "insert";
+  handleInput(data: string): void {
+    if (matchesKey(data, "escape")) {
+      if (this.mode === "insert") { this.mode = "normal"; return; }
+      super.handleInput(data); return;
+    }
+    if (this.mode === "insert") { super.handleInput(data); return; }
+    switch (data) {
+      case "i": this.mode = "insert"; return;
+      case "h": super.handleInput("\x1b[D"); return;
+      case "j": super.handleInput("\x1b[B"); return;
+      case "k": super.handleInput("\x1b[A"); return;
+      case "l": super.handleInput("\x1b[C"); return;
+    }
+    if (data.length === 1 && data.charCodeAt(0) >= 32) return;  // swallow other normal-mode keys
+    super.handleInput(data);
+  }
+  render(width: number): string[] {
+    const lines = super.render(width);
+    if (lines.length > 0) {
+      const label = this.mode === "normal" ? " NORMAL " : " INSERT ";
+      const last = lines[lines.length - 1]!;
+      lines[lines.length - 1] = truncateToWidth(last, width - label.length, "") + label;
+    }
+    return lines;
+  }
+}
+```

@@ -1,5 +1,10 @@
 # Installation Guide
 
+> Current shadcn/ui targets **Tailwind CSS v4**. Vite/React projects use the
+> `@tailwindcss/vite` plugin, the CSS entry is a single `@import "tailwindcss";`, and
+> there is no color config in `tailwind.config.js`. Theme variables (OKLCH) live in your
+> CSS file — see [theming.md](theming.md).
+
 ## Table of Contents
 
 - [TanStack Start](#tanstack-start)
@@ -7,6 +12,10 @@
 - [Vite](#vite)
 - [Manual Installation](#manual-installation)
 - [components.json Configuration](#componentsjson-configuration)
+- [MCP Server](#mcp-server)
+
+The CLI runs equally with `npx`, `pnpm dlx`, `yarn dlx`, or `bunx`. Examples below use
+`npx`.
 
 ## TanStack Start
 
@@ -16,15 +25,14 @@ bunx create-tanstack-app@latest my-app --template react
 cd my-app
 
 # Initialize shadcn/ui
-bunx shadcn@latest init
+npx shadcn@latest init
 
-# Select options:
-# - Style: New York (recommended) or Default
-# - Base color: Neutral, Slate, Gray, Zinc, or Stone
-# - CSS variables: Yes (recommended)
+# Select options when prompted:
+# - Base color: Neutral (default), Stone, Zinc, Gray, or Slate
+# - (Style is fixed to "new-york"; "default" is deprecated)
 
 # Add components
-bunx shadcn@latest add button card input
+npx shadcn@latest add button card input
 ```
 
 ### TanStack Start Configuration
@@ -38,11 +46,13 @@ After init, your `components.json` should look like:
   "rsc": false,
   "tsx": true,
   "tailwind": {
-    "config": "tailwind.config.js",
+    "config": "",
     "css": "src/styles/globals.css",
     "baseColor": "neutral",
-    "cssVariables": true
+    "cssVariables": true,
+    "prefix": ""
   },
+  "iconLibrary": "lucide",
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils"
@@ -53,22 +63,21 @@ After init, your `components.json` should look like:
 ## Next.js
 
 ```bash
-# Create new Next.js project
+# Create new Next.js project (ships with Tailwind v4)
 bunx create-next-app@latest my-app --typescript --tailwind --eslint --app
 cd my-app
 
 # Initialize shadcn/ui
-bunx shadcn@latest init
+npx shadcn@latest init
 
-# For App Router with RSC
-# Answer "yes" to React Server Components
+# For App Router with RSC, answer "yes" to React Server Components
 ```
 
 ### Next.js App Router Structure
 
 ```plaintext
 app/
-├── globals.css          # Tailwind + CSS variables
+├── globals.css          # @import "tailwindcss" + @theme inline + OKLCH vars
 ├── layout.tsx           # Root layout with providers
 └── page.tsx
 components/
@@ -89,21 +98,34 @@ bun create vite my-app --template react-ts
 cd my-app
 bun install
 
+# Install Tailwind v4 and the Vite plugin
+bun add tailwindcss @tailwindcss/vite
+
 # Initialize shadcn/ui
-bunx shadcn@latest init
+npx shadcn@latest init
 ```
 
-### Vite Path Aliases
+### CSS Entry
 
-Update `vite.config.ts`:
+Replace the contents of `src/index.css` with a single import (init then injects the
+theme variables):
+
+```css
+@import "tailwindcss";
+```
+
+### Vite Plugin + Path Aliases
+
+`vite.config.ts`:
 
 ```ts
 import path from "path"
+import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -112,7 +134,7 @@ export default defineConfig({
 })
 ```
 
-Update `tsconfig.json`:
+`tsconfig.json` **and** `tsconfig.app.json` both need the alias:
 
 ```json
 {
@@ -127,97 +149,18 @@ Update `tsconfig.json`:
 
 ## Manual Installation
 
-If you prefer not to use the CLI:
+If you prefer not to use the CLI (Tailwind v4):
 
 ### 1. Install Dependencies
 
 ```bash
-bun add tailwindcss-animate class-variance-authority clsx tailwind-merge lucide-react
+bun add class-variance-authority clsx tailwind-merge lucide-react tw-animate-css
 ```
 
-### 2. Configure Tailwind
+> Note: under Tailwind v4 the old `tailwindcss-animate` plugin is replaced by
+> `tw-animate-css`, imported from CSS rather than configured as a JS plugin.
 
-```js
-// tailwind.config.js
-const { fontFamily } = require("tailwindcss/defaultTheme")
-
-/** @type {import('tailwindcss').Config} */
-module.exports = {
-  darkMode: ["class"],
-  content: ["./src/**/*.{ts,tsx}"],
-  theme: {
-    container: {
-      center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
-    },
-    extend: {
-      colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-      },
-      borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-      },
-      fontFamily: {
-        sans: ["var(--font-sans)", ...fontFamily.sans],
-      },
-      keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
-        },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
-        },
-      },
-      animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-      },
-    },
-  },
-  plugins: [require("tailwindcss-animate")],
-}
-```
-
-### 3. Create Utils
+### 2. Create the `cn()` Utility
 
 ```ts
 // lib/utils.ts
@@ -229,70 +172,44 @@ export function cn(...inputs: ClassValue[]) {
 }
 ```
 
-### 4. Add CSS Variables
+### 3. Set Up CSS (Tailwind v4)
+
+In your CSS entry file, import Tailwind, enable the dark variant, map tokens with
+`@theme inline`, and define the OKLCH variables. The full scaffold is in
+[theming.md](theming.md#full-globalscss-scaffold). Minimal shape:
 
 ```css
-/* globals.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-  }
+@custom-variant dark (&:is(.dark *));
 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-  }
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  /* ...one mapping per token */
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  /* ...rest of the OKLCH tokens */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  /* ...dark overrides */
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground; }
 }
 ```
+
+There is **no** `tailwind.config.js` color block in v4 — `@theme inline` replaces it.
 
 ## components.json Configuration
 
@@ -305,32 +222,75 @@ Full configuration options:
   "rsc": false,
   "tsx": true,
   "tailwind": {
-    "config": "tailwind.config.js",
+    "config": "",
     "css": "src/index.css",
     "baseColor": "neutral",
     "cssVariables": true,
     "prefix": ""
   },
+  "iconLibrary": "lucide",
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",
     "ui": "@/components/ui",
     "lib": "@/lib",
     "hooks": "@/hooks"
+  },
+  "registries": {
+    "@shadcn": "https://ui.shadcn.com/r/{name}.json"
   }
 }
 ```
 
 ### Options Explained
 
-|  |
-|  |
-| `style` | `"default"` or `"new-york"` - visual style of components |
+| Field | Meaning |
+|-------|---------|
+| `style` | Only `"new-york"` is valid (`"default"` is deprecated) |
 | `rsc` | `true` for React Server Components (Next.js App Router) |
 | `tsx` | `true` for TypeScript, `false` for JavaScript |
-| `tailwind.config` | Path to Tailwind config file |
+| `tailwind.config` | `""` for Tailwind v4 (path to config only for v3) |
 | `tailwind.css` | Path to global CSS file |
-| `tailwind.baseColor` | Base color: neutral, slate, gray, zinc, stone |
-| `tailwind.cssVariables` | Use CSS variables for colors |
-| `tailwind.prefix` | Optional prefix for Tailwind classes |
+| `tailwind.baseColor` | `neutral`, `stone`, `zinc`, `gray`, or `slate` |
+| `tailwind.cssVariables` | Use CSS variables for colors (recommended) |
+| `tailwind.prefix` | Optional prefix for generated Tailwind classes |
+| `iconLibrary` | `"lucide"` (default for new-york) or `"radix"` |
 | `aliases.*` | Import path aliases |
+| `registries` | Map `@namespace` → registry URL template |
+
+## MCP Server
+
+Let the agent browse registries and install components conversationally.
+
+```bash
+# Configure for Claude Code (writes .mcp.json)
+npx shadcn@latest mcp init --client claude
+```
+
+Resulting `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"]
+    }
+  }
+}
+```
+
+Restart Claude Code, run `/mcp` to verify, then prompt e.g. "add a login form using the
+shadcn registry" or "list all available components".
+
+### Namespaced & URL Installs
+
+```bash
+# From a registry URL
+npx shadcn@latest add https://example.com/r/hero.json
+
+# From a configured namespace
+npx shadcn@latest add @acme/auth-card
+npx shadcn@latest view @acme/auth-card @v0/dashboard
+npx shadcn@latest search @shadcn -q "table"
+```
