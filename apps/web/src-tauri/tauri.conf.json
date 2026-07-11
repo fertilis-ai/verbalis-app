@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Sapio",
+  "productName": "Verbalis",
   "version": "0.1.0",
-  "identifier": "com.sapio.app",
+  "identifier": "com.verbalis.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3001",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Sapio",
+        "title": "Verbalis",
         "width": 1280,
         "height": 800,
         "minWidth": 800,
@@ -26,7 +26,7 @@
       "devCsp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$HOME/.sapio/images/**"]
+        "scope": ["$HOME/.verbalis/images/**"]
       }
     }
   },

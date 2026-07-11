@@ -1,5 +1,5 @@
 {
-  "name": "@sapio-app/pi-sidecar",
+  "name": "@verbalis-app/pi-sidecar",
   "private": true,
   "type": "module",
   "scripts": {

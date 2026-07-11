@@ -476,7 +476,7 @@ function ModelsSection() {
             <p className="mt-2 text-xs text-muted-foreground">
               {availableImageModels.length === 0
                 ? "Click Refresh to load OpenRouter image models."
-                : "Enables the generate_image chat tool. Images are saved to ~/.sapio/images."}
+                : "Enables the generate_image chat tool. Images are saved to ~/.verbalis/images."}
             </p>
           </div>
         )}
@@ -635,7 +635,7 @@ function DirectoriesSection() {
             <Input
               value={settingsDirectory}
               onChange={(e) => setSettingsDirectory(e.target.value)}
-              placeholder={homeDir ? `${homeDir}/.sapio-app` : "~/.sapio-app"}
+              placeholder={homeDir ? `${homeDir}/.verbalis-app` : "~/.verbalis-app"}
             />
             <Button
               variant="outline"
@@ -647,7 +647,7 @@ function DirectoriesSection() {
             </Button>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Where Sapio stores its configuration and data
+            Where Verbalis stores its configuration and data
           </p>
         </div>
       </div>
@@ -683,7 +683,7 @@ function DebugSection() {
           <div className="flex-1">
             <span className="text-sm">Debug Logging</span>
             <p className="text-xs text-muted-foreground">
-              Write detailed agent execution logs to {homeDir || "~"}/.sapio/logs/
+              Write detailed agent execution logs to {homeDir || "~"}/.verbalis/logs/
             </p>
           </div>
         </label>
@@ -726,7 +726,7 @@ function AboutSection() {
         </div>
       </div>
       <p className="mt-4 text-sm text-muted-foreground">
-        Sapio is a local-first AI agent for non-technical users. All data is stored on your device.
+        Verbalis is a local-first AI agent for non-technical users. All data is stored on your device.
       </p>
     </section>
   );

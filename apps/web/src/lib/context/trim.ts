@@ -5,7 +5,7 @@
  * evicted from the front until it fits, keeping at least the most-recent N
  * messages and never dropping the in-flight (last) message.
  *
- * Tool-call integrity: in Sapio's model a tool call and its result are bundled
+ * Tool-call integrity: in Verbalis's model a tool call and its result are bundled
  * inside a single assistant {@link Message} (the result is emitted right after
  * the assistant message during conversion), so evicting whole messages can
  * never split a tool-call / tool-result pair. After trimming we also drop any

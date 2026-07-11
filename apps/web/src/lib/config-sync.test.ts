@@ -53,7 +53,7 @@ const defaultStoreState = {
   theme: "system" as const,
   hue: "zinc" as const,
   workingDirectory: "/home/user",
-  settingsDirectory: "/home/user/.sapio",
+  settingsDirectory: "/home/user/.verbalis",
   userMode: "normal" as const,
   localLLM: { enabled: false, provider: "ollama" as const, baseUrl: "http://localhost:11434", model: "" },
   defaultModel: "claude-sonnet-4-20250514",
@@ -102,7 +102,7 @@ describe("config-sync", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     subscribeCallback = null;
-    mockGetAppDataDir.mockResolvedValue("/home/user/.sapio");
+    mockGetAppDataDir.mockResolvedValue("/home/user/.verbalis");
     mockWriteFile.mockResolvedValue(undefined);
     mockReadFile.mockResolvedValue("");
     mockPathExists.mockResolvedValue(false);
@@ -133,7 +133,7 @@ describe("config-sync", () => {
       // Should have written config.yaml since the file didn't exist
       expect(mockWriteFile).toHaveBeenCalled();
       const writtenPath = mockWriteFile.mock.calls[0][0] as string;
-      expect(writtenPath).toBe("/home/user/.sapio/config.yaml");
+      expect(writtenPath).toBe("/home/user/.verbalis/config.yaml");
     });
 
     it("loads existing config.yaml into the store", async () => {

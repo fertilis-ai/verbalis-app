@@ -3,15 +3,15 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "sapio-app",
+      "name": "verbalis-app",
       "dependencies": {
-        "@sapio-app/env": "workspace:*",
+        "@verbalis-app/env": "workspace:*",
         "dotenv": "catalog:",
         "zod": "catalog:",
       },
       "devDependencies": {
         "@biomejs/biome": "^2.4.4",
-        "@sapio-app/config": "workspace:*",
+        "@verbalis-app/config": "workspace:*",
         "turbo": "^2.6.3",
         "typescript": "catalog:",
       },
@@ -24,7 +24,7 @@
         "@earendil-works/pi-agent-core": "^0.79.6",
         "@earendil-works/pi-ai": "^0.79.6",
         "@hookform/resolvers": "^5.1.1",
-        "@sapio-app/env": "workspace:*",
+        "@verbalis-app/env": "workspace:*",
         "@streamdown/code": "^1.0.1",
         "@tailwindcss/vite": "^4.0.15",
         "@tanstack/react-form": "^1.12.3",
@@ -59,7 +59,7 @@
         "zustand": "^5.0.11",
       },
       "devDependencies": {
-        "@sapio-app/config": "workspace:*",
+        "@verbalis-app/config": "workspace:*",
         "@tanstack/react-router-devtools": "^1.141.1",
         "@tanstack/router-plugin": "^1.141.1",
         "@tauri-apps/cli": "^2.4.0",
@@ -81,11 +81,11 @@
       },
     },
     "packages/config": {
-      "name": "@sapio-app/config",
+      "name": "@verbalis-app/config",
       "version": "0.0.0",
     },
     "packages/env": {
-      "name": "@sapio-app/env",
+      "name": "@verbalis-app/env",
       "version": "0.0.0",
       "dependencies": {
         "@t3-oss/env-core": "^0.13.1",
@@ -93,12 +93,12 @@
         "zod": "catalog:",
       },
       "devDependencies": {
-        "@sapio-app/config": "workspace:*",
+        "@verbalis-app/config": "workspace:*",
         "typescript": "catalog:",
       },
     },
     "packages/pi-sidecar": {
-      "name": "@sapio-app/pi-sidecar",
+      "name": "@verbalis-app/pi-sidecar",
       "dependencies": {
         "@earendil-works/pi-coding-agent": "^0.79.6",
       },
@@ -498,11 +498,11 @@
 
     "@rollup/rollup-win32-x64-msvc": ["@rollup/rollup-win32-x64-msvc@4.57.1", "", { "os": "win32", "cpu": "x64" }, "sha512-mxRFDdHIWRxg3UfIIAwCm6NzvxG0jDX/wBN6KsQFTvKFqqg9vTrWUE68qEjHt19A5wwx5X5aUi2zuZT7YR0jrA=="],
 
-    "@sapio-app/config": ["@sapio-app/config@workspace:packages/config"],
+    "@verbalis-app/config": ["@verbalis-app/config@workspace:packages/config"],
 
-    "@sapio-app/env": ["@sapio-app/env@workspace:packages/env"],
+    "@verbalis-app/env": ["@verbalis-app/env@workspace:packages/env"],
 
-    "@sapio-app/pi-sidecar": ["@sapio-app/pi-sidecar@workspace:packages/pi-sidecar"],
+    "@verbalis-app/pi-sidecar": ["@verbalis-app/pi-sidecar@workspace:packages/pi-sidecar"],
 
     "@sec-ant/readable-stream": ["@sec-ant/readable-stream@0.4.1", "", {}, "sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg=="],
 

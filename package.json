@@ -1,5 +1,5 @@
 {
-  "name": "sapio-app",
+  "name": "verbalis-app",
   "private": true,
   "workspaces": {
     "packages": [
@@ -27,13 +27,13 @@
     "quick_test": "bun run scripts/quick-test.ts"
   },
   "dependencies": {
-    "@sapio-app/env": "workspace:*",
+    "@verbalis-app/env": "workspace:*",
     "dotenv": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
-    "@sapio-app/config": "workspace:*",
+    "@verbalis-app/config": "workspace:*",
     "turbo": "^2.6.3",
     "typescript": "catalog:"
   },

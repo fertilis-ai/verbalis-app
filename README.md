@@ -1,10 +1,10 @@
-# Sapio
+# Verbalis
 
-A local-first personal AI assistant that runs as a native desktop app (via Tauri) or in the browser. Sapio keeps your data on-device, learns over time, and acts autonomously on your behalf — with configurable safety guardrails so you stay in control.
+A local-first personal AI assistant that runs as a native desktop app (via Tauri) or in the browser. Verbalis keeps your data on-device, learns over time, and acts autonomously on your behalf — with configurable safety guardrails so you stay in control.
 
 Built by [Fertilis.ai](https://fertilis.ai).
 
-![Sapio Settings — Model Discovery](assets/screenshot_settings.png)
+![Verbalis Settings — Model Discovery](assets/screenshot_settings.png)
 
 ## Features
 
@@ -98,8 +98,8 @@ Built by [Fertilis.ai](https://fertilis.ai).
 ### Install
 
 ```bash
-git clone https://github.com/fertilis/sapio-app.git
-cd sapio-app
+git clone https://github.com/fertilis/verbalis-app.git
+cd verbalis-app
 bun install
 ```
 
@@ -123,7 +123,7 @@ This starts the Vite dev server and launches the Tauri window connected to it.
 ## Project Structure
 
 ```
-sapio-app/
+verbalis-app/
 ├── apps/
 │   └── web/                        # React frontend + Tauri desktop runtime
 │       ├── src/
@@ -212,7 +212,7 @@ The desktop app exposes 33 commands to the frontend:
 
 ### Storage
 
-All user data persists locally in `~/.sapio/`:
+All user data persists locally in `~/.verbalis/`:
 - Conversations, files, tasks, schedules, and toolbox items are stored as files
 - Folder metadata supports hierarchical organization
 - Falls back to `localStorage` when running in the browser (without Tauri)
@@ -223,8 +223,8 @@ Turborepo orchestrates builds with dependency awareness:
 
 ```
 turbo build
-  ├── @sapio-app/config    (shared TS config, no output)
-  └── @sapio-app/env       (env validation, no output)
+  ├── @verbalis-app/config    (shared TS config, no output)
+  └── @verbalis-app/env       (env validation, no output)
     └── web
        ├── Vite → dist/          (frontend bundle)
        └── Tauri → native app    (desktop builds only)
@@ -313,7 +313,7 @@ Coverage thresholds (configured in `vitest.config.ts`):
 
 ## Roadmap
 
-Sapio's foundation is complete. The following areas are planned for future development:
+Verbalis's foundation is complete. The following areas are planned for future development:
 
 - **Persistent Memory** — local file-based memory system so the agent retains context across sessions
 - **Progressive Autonomy** — trust framework where the agent starts supervised and gradually earns independence

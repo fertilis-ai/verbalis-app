@@ -316,7 +316,7 @@ export const useToolHistoryStore = create<ToolHistoryState>()(
       },
     }),
     {
-      name: "sapio-tool-history",
+      name: "verbalis-tool-history",
       partialize: (state) => ({
         // Only persist filters and sorting, not the actual records
         filters: state.filters,

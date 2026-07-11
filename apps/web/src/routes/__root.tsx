@@ -22,11 +22,11 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   head: () => ({
     meta: [
       {
-        title: "Sapio",
+        title: "Verbalis",
       },
       {
         name: "description",
-        content: "Sapio - Your personal AI agent",
+        content: "Verbalis - Your personal AI agent",
       },
     ],
     links: [
@@ -84,7 +84,7 @@ function RootComponent() {
         attribute="class"
         defaultTheme="dark"
         disableTransitionOnChange
-        storageKey="sapio-theme"
+        storageKey="verbalis-theme"
       >
         <HueApplicator />
         <div className="h-svh overflow-hidden">

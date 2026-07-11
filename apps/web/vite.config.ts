@@ -75,7 +75,12 @@ function nodeStubsPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [nodeStubsPlugin(), tailwindcss(), tanstackRouter({}), react()],
+  plugins: [
+    nodeStubsPlugin(),
+    tailwindcss(),
+    tanstackRouter({ autoCodeSplitting: true }),
+    react(),
+  ],
   resolve: {
     alias: [
       { find: "@", replacement: path.resolve(__dirname, "./src") },
@@ -83,6 +88,11 @@ export default defineConfig({
     ],
   },
   build: {
+    // shiki language grammars and the pi-agent-core bundle are legitimately
+    // large but are only ever pulled in via lazy dynamic import (per-language
+    // highlighting, agent loop start) — raise the limit instead of forcing
+    // further splits that wouldn't reduce what's actually downloaded upfront.
+    chunkSizeWarningLimit: 1700,
     rollupOptions: {
       output: {
         manualChunks(id) {

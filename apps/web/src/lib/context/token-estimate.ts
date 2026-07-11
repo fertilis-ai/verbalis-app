@@ -23,7 +23,7 @@ export function estimateTokensForText(text: string | undefined | null): number {
 }
 
 /**
- * Estimate the tokens a single Sapio message contributes once converted to
+ * Estimate the tokens a single Verbalis message contributes once converted to
  * pi-ai messages. Only finished tool calls (success/error) are sent to the
  * model, so only those count toward the estimate — matching
  * {@link messagesToPiMessages}.

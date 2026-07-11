@@ -318,10 +318,10 @@ describe("executeNotificationSend", () => {
     });
 
     expect(mockInvoke).toHaveBeenCalledWith("send_notification", {
-      title: "[Sapio] Hello",
+      title: "[Verbalis] Hello",
       body: "World",
     });
-    expect(result).toBe('Notification sent: "[Sapio] Hello"');
+    expect(result).toBe('Notification sent: "[Verbalis] Hello"');
   });
 
   it("throws when Notification API is not supported in browser", async () => {
@@ -379,10 +379,10 @@ describe("executeNotificationSend", () => {
     });
 
     expect(Notification.requestPermission).toHaveBeenCalled();
-    expect(constructorSpy).toHaveBeenCalledWith("[Sapio] Alert", {
+    expect(constructorSpy).toHaveBeenCalledWith("[Verbalis] Alert", {
       body: "Something happened",
     });
-    expect(result).toBe('Notification sent: "[Sapio] Alert"');
+    expect(result).toBe('Notification sent: "[Verbalis] Alert"');
   });
 
   it("throws when permission request is rejected", async () => {
@@ -426,10 +426,10 @@ describe("executeNotificationSend", () => {
       body: "Details here",
     });
 
-    expect(constructorSpy).toHaveBeenCalledWith("[Sapio] Info", {
+    expect(constructorSpy).toHaveBeenCalledWith("[Verbalis] Info", {
       body: "Details here",
     });
-    expect(result).toBe('Notification sent: "[Sapio] Info"');
+    expect(result).toBe('Notification sent: "[Verbalis] Info"');
   });
 });
 
@@ -480,7 +480,7 @@ describe("executeSystemTool", () => {
       title: "Hi",
       body: "There",
     });
-    expect(result).toContain('Notification sent: "[Sapio] Hi"');
+    expect(result).toContain('Notification sent: "[Verbalis] Hi"');
   });
 
   it("throws for unknown tool names", async () => {

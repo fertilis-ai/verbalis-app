@@ -21,7 +21,7 @@ const mockSettingsStore = {
   defaultModel: "claude-sonnet-4-20250514",
   homeDir: "/Users/test",
   workingDirectory: "/Users/test/Projects",
-  settingsDirectory: "/Users/test/.sapio-app",
+  settingsDirectory: "/Users/test/.verbalis-app",
   hue: "neutral" as string,
   agentDebugLogging: false,
   availableModels: [],
@@ -369,7 +369,7 @@ describe("SettingsView", () => {
     it("renders Settings Directory input with current value", () => {
       render(<SettingsView />);
       expect(screen.getByText("Settings Directory")).toBeInTheDocument();
-      const input = screen.getByDisplayValue("/Users/test/.sapio-app");
+      const input = screen.getByDisplayValue("/Users/test/.verbalis-app");
       expect(input).toBeInTheDocument();
     });
 
@@ -406,7 +406,7 @@ describe("SettingsView", () => {
     it("renders description text", () => {
       render(<SettingsView />);
       expect(
-        screen.getByText(/Sapio is a local-first AI agent/)
+        screen.getByText(/Verbalis is a local-first AI agent/)
       ).toBeInTheDocument();
     });
   });

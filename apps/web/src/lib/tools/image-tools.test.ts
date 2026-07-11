@@ -14,7 +14,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@/lib/storage", () => ({
   isTauri: vi.fn(() => false),
-  getAppDataDir: vi.fn(async () => "/Users/test/.sapio"),
+  getAppDataDir: vi.fn(async () => "/Users/test/.verbalis"),
 }));
 
 vi.mock("@/lib/http", () => ({
@@ -111,13 +111,13 @@ describe("executeGenerateImage", () => {
     });
 
     expect(mockInvoke).toHaveBeenCalledWith("write_file_base64", {
-      path: expect.stringMatching(/^\/Users\/test\/\.sapio\/images\/.+-a-red-panda-in-space\.png$/),
+      path: expect.stringMatching(/^\/Users\/test\/\.verbalis\/images\/.+-a-red-panda-in-space\.png$/),
       dataBase64: "aW1hZ2U=",
     });
 
     expect(result).toContain("Image generated successfully.");
     expect(result).toContain("Model: openai/gpt-image-1");
-    expect(result).toMatch(/^Saved to: \/Users\/test\/\.sapio\/images\/.+\.png$/m);
+    expect(result).toMatch(/^Saved to: \/Users\/test\/\.verbalis\/images\/.+\.png$/m);
     expect(result).toContain("Cost: $0.0400");
   });
 
@@ -156,11 +156,11 @@ describe("executeGenerateImage", () => {
 
     const result = await executeGenerateImage({
       prompt: "make it watercolor",
-      source_image: "/Users/test/.sapio/images/old.png",
+      source_image: "/Users/test/.verbalis/images/old.png",
     });
 
     expect(mockInvoke).toHaveBeenCalledWith("read_file_base64", {
-      path: "/Users/test/.sapio/images/old.png",
+      path: "/Users/test/.verbalis/images/old.png",
     });
     const body = JSON.parse(mockAppFetch.mock.calls[0][1].body as string);
     expect(body.input_references).toEqual([

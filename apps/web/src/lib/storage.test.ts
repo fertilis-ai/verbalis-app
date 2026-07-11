@@ -38,11 +38,11 @@ async function importStorage() {
 
 // Helper to build a localStorage-backed virtual FS state
 function setVFS(entries: Record<string, { isDir: boolean; content?: string }>) {
-  localStorageMock.setItem("sapio:vfs", JSON.stringify(entries));
+  localStorageMock.setItem("verbalis:vfs", JSON.stringify(entries));
 }
 
 function getVFS(): Record<string, { isDir: boolean; content?: string }> {
-  const stored = localStorageMock.getItem("sapio:vfs");
+  const stored = localStorageMock.getItem("verbalis:vfs");
   return stored ? JSON.parse(stored) : {};
 }
 
@@ -73,16 +73,16 @@ describe("storage", () => {
     it("returns virtual path when not in Tauri", async () => {
       const { getAppDataDir } = await importStorage();
       const dir = await getAppDataDir();
-      expect(dir).toBe("/sapio-data");
+      expect(dir).toBe("/verbalis-data");
       expect(mockInvoke).not.toHaveBeenCalled();
     });
 
     it("invokes get_app_data_dir when in Tauri", async () => {
       mockIsTauri.mockReturnValue(true);
-      mockInvoke.mockResolvedValue("/Users/test/.sapio");
+      mockInvoke.mockResolvedValue("/Users/test/.verbalis");
       const { getAppDataDir } = await importStorage();
       const dir = await getAppDataDir();
-      expect(dir).toBe("/Users/test/.sapio");
+      expect(dir).toBe("/Users/test/.verbalis");
       expect(mockInvoke).toHaveBeenCalledWith("get_app_data_dir");
     });
   });
@@ -97,41 +97,41 @@ describe("storage", () => {
       const vfs = getVFS();
 
       // Check all required directories
-      expect(vfs["/sapio-data"]).toEqual({ isDir: true });
-      expect(vfs["/sapio-data/chats"]).toEqual({ isDir: true });
-      expect(vfs["/sapio-data/tasks"]).toEqual({ isDir: true });
-      expect(vfs["/sapio-data/agents"]).toEqual({ isDir: true });
-      expect(vfs["/sapio-data/scheduler"]).toEqual({ isDir: true });
-      expect(vfs["/sapio-data/prompts"]).toEqual({ isDir: true });
-      expect(vfs["/sapio-data/memories"]).toEqual({ isDir: true });
-      expect(vfs["/sapio-data/skills"]).toEqual({ isDir: true });
-      expect(vfs["/sapio-data/workflows"]).toEqual({ isDir: true });
-      expect(vfs["/sapio-data/logs"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data/chats"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data/tasks"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data/agents"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data/scheduler"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data/prompts"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data/memories"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data/skills"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data/workflows"]).toEqual({ isDir: true });
+      expect(vfs["/verbalis-data/logs"]).toEqual({ isDir: true });
     });
 
     it("creates default agent file when not already present", async () => {
       const { initAppDataDir } = await importStorage();
       await initAppDataDir();
       const vfs = getVFS();
-      expect(vfs["/sapio-data/agents/default.md"]).toBeDefined();
-      expect(vfs["/sapio-data/agents/default.md"].isDir).toBe(false);
-      expect(vfs["/sapio-data/agents/default.md"].content).toContain("name: default");
-      expect(vfs["/sapio-data/agents/default.md"].content).toContain("model: claude-sonnet-4-20250514");
+      expect(vfs["/verbalis-data/agents/default.md"]).toBeDefined();
+      expect(vfs["/verbalis-data/agents/default.md"].isDir).toBe(false);
+      expect(vfs["/verbalis-data/agents/default.md"].content).toContain("name: default");
+      expect(vfs["/verbalis-data/agents/default.md"].content).toContain("model: claude-sonnet-4-20250514");
     });
 
     it("does not overwrite existing default agent file", async () => {
       // Pre-populate the agent file
       const customContent = "---\nname: custom\n---\nCustom prompt";
       setVFS({
-        "/sapio-data": { isDir: true },
-        "/sapio-data/agents": { isDir: true },
-        "/sapio-data/agents/default.md": { isDir: false, content: customContent },
+        "/verbalis-data": { isDir: true },
+        "/verbalis-data/agents": { isDir: true },
+        "/verbalis-data/agents/default.md": { isDir: false, content: customContent },
       });
 
       const { initAppDataDir } = await importStorage();
       await initAppDataDir();
       const vfs = getVFS();
-      expect(vfs["/sapio-data/agents/default.md"].content).toBe(customContent);
+      expect(vfs["/verbalis-data/agents/default.md"].content).toBe(customContent);
     });
 
     it("invokes init_app_data_dir when in Tauri", async () => {
@@ -457,7 +457,7 @@ describe("storage", () => {
       await initAppDataDir();
 
       const path = await createChatFolder("my-folder");
-      expect(path).toBe("/sapio-data/chats/my-folder");
+      expect(path).toBe("/verbalis-data/chats/my-folder");
 
       const metaContent = await readFile(`${path}/_meta.yaml`);
       const YAML = await import("yaml");
@@ -472,7 +472,7 @@ describe("storage", () => {
 
       const parentPath = await createChatFolder("parent");
       const childPath = await createChatFolder("child", parentPath);
-      expect(childPath).toBe("/sapio-data/chats/parent/child");
+      expect(childPath).toBe("/verbalis-data/chats/parent/child");
     });
   });
 
@@ -524,7 +524,7 @@ describe("storage", () => {
       await initAppDataDir();
 
       await saveChatToFolder(sampleChat);
-      const content = await readFile("/sapio-data/chats/chat-1.json");
+      const content = await readFile("/verbalis-data/chats/chat-1.json");
       expect(JSON.parse(content)).toEqual(sampleChat);
     });
   });
@@ -645,7 +645,7 @@ describe("storage", () => {
 
       // Write a _meta.yaml - should not appear as a chat
       await writeFile(
-        "/sapio-data/chats/_meta.yaml",
+        "/verbalis-data/chats/_meta.yaml",
         YAML.stringify({ isPinned: false, createdAt: "2025-01-01T00:00:00Z" }),
       );
 
@@ -656,7 +656,7 @@ describe("storage", () => {
     it("skips malformed chat JSON files gracefully", async () => {
       const { initAppDataDir, writeFile, loadChatTree } = await importStorage();
       await initAppDataDir();
-      await writeFile("/sapio-data/chats/bad.json", "not valid json{{{");
+      await writeFile("/verbalis-data/chats/bad.json", "not valid json{{{");
       const tree = await loadChatTree();
       expect(tree).toHaveLength(0);
     });
@@ -675,7 +675,7 @@ describe("storage", () => {
         createdAt: "2025-01-01T00:00:00Z",
         updatedAt: "2025-01-02T00:00:00Z",
       };
-      await writeFile("/sapio-data/chats/yaml-chat.yaml", YAML.stringify(chatData));
+      await writeFile("/verbalis-data/chats/yaml-chat.yaml", YAML.stringify(chatData));
 
       const tree = await loadChatTree();
       expect(tree).toHaveLength(1);
@@ -686,7 +686,7 @@ describe("storage", () => {
     it("skips malformed YAML chat files gracefully", async () => {
       const { initAppDataDir, writeFile, loadChatTree } = await importStorage();
       await initAppDataDir();
-      await writeFile("/sapio-data/chats/bad.yaml", ":\n  :\n  invalid: [}{");
+      await writeFile("/verbalis-data/chats/bad.yaml", ":\n  :\n  invalid: [}{");
       const tree = await loadChatTree();
       expect(tree).toHaveLength(0);
     });
@@ -711,9 +711,9 @@ describe("storage", () => {
       };
       await saveChatToFolder(chat);
 
-      expect(await pathExists("/sapio-data/chats/c1.json")).toBe(true);
-      await deleteChatByPath("/sapio-data/chats/c1.json");
-      expect(await pathExists("/sapio-data/chats/c1.json")).toBe(false);
+      expect(await pathExists("/verbalis-data/chats/c1.json")).toBe(true);
+      await deleteChatByPath("/verbalis-data/chats/c1.json");
+      expect(await pathExists("/verbalis-data/chats/c1.json")).toBe(false);
     });
 
     it("deletes a chat folder and all contents", async () => {
@@ -751,10 +751,10 @@ describe("storage", () => {
       };
       await saveChatToFolder(chat);
 
-      const newPath = await renameChat("/sapio-data/chats/old-id.json", "new-id");
-      expect(newPath).toBe("/sapio-data/chats/new-id.json");
-      expect(await pathExists("/sapio-data/chats/old-id.json")).toBe(false);
-      expect(await pathExists("/sapio-data/chats/new-id.json")).toBe(true);
+      const newPath = await renameChat("/verbalis-data/chats/old-id.json", "new-id");
+      expect(newPath).toBe("/verbalis-data/chats/new-id.json");
+      expect(await pathExists("/verbalis-data/chats/old-id.json")).toBe(false);
+      expect(await pathExists("/verbalis-data/chats/new-id.json")).toBe(true);
     });
 
     it("renames a chat folder", async () => {
@@ -763,7 +763,7 @@ describe("storage", () => {
 
       const folder = await createChatFolder("old-name");
       const newPath = await renameChatFolder(folder, "new-name");
-      expect(newPath).toBe("/sapio-data/chats/new-name");
+      expect(newPath).toBe("/verbalis-data/chats/new-name");
       expect(await pathExists(folder)).toBe(false);
       expect(await pathExists(newPath)).toBe(true);
     });
@@ -805,7 +805,7 @@ describe("storage", () => {
       await initAppDataDir();
 
       // Write a markdown file with minimal frontmatter
-      await writeFile("/sapio-data/agents/minimal.md", "---\n---\nJust a prompt.");
+      await writeFile("/verbalis-data/agents/minimal.md", "---\n---\nJust a prompt.");
       const loaded = await loadAgent("minimal");
       expect(loaded).not.toBeNull();
       expect(loaded!.name).toBe("minimal"); // falls back to name param
@@ -909,9 +909,9 @@ describe("storage", () => {
 
       // Create a task folder manually
       const folderId = "test-folder-id";
-      await createDirectory(`/sapio-data/tasks/${folderId}`);
+      await createDirectory(`/verbalis-data/tasks/${folderId}`);
       await writeFile(
-        `/sapio-data/tasks/${folderId}/folder.yaml`,
+        `/verbalis-data/tasks/${folderId}/folder.yaml`,
         YAML.stringify({
           id: folderId,
           name: "Test Folder",
@@ -934,9 +934,9 @@ describe("storage", () => {
       const { initAppDataDir, createDirectory, writeFile, loadTaskTree } = await importStorage();
       await initAppDataDir();
 
-      await createDirectory("/sapio-data/tasks/f1");
+      await createDirectory("/verbalis-data/tasks/f1");
       await writeFile(
-        "/sapio-data/tasks/f1/folder.yaml",
+        "/verbalis-data/tasks/f1/folder.yaml",
         YAML.stringify({
           id: "f1",
           name: "Alpha",
@@ -947,9 +947,9 @@ describe("storage", () => {
         }),
       );
 
-      await createDirectory("/sapio-data/tasks/f2");
+      await createDirectory("/verbalis-data/tasks/f2");
       await writeFile(
-        "/sapio-data/tasks/f2/folder.yaml",
+        "/verbalis-data/tasks/f2/folder.yaml",
         YAML.stringify({
           id: "f2",
           name: "Beta",
@@ -968,7 +968,7 @@ describe("storage", () => {
     it("loadTaskTree skips directories without folder.yaml", async () => {
       const { initAppDataDir, createDirectory, loadTaskTree } = await importStorage();
       await initAppDataDir();
-      await createDirectory("/sapio-data/tasks/empty-dir");
+      await createDirectory("/verbalis-data/tasks/empty-dir");
       const tree = await loadTaskTree();
       expect(tree).toHaveLength(0);
     });
@@ -976,8 +976,8 @@ describe("storage", () => {
     it("loadTaskTree skips directories with malformed folder.yaml", async () => {
       const { initAppDataDir, createDirectory, writeFile, loadTaskTree } = await importStorage();
       await initAppDataDir();
-      await createDirectory("/sapio-data/tasks/bad-folder");
-      await writeFile("/sapio-data/tasks/bad-folder/folder.yaml", ":\n  :\n  [}{");
+      await createDirectory("/verbalis-data/tasks/bad-folder");
+      await writeFile("/verbalis-data/tasks/bad-folder/folder.yaml", ":\n  :\n  [}{");
       const tree = await loadTaskTree();
       expect(tree).toHaveLength(0);
     });
@@ -1054,7 +1054,7 @@ describe("storage", () => {
       await initAppDataDir();
 
       const path = await saveSchedule(sampleSchedule);
-      expect(path).toBe("/sapio-data/scheduler/sched-1.yaml");
+      expect(path).toBe("/verbalis-data/scheduler/sched-1.yaml");
 
       const loaded = await loadSchedule(path);
       expect(loaded).not.toBeNull();
@@ -1096,7 +1096,7 @@ describe("storage", () => {
       await initAppDataDir();
 
       const path = await createSchedulerFolder("my-schedules");
-      expect(path).toBe("/sapio-data/scheduler/my-schedules");
+      expect(path).toBe("/verbalis-data/scheduler/my-schedules");
       expect(await pathExists(`${path}/_meta.yaml`)).toBe(true);
     });
 
@@ -1106,7 +1106,7 @@ describe("storage", () => {
 
       const parent = await createSchedulerFolder("parent");
       const child = await createSchedulerFolder("child", parent);
-      expect(child).toBe("/sapio-data/scheduler/parent/child");
+      expect(child).toBe("/verbalis-data/scheduler/parent/child");
       expect(await pathExists(child)).toBe(true);
     });
 
@@ -1127,7 +1127,7 @@ describe("storage", () => {
 
       const oldPath = await createSchedulerFolder("old-name");
       const newPath = await renameSchedulerFolder(oldPath, "new-name");
-      expect(newPath).toBe("/sapio-data/scheduler/new-name");
+      expect(newPath).toBe("/verbalis-data/scheduler/new-name");
       expect(await pathExists(oldPath)).toBe(false);
       expect(await pathExists(newPath)).toBe(true);
     });
@@ -1204,7 +1204,7 @@ describe("storage", () => {
     it("skips malformed schedule YAML files", async () => {
       const { initAppDataDir, writeFile, loadSchedulerTree } = await importStorage();
       await initAppDataDir();
-      await writeFile("/sapio-data/scheduler/bad.yaml", ":\n  :\n  [}{");
+      await writeFile("/verbalis-data/scheduler/bad.yaml", ":\n  :\n  [}{");
       const tree = await loadSchedulerTree();
       expect(tree).toHaveLength(0);
     });
@@ -1238,10 +1238,10 @@ describe("storage", () => {
       await initAppDataDir();
 
       // Create a directory without _meta.yaml
-      await createDirectory("/sapio-data/scheduler/no-meta");
-      await toggleSchedulerFolderPin("/sapio-data/scheduler/no-meta");
+      await createDirectory("/verbalis-data/scheduler/no-meta");
+      await toggleSchedulerFolderPin("/verbalis-data/scheduler/no-meta");
 
-      const meta = await loadFolderMeta("/sapio-data/scheduler/no-meta");
+      const meta = await loadFolderMeta("/verbalis-data/scheduler/no-meta");
       expect(meta).not.toBeNull();
       expect(meta!.isPinned).toBe(true);
     });

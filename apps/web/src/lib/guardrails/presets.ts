@@ -35,7 +35,7 @@ export const ADVANCED_MODE_CONFIG: GuardrailsConfig = {
     enabled: false,
     shellCommands: false,
     networkAccess: true,
-    tempDirectory: "~/.sapio/sandbox",
+    tempDirectory: "~/.verbalis/sandbox",
   },
   shellCommands: {
     ...DEFAULT_GUARDRAILS_CONFIG.shellCommands,
@@ -72,7 +72,7 @@ export const YOLO_MODE_CONFIG: GuardrailsConfig = {
     enabled: false,
     shellCommands: false,
     networkAccess: true,
-    tempDirectory: "~/.sapio/sandbox",
+    tempDirectory: "~/.verbalis/sandbox",
   },
   paths: {
     allowlist: [],

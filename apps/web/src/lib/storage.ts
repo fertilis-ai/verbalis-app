@@ -17,7 +17,7 @@ if (typeof window !== "undefined" && !window.Buffer) {
 // LocalStorage-based fallback for web browser (non-Tauri)
 // ============================================================================
 
-const STORAGE_PREFIX = "sapio:";
+const STORAGE_PREFIX = "verbalis:";
 
 const DEFAULT_AGENT_FILE = `---
 name: default
@@ -225,7 +225,7 @@ export { isTauri };
 // File System Commands
 export async function getAppDataDir(): Promise<string> {
   if (!isTauri()) {
-    return "/sapio-data";  // Virtual path for localStorage
+    return "/verbalis-data";  // Virtual path for localStorage
   }
   return invoke<string>("get_app_data_dir");
 }
@@ -239,17 +239,17 @@ function getAppDataDirCached(): Promise<string> {
 export async function initAppDataDir(): Promise<void> {
   if (!isTauri()) {
     // Initialize default directories in virtual FS
-    webCreateDirectory("/sapio-data/chats");
-    webCreateDirectory("/sapio-data/tasks");
-    webCreateDirectory("/sapio-data/agents");
-    webCreateDirectory("/sapio-data/scheduler");
-    webCreateDirectory("/sapio-data/prompts");
-    webCreateDirectory("/sapio-data/memories");
-    webCreateDirectory("/sapio-data/skills");
-    webCreateDirectory("/sapio-data/workflows");
-    webCreateDirectory("/sapio-data/logs");
-    if (!webPathExists("/sapio-data/agents/default.md")) {
-      webWriteFile("/sapio-data/agents/default.md", DEFAULT_AGENT_FILE);
+    webCreateDirectory("/verbalis-data/chats");
+    webCreateDirectory("/verbalis-data/tasks");
+    webCreateDirectory("/verbalis-data/agents");
+    webCreateDirectory("/verbalis-data/scheduler");
+    webCreateDirectory("/verbalis-data/prompts");
+    webCreateDirectory("/verbalis-data/memories");
+    webCreateDirectory("/verbalis-data/skills");
+    webCreateDirectory("/verbalis-data/workflows");
+    webCreateDirectory("/verbalis-data/logs");
+    if (!webPathExists("/verbalis-data/agents/default.md")) {
+      webWriteFile("/verbalis-data/agents/default.md", DEFAULT_AGENT_FILE);
     }
     return;
   }

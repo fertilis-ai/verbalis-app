@@ -30,8 +30,8 @@ function SettingsPage() {
         resolved = "/Users";
       }
       setHomeDir(resolved);
-      if (!settingsDirectory || settingsDirectory === "~/.sapio-app") {
-        setSettingsDirectory(`${resolved}/.sapio-app`);
+      if (!settingsDirectory || settingsDirectory === "~/.verbalis-app") {
+        setSettingsDirectory(`${resolved}/.verbalis-app`);
       }
       if (!workingDirectory || workingDirectory === "~/Projects") {
         setWorkingDirectory(`${resolved}/Projects`);

@@ -1,5 +1,5 @@
 /**
- * SapioAgentAdapter - Wraps pi-agent-core's agentLoop() with Sapio-specific features
+ * VerbalisAgentAdapter - Wraps pi-agent-core's agentLoop() with Verbalis-specific features
  *
  * This adapter provides:
  * - Tool approval workflow (pending confirmation)
@@ -47,7 +47,7 @@ import type {
   LoopIteration,
   LoopContext,
   StopReason,
-  AgentLoopConfig as SapioLoopConfig,
+  AgentLoopConfig as VerbalisLoopConfig,
 } from "./types";
 import {
   createInitialLoopContext,
@@ -62,7 +62,7 @@ import { logAgent } from "@/lib/logger";
 // Types
 // ============================================================================
 
-export interface SapioAdapterConfig {
+export interface VerbalisAdapterConfig {
   /** The model to use for LLM calls */
   model: Model<Api>;
   /** System prompt to use */
@@ -78,7 +78,7 @@ export interface SapioAdapterConfig {
   /** Optional per-agent tool allowlist (tool names). Undefined = all tools. */
   allowedTools?: string[];
   /** Loop configuration */
-  loopConfig?: Partial<SapioLoopConfig>;
+  loopConfig?: Partial<VerbalisLoopConfig>;
   /** Callback for events */
   onEvent: (event: AgentLoopEvent) => void;
 }
@@ -101,16 +101,16 @@ function toolCallToState(toolCall: ToolCall): ToolCallState {
 }
 
 // ============================================================================
-// SapioAgentAdapter
+// VerbalisAgentAdapter
 // ============================================================================
 
-export class SapioAgentAdapter {
+export class VerbalisAgentAdapter {
   private abortController: AbortController | null = null;
   private pendingToolConfirmations: Map<string, { resolve: () => void; reject: (reason: string) => void }> = new Map();
   private pendingDispatchToolCalls: Map<string, ToolCallState> = new Map();
   private handledToolCallIds: Set<string> = new Set();
   private loopContext: LoopContext;
-  private config: SapioAdapterConfig | null = null;
+  private config: VerbalisAdapterConfig | null = null;
   private getMessagesCallback: (() => Message[]) | null = null;
   private isPausedFlag = false;
   private resumeResolver: (() => void) | null = null;
@@ -120,7 +120,7 @@ export class SapioAgentAdapter {
     private conversationId: string,
     private agentId: string | null,
     guardrailsConfig: GuardrailsConfig,
-    loopConfig: Partial<SapioLoopConfig> = {}
+    loopConfig: Partial<VerbalisLoopConfig> = {}
   ) {
     this.loopContext = createInitialLoopContext(conversationId, agentId, loopConfig);
   }
@@ -137,7 +137,7 @@ export class SapioAgentAdapter {
   // Control Methods
   // ============================================================================
 
-  async run(adapterConfig: SapioAdapterConfig): Promise<Message[]> {
+  async run(adapterConfig: VerbalisAdapterConfig): Promise<Message[]> {
     if (this.loopContext.status !== "idle") {
       throw new Error("Adapter already running");
     }
@@ -314,7 +314,7 @@ export class SapioAgentAdapter {
       try {
         this.config.onEvent(event);
       } catch (error) {
-        console.error("[SapioAgentAdapter] External event handler error:", error);
+        console.error("[VerbalisAgentAdapter] External event handler error:", error);
       }
     }
 
@@ -323,7 +323,7 @@ export class SapioAgentAdapter {
       try {
         handler(event);
       } catch (error) {
-        console.error("[SapioAgentAdapter] Event handler error:", error);
+        console.error("[VerbalisAgentAdapter] Event handler error:", error);
       }
     }
   }
@@ -355,10 +355,10 @@ export class SapioAgentAdapter {
 
     logAgent("LLM_CALL", `Starting agentLoop with ${messages.length} messages`);
 
-    // Build wrapped tools with Sapio's guardrails, confirmation, and undo support
+    // Build wrapped tools with Verbalis's guardrails, confirmation, and undo support
     const wrappedTools = this.buildWrappedTools();
 
-    // Convert Sapio messages to pi-ai messages for the initial context
+    // Convert Verbalis messages to pi-ai messages for the initial context
     const initialPiMessages = messagesToPiMessages(
       messages,
       config.model.api,
@@ -415,7 +415,7 @@ export class SapioAgentAdapter {
         // Check for pause
         await this.checkPause();
 
-        // Translate pi-agent-core events to Sapio events
+        // Translate pi-agent-core events to Verbalis events
         await this.handleAgentEvent(
           event,
           iteration,
@@ -600,7 +600,7 @@ export class SapioAgentAdapter {
 
       case "tool_execution_start":
         // Tool events are handled in createWrappedExecute where we have
-        // Sapio-specific logic (guardrails, confirmation, undo)
+        // Verbalis-specific logic (guardrails, confirmation, undo)
         // Events emitted there: tool_pending, tool_executing, tool_completed, tool_failed
         break;
 
@@ -841,7 +841,7 @@ export class SapioAgentAdapter {
               }
             }
           } catch (error) {
-            console.warn("[SapioAgentAdapter] Failed to prepare undo:", error);
+            console.warn("[VerbalisAgentAdapter] Failed to prepare undo:", error);
           }
         }
 
@@ -979,11 +979,11 @@ export class SapioAgentAdapter {
 // Factory Function
 // ============================================================================
 
-export function createSapioAdapter(
+export function createVerbalisAdapter(
   conversationId: string,
   agentId: string | null,
   guardrailsConfig: GuardrailsConfig,
-  config?: Partial<SapioLoopConfig>
-): SapioAgentAdapter {
-  return new SapioAgentAdapter(conversationId, agentId, guardrailsConfig, config);
+  config?: Partial<VerbalisLoopConfig>
+): VerbalisAgentAdapter {
+  return new VerbalisAgentAdapter(conversationId, agentId, guardrailsConfig, config);
 }

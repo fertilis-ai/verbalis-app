@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Sapio-app is a modern TypeScript monorepo for building a consumer AI agent application. The project uses Better-T-Stack and combines React 19, TanStack Router, TailwindCSS, shadcn/ui, and Tauri to create both web and native desktop applications from a single codebase.
+Verbalis-app is a modern TypeScript monorepo for building a consumer AI agent application. The project uses Better-T-Stack and combines React 19, TanStack Router, TailwindCSS, shadcn/ui, and Tauri to create both web and native desktop applications from a single codebase.
 
 **Vision:** This project implements the specification in SPEC.md - a next-generation personal AI assistant that lives on user devices, learns over time, acts autonomously, and keeps data private through a local-first architecture.
 
@@ -62,8 +62,8 @@ This is a **Turborepo monorepo** with Bun as the package manager. The architectu
 1. **Workspace Catalog**: Shared dependency versions defined in root `package.json` under `workspaces.catalog` (dotenv, zod, typescript)
 2. **Local Packages**: Internal packages referenced via `workspace:*` protocol
 3. **Build Orchestration**: Turborepo manages task dependencies and caching
-4. **Shared Configuration**: TypeScript and build configs centralized in `@sapio-app/config`
-5. **App logs**: `~/.sapio/logs/`
+4. **Shared Configuration**: TypeScript and build configs centralized in `@verbalis-app/config`
+5. **App logs**: `~/.verbalis/logs/`
 
 ```
 apps/
@@ -153,8 +153,8 @@ Dev mode runs frontend on `http://localhost:3001` and Tauri connects to it. Prod
 Turborepo orchestrates builds with dependency awareness:
 ```
 turbo build
-  ├── @sapio-app/config (no build output)
-  └── @sapio-app/env (no build output)
+  ├── @verbalis-app/config (no build output)
+  └── @verbalis-app/env (no build output)
     └── web (depends on ^build)
        ├── Vite builds React → dist/
        └── Tauri packages desktop app (production only)
@@ -212,7 +212,7 @@ This is a fresh project (initial commit). The foundation is established with mod
 - Tests use Vitest (jsdom): `bun run test` from root (or `bun run test:run` in apps/web). `bun run quick_test` runs a fast subset
 - Lint with Biome (linter-only, formatter disabled): `bun run lint` / `bun run lint:fix` from root
 - CI (.github/workflows/ci.yml) runs lint, check-types, and tests on every push/PR
-- Desktop app identifier is `com.sapio.app` (tauri.conf.json)
+- Desktop app identifier is `com.verbalis.app` (tauri.conf.json)
 - Dev server runs on port 3001 (configurable in vite.config.ts)
 - Bun is the package manager - do not use npm/yarn/pnpm
 - The `routeTree.gen.ts` file is auto-generated - never edit manually

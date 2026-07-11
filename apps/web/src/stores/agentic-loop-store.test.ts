@@ -109,7 +109,7 @@ const mockAdapterConfirmAllPending = vi.fn();
 const mockAdapterRejectTool = vi.fn();
 const mockAdapterRejectAllPending = vi.fn();
 
-const mockCreateSapioAdapter = vi.fn().mockReturnValue({
+const mockCreateVerbalisAdapter = vi.fn().mockReturnValue({
   stop: mockAdapterStop,
   onEvent: mockAdapterOnEvent,
   getContext: mockAdapterGetContext,
@@ -119,9 +119,9 @@ const mockCreateSapioAdapter = vi.fn().mockReturnValue({
   rejectAllPending: mockAdapterRejectAllPending,
 });
 
-vi.mock("@/lib/agentic/sapio-agent-adapter", () => ({
-  SapioAgentAdapter: vi.fn(),
-  createSapioAdapter: (...args: unknown[]) => mockCreateSapioAdapter(...args),
+vi.mock("@/lib/agentic/verbalis-agent-adapter", () => ({
+  VerbalisAgentAdapter: vi.fn(),
+  createVerbalisAdapter: (...args: unknown[]) => mockCreateVerbalisAdapter(...args),
 }));
 
 // Import store and dependencies after mocks
@@ -203,7 +203,7 @@ describe("agentic-loop-store", () => {
       const adapter = useAgenticLoopStore.getState().createAdapter("conv-1", "agent-1");
 
       expect(adapter).toBeDefined();
-      expect(mockCreateSapioAdapter).toHaveBeenCalledWith(
+      expect(mockCreateVerbalisAdapter).toHaveBeenCalledWith(
         "conv-1",
         "agent-1",
         expect.any(Object),

@@ -92,11 +92,11 @@ pub fn get_home_dir() -> Result<String, String> {
         .ok_or_else(|| "Could not find home directory".to_string())
 }
 
-/// Get the app data directory (~/.sapio)
+/// Get the app data directory (~/.verbalis)
 #[tauri::command]
 pub fn get_app_data_dir() -> Result<String, String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let app_dir = home.join(".sapio");
+    let app_dir = home.join(".verbalis");
     Ok(app_dir.to_string_lossy().to_string())
 }
 
@@ -104,7 +104,7 @@ pub fn get_app_data_dir() -> Result<String, String> {
 #[tauri::command]
 pub fn init_app_data_dir() -> Result<(), String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let app_dir = home.join(".sapio");
+    let app_dir = home.join(".verbalis");
 
     let subdirs = [
         "chats",
@@ -141,7 +141,7 @@ pub fn init_app_data_dir() -> Result<(), String> {
             .map_err(|e| format!("Failed to write default agent: {}", e))?;
     }
 
-    // Migrate old log path (~/.sapio/log.txt → ~/.sapio/logs/agent.txt)
+    // Migrate old log path (~/.verbalis/log.txt → ~/.verbalis/logs/agent.txt)
     let old_log = app_dir.join("log.txt");
     let new_log = app_dir.join("logs").join("agent.txt");
     if old_log.exists() && !new_log.exists() {
@@ -533,7 +533,7 @@ pub fn send_notification(title: String, body: String) -> Result<(), String> {
     notify_rust::Notification::new()
         .summary(&title)
         .body(&body)
-        .appname("Sapio")
+        .appname("Verbalis")
         .show()
         .map_err(|e| format!("Failed to send notification: {}", e))?;
 
@@ -636,7 +636,7 @@ pub fn backup_file(path: String) -> Result<String, String> {
 
     // Create backup directory
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let backup_dir = home.join(".sapio").join("backups");
+    let backup_dir = home.join(".verbalis").join("backups");
     fs::create_dir_all(&backup_dir)
         .map_err(|e| format!("Failed to create backup directory: {}", e))?;
 
@@ -684,7 +684,7 @@ pub fn restore_file(backup_path: String, original_path: String) -> Result<(), St
 #[tauri::command]
 pub fn read_config() -> Result<AppConfig, String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let config_path = home.join(".sapio").join("config.yaml");
+    let config_path = home.join(".verbalis").join("config.yaml");
 
     if !config_path.exists() {
         return Ok(AppConfig::default());
@@ -699,7 +699,7 @@ pub fn read_config() -> Result<AppConfig, String> {
 #[tauri::command]
 pub fn save_config(config: AppConfig) -> Result<(), String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let config_path = home.join(".sapio").join("config.yaml");
+    let config_path = home.join(".verbalis").join("config.yaml");
 
     let yaml =
         serde_yaml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
@@ -732,13 +732,13 @@ pub async fn rename_path(old_path: String, new_path: String) -> Result<(), Strin
 // Debug Logging
 // ============================================================================
 
-/// Get the logs directory (~/.sapio/logs)
+/// Get the logs directory (~/.verbalis/logs)
 fn get_logs_dir() -> Result<std::path::PathBuf, String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    Ok(home.join(".sapio").join("logs"))
+    Ok(home.join(".verbalis").join("logs"))
 }
 
-/// Get the log file path (~/.sapio/logs/agent.txt)
+/// Get the log file path (~/.verbalis/logs/agent.txt)
 fn get_log_path() -> Result<std::path::PathBuf, String> {
     Ok(get_logs_dir()?.join("agent.txt"))
 }
@@ -796,7 +796,7 @@ pub fn read_log() -> Result<String, String> {
         .map_err(|e| format!("Failed to read log file: {}", e))
 }
 
-/// List log files in ~/.sapio/logs/
+/// List log files in ~/.verbalis/logs/
 #[tauri::command]
 pub fn list_log_files() -> Result<Vec<String>, String> {
     let logs_dir = get_logs_dir()?;
@@ -823,7 +823,7 @@ pub fn list_log_files() -> Result<Vec<String>, String> {
     Ok(files)
 }
 
-/// Read a specific log file from ~/.sapio/logs/
+/// Read a specific log file from ~/.verbalis/logs/
 #[tauri::command]
 pub fn read_log_file(filename: String) -> Result<String, String> {
     // Guard against path traversal
@@ -840,7 +840,7 @@ pub fn read_log_file(filename: String) -> Result<String, String> {
     fs::read_to_string(&log_path).map_err(|e| format!("Failed to read log file: {}", e))
 }
 
-/// Append a line to a specific log file in ~/.sapio/logs/
+/// Append a line to a specific log file in ~/.verbalis/logs/
 #[tauri::command]
 pub fn append_log_file(filename: String, line: String) -> Result<(), String> {
     // Guard against path traversal
@@ -868,7 +868,7 @@ pub fn append_log_file(filename: String, line: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Clear a specific log file in ~/.sapio/logs/
+/// Clear a specific log file in ~/.verbalis/logs/
 #[tauri::command]
 pub fn clear_log_file(filename: String) -> Result<(), String> {
     // Guard against path traversal
@@ -902,7 +902,7 @@ pub fn write_log_file(filename: String, content: String) -> Result<(), String> {
 // Keychain (OS Secure Storage)
 // ============================================================================
 
-const KEYCHAIN_SERVICE: &str = "com.sapio.app";
+const KEYCHAIN_SERVICE: &str = "com.verbalis.app";
 
 /// Store an API key in the OS keychain
 #[tauri::command]

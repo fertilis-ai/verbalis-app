@@ -99,7 +99,7 @@ export async function executeNotificationSend(
 ): Promise<string> {
   // Prefix and cap agent-sent notifications so they can't impersonate
   // system alerts or other apps.
-  const title = `[Sapio] ${args.title}`.slice(0, 100);
+  const title = `[Verbalis] ${args.title}`.slice(0, 100);
   const body = args.body.slice(0, 400);
 
   if (!isTauri()) {

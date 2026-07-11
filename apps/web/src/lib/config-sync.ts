@@ -1,7 +1,7 @@
 /**
  * Config Sync
  *
- * Subscribes to the Zustand settings store and writes changes to ~/.sapio/config.yaml (debounced).
+ * Subscribes to the Zustand settings store and writes changes to ~/.verbalis/config.yaml (debounced).
  * On startup, loads from config.yaml to hydrate the store.
  * In browser mode, this module is a no-op.
  */

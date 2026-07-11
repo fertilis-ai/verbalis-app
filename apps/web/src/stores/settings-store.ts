@@ -388,7 +388,7 @@ export const useSettingsStore = create<SettingsState>()(
       },
     }),
     {
-      name: "sapio-settings",
+      name: "verbalis-settings",
       partialize: (state) => ({
         theme: state.theme,
         hue: state.hue,

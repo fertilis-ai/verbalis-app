@@ -66,7 +66,7 @@ export const useLayoutStore = create<LayoutState>()(
       },
     }),
     {
-      name: "sapio-layout",
+      name: "verbalis-layout",
       partialize: (state) => ({
         paneWidths: state.paneWidths,
       }),

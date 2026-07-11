@@ -29,7 +29,7 @@ describe("normalizePath", () => {
 
 describe("resolvePath", () => {
   const wd = "/Users/martin/Projects";
-  const settingsDir = "/Users/martin/.sapio";
+  const settingsDir = "/Users/martin/.verbalis";
   const homeDir = "/Users/martin";
 
   describe("empty / whitespace paths", () => {

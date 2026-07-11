@@ -206,4 +206,4 @@ export type AgentLoopEvent =
 
 export type AgentLoopEventHandler = (event: AgentLoopEvent) => void;
 
-// Note: LLMConfig has been replaced by SapioAdapterConfig in sapio-agent-adapter.ts
+// Note: LLMConfig has been replaced by VerbalisAdapterConfig in verbalis-agent-adapter.ts

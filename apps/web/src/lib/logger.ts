@@ -1,7 +1,7 @@
 /**
  * Agent Debug Logger
  *
- * Writes timestamped log entries to ~/.sapio/logs/agent.txt for tracing agent execution.
+ * Writes timestamped log entries to ~/.verbalis/logs/agent.txt for tracing agent execution.
  * Logging is only active when enabled in settings.
  *
  * Format: [ISO timestamp] [CATEGORY] message

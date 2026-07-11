@@ -167,7 +167,7 @@ export const DEFAULT_GUARDRAILS_CONFIG: GuardrailsConfig = {
     enabled: true,
     shellCommands: true,
     networkAccess: true,
-    tempDirectory: "~/.sapio/sandbox",
+    tempDirectory: "~/.verbalis/sandbox",
   },
 };
 

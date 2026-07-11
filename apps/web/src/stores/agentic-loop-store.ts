@@ -7,7 +7,7 @@ import type {
   AgentLoopEvent,
 } from "@/lib/agentic/types";
 import { DEFAULT_LOOP_CONFIG, } from "@/lib/agentic/types";
-import { type SapioAgentAdapter, createSapioAdapter } from "@/lib/agentic/sapio-agent-adapter";
+import { type VerbalisAgentAdapter, createVerbalisAdapter } from "@/lib/agentic/verbalis-agent-adapter";
 import { useSettingsStore } from "./settings-store";
 import type { ToolCallState } from "@/lib/tools";
 import { useChatStore } from "./chat-store";
@@ -41,7 +41,7 @@ function notifyToolStateChange(conversationId: string, toolCall: ToolCallState):
 
 interface AgenticLoopState {
   // Active adapters (replacing loops)
-  activeAdapters: Map<string, SapioAgentAdapter>;
+  activeAdapters: Map<string, VerbalisAgentAdapter>;
   activeContexts: Map<string, LoopContext>;
 
   // Current loop (for primary UI)
@@ -61,8 +61,8 @@ interface AgenticLoopState {
   defaultConfig: AgentLoopConfig;
 
   // Actions - Adapter Management
-  createAdapter: (conversationId: string, agentId: string | null, config?: Partial<AgentLoopConfig>) => SapioAgentAdapter;
-  getAdapter: (conversationId: string) => SapioAgentAdapter | null;
+  createAdapter: (conversationId: string, agentId: string | null, config?: Partial<AgentLoopConfig>) => VerbalisAgentAdapter;
+  getAdapter: (conversationId: string) => VerbalisAgentAdapter | null;
   removeAdapter: (conversationId: string) => void;
   setCurrentLoop: (conversationId: string | null) => void;
 
@@ -128,7 +128,7 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
 
     // Create new adapter
     const loopConfig = { ...defaultConfig, ...config };
-    const adapter = createSapioAdapter(conversationId, agentId, guardrailsConfig, loopConfig);
+    const adapter = createVerbalisAdapter(conversationId, agentId, guardrailsConfig, loopConfig);
 
     // Subscribe to events
     const unsubscribe = adapter.onEvent((event) => {

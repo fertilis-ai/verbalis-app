@@ -215,7 +215,7 @@ export function GuardrailsSection() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "sapio-guardrails.json";
+    a.download = "verbalis-guardrails.json";
     a.click();
     URL.revokeObjectURL(url);
   };

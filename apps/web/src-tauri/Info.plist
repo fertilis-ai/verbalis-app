@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Sapio uses the microphone to transcribe voice messages into text.</string>
+  <string>Verbalis uses the microphone to transcribe voice messages into text.</string>
 </dict>
 </plist>

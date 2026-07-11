@@ -127,7 +127,7 @@ export async function executeWebSearch(
       url: searchUrl,
       method: "GET",
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Sapio/1.0)",
+        "User-Agent": "Mozilla/5.0 (compatible; Verbalis/1.0)",
       },
       body: null,
       timeoutMs: 10000,
@@ -152,7 +152,7 @@ export async function executeScrapeWebpage(
       url,
       method: "GET",
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Sapio/1.0)",
+        "User-Agent": "Mozilla/5.0 (compatible; Verbalis/1.0)",
       },
       body: null,
       timeoutMs: timeout_ms,

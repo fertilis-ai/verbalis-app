@@ -72,7 +72,7 @@ vi.mock("@/lib/tools", () => ({
   TOOL_DEFINITIONS: {},
 }));
 
-import { createSapioAdapter } from "./sapio-agent-adapter";
+import { createVerbalisAdapter } from "./verbalis-agent-adapter";
 
 function createModel() {
   return {
@@ -89,7 +89,7 @@ function createModel() {
   } as const;
 }
 
-describe("sapio-agent-adapter", () => {
+describe("verbalis-agent-adapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsTauri.mockReturnValue(true);
@@ -131,7 +131,7 @@ describe("sapio-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createSapioAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -215,7 +215,7 @@ describe("sapio-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createSapioAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -298,7 +298,7 @@ describe("sapio-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createSapioAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -363,7 +363,7 @@ describe("sapio-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createSapioAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -404,7 +404,7 @@ describe("sapio-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createSapioAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
     adapter.setMessageProvider(() => []);
 
     let abortedCount = 0;
@@ -465,7 +465,7 @@ describe("sapio-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createSapioAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -558,7 +558,7 @@ describe("sapio-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createSapioAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -623,7 +623,7 @@ describe("sapio-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createSapioAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -720,7 +720,7 @@ describe("sapio-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createSapioAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];

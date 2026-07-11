@@ -3,7 +3,7 @@
  *
  * Resolves relative paths to the user's Working Directory,
  * and routes known app-data prefixes (agents/, prompts/, etc.)
- * to the Sapio settings directory (~/.sapio/).
+ * to the Verbalis settings directory (~/.verbalis/).
  */
 
 /** Known prefixes that should resolve to the settings/app-data directory. */

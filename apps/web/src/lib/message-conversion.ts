@@ -19,7 +19,7 @@ export function buildEmptyUsage(): Usage {
 }
 
 /**
- * Convert Sapio Message[] to pi-ai PiMessage[] for LLM context.
+ * Convert Verbalis Message[] to pi-ai PiMessage[] for LLM context.
  * Handles user and assistant messages including tool calls and tool results.
  */
 export function messagesToPiMessages(

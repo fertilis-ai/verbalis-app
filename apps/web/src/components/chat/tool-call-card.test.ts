@@ -13,11 +13,11 @@ describe("extractImagePaths", () => {
     const result = [
       "Image generated successfully.",
       "Model: openai/gpt-image-1",
-      "Saved to: /Users/test/.sapio/images/20260701-120000-a-cat.png",
+      "Saved to: /Users/test/.verbalis/images/20260701-120000-a-cat.png",
       "Cost: $0.0400",
     ].join("\n");
     expect(extractImagePaths(result)).toEqual([
-      "/Users/test/.sapio/images/20260701-120000-a-cat.png",
+      "/Users/test/.verbalis/images/20260701-120000-a-cat.png",
     ]);
   });
 
@@ -27,8 +27,8 @@ describe("extractImagePaths", () => {
   });
 
   it("handles Windows-style paths", () => {
-    const result = "Saved to: C:\\Users\\test\\.sapio\\images\\img.png";
-    expect(extractImagePaths(result)).toEqual(["C:\\Users\\test\\.sapio\\images\\img.png"]);
+    const result = "Saved to: C:\\Users\\test\\.verbalis\\images\\img.png";
+    expect(extractImagePaths(result)).toEqual(["C:\\Users\\test\\.verbalis\\images\\img.png"]);
   });
 
   it("returns empty array for no matches or missing result", () => {
