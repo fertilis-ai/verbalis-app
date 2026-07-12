@@ -133,6 +133,97 @@ describe("executeToolboxTool", () => {
     expect(mockSave).not.toHaveBeenCalled();
   });
 
+  it("edit_toolbox_item replaces an exact unique match and reloads", async () => {
+    mockLoad.mockResolvedValue({
+      name: "note",
+      category: "memories",
+      content: "line one\nline two\nline three",
+      updatedAt: "",
+    });
+    const out = await executeToolboxTool("edit_toolbox_item", {
+      category: "memories",
+      name: "note",
+      old_string: "line two",
+      new_string: "line 2",
+    });
+    expect(mockSave).toHaveBeenCalledOnce();
+    expect(mockSave.mock.calls[0][0].content).toBe("line one\nline 2\nline three");
+    expect(mockToolboxReload).toHaveBeenCalledOnce();
+    expect(out).toContain("Edited");
+  });
+
+  it("edit_toolbox_item throws when old_string is missing from the item", async () => {
+    mockLoad.mockResolvedValue({ name: "n", category: "memories", content: "abc", updatedAt: "" });
+    await expect(
+      executeToolboxTool("edit_toolbox_item", {
+        category: "memories",
+        name: "n",
+        old_string: "zzz",
+        new_string: "y",
+      })
+    ).rejects.toThrow(/not found/);
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  it("edit_toolbox_item reports the occurrence count on ambiguity", async () => {
+    mockLoad.mockResolvedValue({
+      name: "n",
+      category: "memories",
+      content: "dup\ndup\ndup",
+      updatedAt: "",
+    });
+    await expect(
+      executeToolboxTool("edit_toolbox_item", {
+        category: "memories",
+        name: "n",
+        old_string: "dup",
+        new_string: "x",
+      })
+    ).rejects.toThrow(/matches 3 places/);
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  it("edit_toolbox_item rejects an edit that makes the item invalid, leaving it unchanged", async () => {
+    mockLoad.mockResolvedValue({
+      name: "s",
+      category: "skills",
+      content: '---\ntrigger: "git"\n---\nbody',
+      updatedAt: "",
+    });
+    await expect(
+      executeToolboxTool("edit_toolbox_item", {
+        category: "skills",
+        name: "s",
+        old_string: 'trigger: "git"',
+        new_string: "notrigger: true",
+      })
+    ).rejects.toThrow(/item unchanged.*trigger/is);
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  it("edit_toolbox_item throws when the item does not exist", async () => {
+    mockLoad.mockResolvedValue(null);
+    await expect(
+      executeToolboxTool("edit_toolbox_item", {
+        category: "memories",
+        name: "ghost",
+        old_string: "a",
+        new_string: "b",
+      })
+    ).rejects.toThrow(/No memories item/);
+  });
+
+  it("edit_toolbox_item rejects identical old and new strings", async () => {
+    await expect(
+      executeToolboxTool("edit_toolbox_item", {
+        category: "memories",
+        name: "n",
+        old_string: "same",
+        new_string: "same",
+      })
+    ).rejects.toThrow(/identical/);
+  });
+
   it("delete_toolbox_item deletes existing and reloads", async () => {
     mockLoad.mockResolvedValue({ name: "x", category: "memories", content: "c", updatedAt: "" });
     const out = await executeToolboxTool("delete_toolbox_item", { category: "memories", name: "x" });

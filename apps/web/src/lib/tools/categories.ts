@@ -160,6 +160,7 @@ export const TOOLBOX_TOOLS: ToolInventoryItem[] = [
   { name: "list_toolbox_items", category: "file_system", riskLevel: "low", supportsUndo: false, description: "List Toolbox items" },
   { name: "read_toolbox_item", category: "file_system", riskLevel: "low", supportsUndo: false, description: "Read a Toolbox item" },
   { name: "write_toolbox_item", category: "file_system", riskLevel: "medium", supportsUndo: false, description: "Create/overwrite a Toolbox item" },
+  { name: "edit_toolbox_item", category: "file_system", riskLevel: "medium", supportsUndo: false, description: "Targeted string replacement in a Toolbox item" },
   { name: "delete_toolbox_item", category: "file_system", riskLevel: "high", supportsUndo: false, description: "Delete a Toolbox item" },
   // `remember` is a memory-category append; medium risk so it learns without
   // a confirmation prompt on every fact (memory matrix only gates high+).

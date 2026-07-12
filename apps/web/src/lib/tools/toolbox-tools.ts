@@ -39,6 +39,7 @@ export const TOOLBOX_TOOL_NAMES = [
   "list_toolbox_items",
   "read_toolbox_item",
   "write_toolbox_item",
+  "edit_toolbox_item",
   "delete_toolbox_item",
 ] as const;
 
@@ -75,6 +76,8 @@ export interface ToolboxToolArgs {
   category?: unknown;
   name?: unknown;
   content?: unknown;
+  old_string?: unknown;
+  new_string?: unknown;
 }
 
 /**
@@ -139,6 +142,52 @@ export async function executeToolboxTool(
       await saveToolboxItem(item);
       await reloadStores(args.category);
       return `Saved ${args.category} item "${args.name}".`;
+    }
+
+    case "edit_toolbox_item": {
+      if (!isValidCategory(args.category)) {
+        throw new Error(`Invalid category. Expected one of: ${TOOLBOX_CATEGORIES.join(", ")}`);
+      }
+      if (!isSafeName(args.name)) {
+        throw new Error("Invalid or unsafe item name.");
+      }
+      if (typeof args.old_string !== "string" || args.old_string.length === 0) {
+        throw new Error("old_string must be a non-empty string.");
+      }
+      if (typeof args.new_string !== "string") {
+        throw new Error("new_string must be a string.");
+      }
+      if (args.old_string === args.new_string) {
+        throw new Error("old_string and new_string are identical; nothing to change.");
+      }
+      const existing = await loadToolboxItem(args.category, args.name);
+      if (!existing) {
+        throw new Error(`No ${args.category} item named "${args.name}" to edit.`);
+      }
+      const occurrences = existing.content.split(args.old_string).length - 1;
+      if (occurrences === 0) {
+        throw new Error(
+          `old_string not found in ${args.category} item "${args.name}". Read the item and match its content exactly.`
+        );
+      }
+      if (occurrences > 1) {
+        throw new Error(
+          `old_string matches ${occurrences} places in "${args.name}". Provide a longer, unique string.`
+        );
+      }
+      const updated = existing.content.replace(args.old_string, args.new_string);
+      const validation = validateToolboxContent(args.category, updated);
+      if (!validation.ok) {
+        throw new Error(`Edit rejected, item unchanged — result would be invalid: ${validation.error}`);
+      }
+      await saveToolboxItem({
+        name: args.name,
+        category: args.category,
+        content: updated,
+        updatedAt: new Date().toISOString(),
+      });
+      await reloadStores(args.category);
+      return `Edited ${args.category} item "${args.name}".`;
     }
 
     case "delete_toolbox_item": {

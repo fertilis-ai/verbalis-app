@@ -556,7 +556,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       // Memory / self-enhancement guidance
       systemPrompt += `\n\n## Memory\nUse the \`remember\` tool to persist durable facts about the user or task so they are available in future sessions. Don't remember trivial or ephemeral details.`;
       if (settings.allowSelfEnhancement) {
-        systemPrompt += `\n\n## Self-Enhancement\nYou may improve your own Toolbox using \`list_toolbox_items\`, \`read_toolbox_item\`, \`write_toolbox_item\`, and \`delete_toolbox_item\` (categories: prompts, memories, agents, skills, workflows). Writes and deletes require user confirmation. Prefer small, well-scoped edits.`;
+        systemPrompt += `\n\n## Self-Enhancement\nYou may improve your own Toolbox using \`list_toolbox_items\`, \`read_toolbox_item\`, \`write_toolbox_item\`, \`edit_toolbox_item\`, and \`delete_toolbox_item\` (categories: prompts, memories, agents, skills, workflows). Writes and deletes require user confirmation. Prefer \`edit_toolbox_item\` for small changes and \`write_toolbox_item\` for new items or rewrites. Create referenced agents before workflows that name them.`;
       }
       if (settings.apiKeys.openrouter?.trim() && settings.imageModel) {
         systemPrompt += `\n\n## Image Generation\nWhen the user asks you to create, draw, or generate an image or picture, use the \`generate_image\` tool. To edit or vary a previously generated image, pass its file path (the "Saved to:" line of the earlier tool result) as \`source_image\`. Generated images are saved to ~/.verbalis/images and shown to the user automatically — after the tool succeeds, just briefly describe the image; never embed image data in your reply.`;

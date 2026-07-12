@@ -27,6 +27,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { GeneratedImage } from "./generated-image";
+import { computeLineDiff, type DiffLine } from "@/lib/toolbox/line-diff";
 import { normalizeToolCallStatus, type ToolCallState } from "@/lib/tools";
 import type { RiskLevel, ToolCategory } from "@/lib/tools/categories";
 import { RISK_LEVEL_CONFIG, CATEGORY_CONFIG } from "@/lib/tools/categories";
@@ -59,6 +60,87 @@ export function extractImagePaths(result?: string): string[] {
   if (!result) return [];
   return [...result.matchAll(/^Saved to: (.+)$/gm)].map((m) => m[1].trim());
 }
+
+/**
+ * Before/after preview for Toolbox write/edit confirmations, so the user
+ * approves a *change* rather than a content blob. For edits the diff comes
+ * straight from the arguments; for overwrites the current content is loaded
+ * to diff against (a brand-new item renders no diff — the arguments pane
+ * already shows its full content).
+ */
+interface KeyedDiffLine extends DiffLine {
+  key: string;
+}
+
+/** Stable, content-based React keys (repeated lines get an occurrence suffix). */
+function keyDiffLines(lines: DiffLine[]): KeyedDiffLine[] {
+  const seen = new Map<string, number>();
+  return lines.map((line) => {
+    const base = `${line.type}:${line.text}`;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return { ...line, key: `${base}#${n}` };
+  });
+}
+
+function useToolboxDiff(toolCall: ToolCallState, active: boolean): KeyedDiffLine[] | null {
+  const [diff, setDiff] = React.useState<KeyedDiffLine[] | null>(null);
+
+  React.useEffect(() => {
+    if (!active) {
+      setDiff(null);
+      return;
+    }
+    const { category, name, content, old_string, new_string } = toolCall.arguments as Record<
+      string,
+      unknown
+    >;
+
+    if (toolCall.name === "edit_toolbox_item") {
+      if (typeof old_string === "string" && typeof new_string === "string") {
+        setDiff(keyDiffLines(computeLineDiff(old_string, new_string)));
+      }
+      return;
+    }
+
+    // write_toolbox_item: diff against the existing item, if any.
+    if (typeof category !== "string" || typeof name !== "string" || typeof content !== "string") {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { loadToolboxItem } = await import("@/lib/storage");
+        const existing = await loadToolboxItem(
+          category as Parameters<typeof loadToolboxItem>[0],
+          name
+        );
+        if (!cancelled && existing) {
+          setDiff(keyDiffLines(computeLineDiff(existing.content, content)));
+        }
+      } catch {
+        // No preview on load failure; the arguments pane still shows content.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active, toolCall.name, toolCall.arguments]);
+
+  return diff && diff.length > 0 ? diff : null;
+}
+
+const DIFF_LINE_STYLES: Record<DiffLine["type"], string> = {
+  context: "text-muted-foreground",
+  removed: "bg-red-500/10 text-red-600 dark:text-red-400",
+  added: "bg-green-500/10 text-green-600 dark:text-green-400",
+};
+
+const DIFF_LINE_PREFIX: Record<DiffLine["type"], string> = {
+  context: "  ",
+  removed: "- ",
+  added: "+ ",
+};
 
 const CATEGORY_ICONS: Record<ToolCategory, React.ElementType> = {
   file_system: Folder,
@@ -198,6 +280,12 @@ export function ToolCallCard({
       setIsExpanded(true);
     }
   }, [normalizedStatus]);
+
+  const toolboxDiff = useToolboxDiff(
+    toolCall,
+    normalizedStatus === "pending_confirmation" &&
+      (toolCall.name === "edit_toolbox_item" || toolCall.name === "write_toolbox_item")
+  );
 
   // ============================================================================
   // Helpers
@@ -393,6 +481,24 @@ export function ToolCallCard({
                   </ul>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Toolbox change preview (confirmation only) */}
+          {toolboxDiff && (
+            <div className="rounded bg-background/50 p-2">
+              <span className="text-xs font-medium text-muted-foreground">Changes</span>
+              <pre className="mt-1 text-xs font-mono max-h-48 overflow-auto">
+                {toolboxDiff.map((line) => (
+                  <div
+                    key={line.key}
+                    className={cn("whitespace-pre-wrap break-all px-1", DIFF_LINE_STYLES[line.type])}
+                  >
+                    {DIFF_LINE_PREFIX[line.type]}
+                    {line.text}
+                  </div>
+                ))}
+              </pre>
             </div>
           )}
 

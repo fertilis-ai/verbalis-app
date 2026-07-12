@@ -150,6 +150,15 @@ const WriteToolboxItemParams = Type.Object({
   }),
 });
 
+const EditToolboxItemParams = Type.Object({
+  category: Type.String({ description: TOOLBOX_CATEGORY_DESC }),
+  name: Type.String({ description: "Item name (without extension)" }),
+  old_string: Type.String({
+    description: "Exact text to replace. Must match the item's content exactly and appear only once.",
+  }),
+  new_string: Type.String({ description: "Replacement text" }),
+});
+
 const DeleteToolboxItemParams = Type.Object({
   category: Type.String({ description: TOOLBOX_CATEGORY_DESC }),
   name: Type.String({ description: "Item name (without extension)" }),
@@ -314,6 +323,18 @@ export const TOOL_DEFINITIONS: Record<string, ToolDefinition> = {
     description:
       "Create or overwrite a Toolbox item (prompt, memory, agent, skill, or workflow). Content is validated against the category schema before saving.",
     parameters: WriteToolboxItemParams,
+    requiresConfirmation: true,
+    category: "file_system",
+    riskLevel: "medium",
+    supportsUndo: false,
+    requiresNetwork: false,
+    estimatedDurationMs: 100,
+  },
+  edit_toolbox_item: {
+    name: "edit_toolbox_item",
+    description:
+      "Make a targeted edit to an existing Toolbox item by replacing an exact string. Preferred over write_toolbox_item for small changes. The edited result is validated against the category schema before saving.",
+    parameters: EditToolboxItemParams,
     requiresConfirmation: true,
     category: "file_system",
     riskLevel: "medium",
@@ -521,6 +542,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       case "list_toolbox_items":
       case "read_toolbox_item":
       case "write_toolbox_item":
+      case "edit_toolbox_item":
       case "delete_toolbox_item": {
         result = await executeToolboxTool(name, args as Record<string, unknown>);
         break;
