@@ -132,6 +132,12 @@ vi.mock("@/lib/message-conversion", () => ({
 vi.mock("@earendil-works/pi-ai", () => ({
   streamSimple: mockStreamSimple,
   getModel: mockGetModel,
+  // Needed by web-tools param schemas (pulled in via toolbox-schemas → categories).
+  StringEnum: (values: readonly string[], options?: Record<string, unknown>) => ({
+    ...options,
+    type: "string",
+    enum: [...values],
+  }),
 }));
 
 vi.mock("@/lib/http", () => ({

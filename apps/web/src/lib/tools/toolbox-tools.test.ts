@@ -232,6 +232,23 @@ describe("executeToolboxTool", () => {
     expect(out).toContain("Deleted");
   });
 
+  it("delete_toolbox_item refuses the protected SOUL/USER memories", async () => {
+    mockLoad.mockResolvedValue({ name: "SOUL", category: "memories", content: "I am.", updatedAt: "" });
+    await expect(
+      executeToolboxTool("delete_toolbox_item", { category: "memories", name: "SOUL" })
+    ).rejects.toThrow(/protected memory/);
+    await expect(
+      executeToolboxTool("delete_toolbox_item", { category: "memories", name: "user" })
+    ).rejects.toThrow(/protected memory/);
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("delete_toolbox_item allows SOUL as a name in other categories", async () => {
+    mockLoad.mockResolvedValue({ name: "SOUL", category: "prompts", content: "template: x", updatedAt: "" });
+    await executeToolboxTool("delete_toolbox_item", { category: "prompts", name: "SOUL" });
+    expect(mockDelete).toHaveBeenCalledOnce();
+  });
+
   it("delete_toolbox_item throws when missing", async () => {
     mockLoad.mockResolvedValue(null);
     await expect(

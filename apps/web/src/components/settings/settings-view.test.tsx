@@ -14,6 +14,7 @@ const mockSetDefaultModel = vi.fn();
 const mockSetWorkingDirectory = vi.fn();
 const mockSetSettingsDirectory = vi.fn();
 const mockSetAgentDebugLogging = vi.fn();
+const mockSetAllowSelfEnhancement = vi.fn();
 
 const mockSettingsStore = {
   apiKeys: { anthropic: "", openai: "", google: "", openrouter: "" },
@@ -24,6 +25,7 @@ const mockSettingsStore = {
   settingsDirectory: "/Users/test/.verbalis-app",
   hue: "neutral" as string,
   agentDebugLogging: false,
+  allowSelfEnhancement: true,
   availableModels: [],
   selectedModels: [],
   modelFetchStatus: "idle" as string,
@@ -38,6 +40,7 @@ const mockSettingsStore = {
   setWorkingDirectory: mockSetWorkingDirectory,
   setSettingsDirectory: mockSetSettingsDirectory,
   setAgentDebugLogging: mockSetAgentDebugLogging,
+  setAllowSelfEnhancement: mockSetAllowSelfEnhancement,
   fetchModels: vi.fn(),
   setModelDiscoveryNoDataCollection: vi.fn(),
   addSelectedModels: vi.fn(),
@@ -108,6 +111,7 @@ vi.mock("lucide-react", () => ({
   Cpu: (props: any) => <span data-testid="icon-Cpu" {...props} />,
   Server: (props: any) => <span data-testid="icon-Server" {...props} />,
   Bug: (props: any) => <span data-testid="icon-Bug" {...props} />,
+  Bot: (props: any) => <span data-testid="icon-Bot" {...props} />,
   Info: (props: any) => <span data-testid="icon-Info" {...props} />,
   RefreshCw: (props: any) => <span data-testid="icon-RefreshCw" {...props} />,
   Loader2: (props: any) => <span data-testid="icon-Loader2" {...props} />,

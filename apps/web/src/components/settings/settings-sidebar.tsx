@@ -1,11 +1,12 @@
 
-import { Palette, Key, FolderCog, Info, Server, Cpu, Shield, Bug } from "lucide-react";
+import { Palette, Key, FolderCog, Info, Server, Cpu, Shield, Bug, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "directories", label: "Directories", icon: FolderCog },
   { id: "guardrails", label: "Guardrails", icon: Shield },
+  { id: "agent", label: "Agent", icon: Bot },
   { id: "api-keys", label: "API Keys", icon: Key },
   { id: "models", label: "Models", icon: Cpu },
   { id: "local-llm", label: "Local LLM", icon: Server },

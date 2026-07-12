@@ -8,9 +8,18 @@ const mockFetchOpenRouterTranscriptionModels = vi.fn();
 const mockFetchOpenRouterSpeechModels = vi.fn();
 const mockGetPresetConfig = vi.fn();
 
-// Mock zustand persist to be a passthrough (avoids localStorage issues in tests)
+// Mock zustand persist to be a passthrough (avoids localStorage issues in
+// tests) while capturing the options so version/migrate can be asserted.
+// vi.hoisted avoids the TDZ on module-level lets (vi.mock factories run
+// during hoisted imports, before let initializers).
+const persistCapture = vi.hoisted(() => ({
+  options: undefined as Record<string, unknown> | undefined,
+}));
 vi.mock("zustand/middleware", () => ({
-  persist: (fn: unknown) => fn,
+  persist: (fn: unknown, options: Record<string, unknown>) => {
+    persistCapture.options = options;
+    return fn;
+  },
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -125,6 +134,34 @@ describe("settings-store", () => {
 
     it("has idle model fetch status", () => {
       expect(useSettingsStore.getState().modelFetchStatus).toBe("idle");
+    });
+
+    it("has self-enhancement enabled by default", () => {
+      expect(useSettingsStore.getState().allowSelfEnhancement).toBe(true);
+    });
+  });
+
+  describe("persist migration", () => {
+    type Migrate = (state: unknown, version: number) => unknown;
+
+    it("is versioned", () => {
+      expect(persistCapture.options?.version).toBe(1);
+    });
+
+    it("v0 → v1 flips allowSelfEnhancement to true (old default was persisted, not chosen)", () => {
+      const migrate = persistCapture.options?.migrate as Migrate;
+      const migrated = migrate({ allowSelfEnhancement: false, theme: "dark" }, 0) as Record<
+        string,
+        unknown
+      >;
+      expect(migrated.allowSelfEnhancement).toBe(true);
+      expect(migrated.theme).toBe("dark");
+    });
+
+    it("leaves v1 states untouched (a later opt-out survives)", () => {
+      const migrate = persistCapture.options?.migrate as Migrate;
+      const migrated = migrate({ allowSelfEnhancement: false }, 1) as Record<string, unknown>;
+      expect(migrated.allowSelfEnhancement).toBe(false);
     });
   });
 

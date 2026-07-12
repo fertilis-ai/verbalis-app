@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Moon, Sun, Monitor, Eye, EyeOff, FolderOpen, Palette, FolderCog, Key, Cpu, Server, Bug, Info, RefreshCw, Loader2 } from "lucide-react";
+import { Moon, Sun, Monitor, Eye, EyeOff, FolderOpen, Palette, FolderCog, Key, Cpu, Server, Bug, Bot, Info, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -16,6 +16,7 @@ const SECTION_IDS: SettingsSection[] = [
   "appearance",
   "directories",
   "guardrails",
+  "agent",
   "api-keys",
   "models",
   "local-llm",
@@ -101,6 +102,7 @@ export function SettingsView({ selectedSection, onSelectSection }: SettingsViewP
           <section id="section-guardrails" className="border-b border-border pb-8">
             <GuardrailsSection />
           </section>
+          <AgentSection />
           <ApiKeysSection />
           <ModelsSection />
           <LocalLlmSection />
@@ -655,13 +657,38 @@ function DirectoriesSection() {
   );
 }
 
+function AgentSection() {
+  const { allowSelfEnhancement, setAllowSelfEnhancement } = useSettingsStore();
+
+  return (
+    <section id="section-agent" className="border-b border-border pb-8">
+      <h2 className="text-lg font-medium mb-4 flex items-center gap-2"><Bot className="h-4.5 w-4.5 text-muted-foreground" />Agent</h2>
+      <div className="space-y-4">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={allowSelfEnhancement}
+            onChange={(e) => setAllowSelfEnhancement(e.target.checked)}
+            className="h-4 w-4 rounded border-input"
+          />
+          <div className="flex-1">
+            <span className="text-sm">Allow Self-Enhancement</span>
+            <p className="text-xs text-muted-foreground">
+              Let the agent create and edit its own Toolbox files (prompts, memories,
+              agents, skills, workflows). Writes and deletes still require confirmation.
+            </p>
+          </div>
+        </label>
+      </div>
+    </section>
+  );
+}
+
 function DebugSection() {
   const {
     homeDir,
     agentDebugLogging,
     setAgentDebugLogging,
-    allowSelfEnhancement,
-    setAllowSelfEnhancement,
   } = useSettingsStore();
 
   // Only show in Tauri (desktop) environment
@@ -684,21 +711,6 @@ function DebugSection() {
             <span className="text-sm">Debug Logging</span>
             <p className="text-xs text-muted-foreground">
               Write detailed agent execution logs to {homeDir || "~"}/.verbalis/logs/
-            </p>
-          </div>
-        </label>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={allowSelfEnhancement}
-            onChange={(e) => setAllowSelfEnhancement(e.target.checked)}
-            className="h-4 w-4 rounded border-input"
-          />
-          <div className="flex-1">
-            <span className="text-sm">Allow Self-Enhancement</span>
-            <p className="text-xs text-muted-foreground">
-              Let the agent create and edit its own Toolbox files (prompts, memories,
-              agents, skills, workflows). Writes and deletes still require confirmation.
             </p>
           </div>
         </label>

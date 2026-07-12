@@ -24,6 +24,7 @@ import { useToolboxStore } from "@/stores/toolbox-store";
 import { useAgentStore } from "@/stores/agent-store";
 import {
   TOOLBOX_CATEGORIES,
+  isWellKnownMemory,
   validateToolboxContent,
   type ToolboxToolCategory,
 } from "@/lib/toolbox/toolbox-schemas";
@@ -196,6 +197,11 @@ export async function executeToolboxTool(
       }
       if (!isSafeName(args.name)) {
         throw new Error("Invalid or unsafe item name.");
+      }
+      if (args.category === "memories" && isWellKnownMemory(args.name)) {
+        throw new Error(
+          `"${args.name}" is a protected memory (the agent's identity/user model). It can be edited but never deleted.`
+        );
       }
       const existing = await loadToolboxItem(args.category, args.name);
       if (!existing) {

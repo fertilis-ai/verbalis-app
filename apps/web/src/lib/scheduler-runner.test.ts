@@ -22,6 +22,16 @@ vi.mock("@/lib/storage", () => ({
   saveSchedule: (...args: unknown[]) => mockSaveSchedule(...args),
 }));
 
+const mockListWorkflows = vi.fn();
+const mockLoadWorkflow = vi.fn();
+const mockRunWorkflow = vi.fn();
+
+vi.mock("@/lib/workflows/run-workflow", () => ({
+  listWorkflows: (...args: unknown[]) => mockListWorkflows(...args),
+  loadWorkflow: (...args: unknown[]) => mockLoadWorkflow(...args),
+  runWorkflow: (...args: unknown[]) => mockRunWorkflow(...args),
+}));
+
 const mockCreateConversationInBackground = vi.fn();
 const mockSendMessageToConversation = vi.fn();
 
@@ -83,11 +93,59 @@ describe("scheduler-runner", () => {
     mockSaveSchedule.mockResolvedValue(undefined);
     mockCreateConversationInBackground.mockResolvedValue({ id: "conv-1" });
     mockSendMessageToConversation.mockResolvedValue(undefined);
+    mockListWorkflows.mockResolvedValue([]);
+    mockLoadWorkflow.mockResolvedValue(null);
+    mockRunWorkflow.mockResolvedValue({ stepOutputs: [] });
   });
 
   afterEach(() => {
     stopSchedulerRunner();
     vi.useRealTimers();
+  });
+
+  // =========================================================================
+  // Scheduled workflow discovery
+  // =========================================================================
+  describe("scheduled workflow discovery", () => {
+    it("picks up a newly saved workflow without a restart and runs it when due", async () => {
+      vi.setSystemTime(new Date("2026-07-11T08:00:30Z"));
+      mockLoadSchedulerTree.mockResolvedValue([]);
+
+      startSchedulerRunner(60_000);
+      // Initial tick: toolbox has no workflows yet.
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockRunWorkflow).not.toHaveBeenCalled();
+
+      // A workflow with an every-minute cron is written between ticks
+      // (e.g. by the agent's write_toolbox_item) — no restart happens.
+      const workflow = {
+        name: "brief",
+        trigger: { schedule: "* * * * *" },
+        steps: [{ prompt: "go" }],
+      };
+      mockListWorkflows.mockResolvedValue(["brief"]);
+      mockLoadWorkflow.mockResolvedValue(workflow);
+
+      // Next tick: first sighting seeds nextRun but must not fire immediately.
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(mockRunWorkflow).not.toHaveBeenCalled();
+
+      // Following tick: the seeded cron time has passed — the workflow runs.
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(mockRunWorkflow).toHaveBeenCalledWith(workflow);
+    });
+
+    it("ignores workflows without a trigger.schedule", async () => {
+      mockLoadSchedulerTree.mockResolvedValue([]);
+      mockListWorkflows.mockResolvedValue(["manual"]);
+      mockLoadWorkflow.mockResolvedValue({ name: "manual", steps: [{ prompt: "go" }] });
+
+      startSchedulerRunner(60_000);
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      expect(mockRunWorkflow).not.toHaveBeenCalled();
+    });
   });
 
   // =========================================================================

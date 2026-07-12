@@ -1,10 +1,11 @@
 import * as React from "react";
-import { Wrench, Play, Loader2 } from "lucide-react";
+import { Wrench, Play, Loader2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { useToolboxStore, itemKey, type ToolboxCategory } from "@/stores/toolbox-store";
 import { ToolboxTabs } from "./toolbox-tabs";
 import { highlightCode, escapeHtml } from "@/lib/highlighter";
 import { runWorkflowByName } from "@/lib/workflows/run-workflow";
+import { validateToolboxContent } from "@/lib/toolbox/toolbox-schemas";
 
 // Map category to language for syntax highlighting
 function getLanguage(category: ToolboxCategory): string {
@@ -58,6 +59,13 @@ export function ToolboxEditor() {
       cancelled = true;
     };
   }, [activeItem?.currentContent, activeItem?.category]);
+
+  // Same schema contract the agent's tools enforce, but advisory here: a
+  // human can always save (warn-but-allow), the agent's writes are rejected.
+  const validation = React.useMemo(() => {
+    if (!activeItem) return null;
+    return validateToolboxContent(activeItem.category, activeItem.currentContent);
+  }, [activeItem]);
 
   const handleSave = async () => {
     if (activeItem) {
@@ -128,6 +136,12 @@ export function ToolboxEditor() {
         </div>
       ) : (
         <div className="flex flex-1 flex-col overflow-hidden">
+        {validation && !validation.ok && (
+          <div className="flex items-start gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-600 dark:text-amber-400">
+            <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>{validation.error} (saving is still allowed)</span>
+          </div>
+        )}
         {activeItem.category === "workflows" && (
           <div className="flex items-center justify-end gap-2 border-b border-border/50 px-3 py-1.5">
             <button

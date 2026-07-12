@@ -172,7 +172,7 @@ export const useSettingsStore = create<SettingsState>()(
       speechModelFetchError: null,
       guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
       agentDebugLogging: false,
-      allowSelfEnhancement: false,
+      allowSelfEnhancement: true,
 
       setTheme: (theme) => set({ theme }),
       setHue: (hue) => set({ hue }),
@@ -389,6 +389,17 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "verbalis-settings",
+      version: 1,
+      // v0 → v1: allowSelfEnhancement's default flipped to true. The old
+      // default (false) was persisted on every save whether or not the user
+      // ever touched the toggle, so a stored false can't be read as a choice —
+      // flip it once; opting out again survives (v1 states are never migrated).
+      migrate: (persistedState, version) => {
+        if (version === 0 && persistedState && typeof persistedState === "object") {
+          (persistedState as { allowSelfEnhancement?: boolean }).allowSelfEnhancement = true;
+        }
+        return persistedState;
+      },
       partialize: (state) => ({
         theme: state.theme,
         hue: state.hue,
