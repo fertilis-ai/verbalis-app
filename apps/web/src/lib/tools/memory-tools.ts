@@ -14,6 +14,7 @@
 import matter from "gray-matter";
 import { loadToolboxItem, saveToolboxItem } from "@/lib/storage";
 import { useToolboxStore } from "@/stores/toolbox-store";
+import { isWellKnownMemory } from "@/lib/toolbox/toolbox-schemas";
 
 /** Default memory file the agent appends learned facts to. */
 export const DEFAULT_MEMORY_NAME = "learned";
@@ -58,7 +59,7 @@ export async function executeRemember(args: RememberArgs): Promise<string> {
 
   // Ensure the memory is injected into future prompts. SOUL/USER are always
   // injected regardless; for any other file we set alwaysInclude.
-  if (!isWellKnown(name)) {
+  if (!isWellKnownMemory(name)) {
     frontmatter.alwaysInclude = true;
   }
 
@@ -80,9 +81,4 @@ export async function executeRemember(args: RememberArgs): Promise<string> {
   }
 
   return `Remembered in "${name}".`;
-}
-
-function isWellKnown(name: string): boolean {
-  const n = name.toLowerCase();
-  return n === "soul" || n === "user";
 }

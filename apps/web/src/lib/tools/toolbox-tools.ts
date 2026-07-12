@@ -13,8 +13,6 @@
  * (see getToolsForContext); this module is the execution backend.
  */
 
-import matter from "gray-matter";
-import YAML from "yaml";
 import {
   saveToolboxItem,
   loadToolboxItem,
@@ -24,15 +22,18 @@ import {
 } from "@/lib/storage";
 import { useToolboxStore } from "@/stores/toolbox-store";
 import { useAgentStore } from "@/stores/agent-store";
+import {
+  TOOLBOX_CATEGORIES,
+  validateToolboxContent,
+  type ToolboxToolCategory,
+} from "@/lib/toolbox/toolbox-schemas";
 
-export const TOOLBOX_CATEGORIES = [
-  "prompts",
-  "memories",
-  "agents",
-  "skills",
-  "workflows",
-] as const;
-export type ToolboxToolCategory = (typeof TOOLBOX_CATEGORIES)[number];
+export {
+  TOOLBOX_CATEGORIES,
+  validateToolboxContent,
+  type ToolboxToolCategory,
+  type ValidationResult,
+} from "@/lib/toolbox/toolbox-schemas";
 
 export const TOOLBOX_TOOL_NAMES = [
   "list_toolbox_items",
@@ -56,100 +57,6 @@ function isSafeName(name: unknown): name is string {
     !name.includes("..") &&
     !name.startsWith(".")
   );
-}
-
-export interface ValidationResult {
-  ok: boolean;
-  error?: string;
-}
-
-/**
- * Validate that content is well-formed for its category so the agent can't
- * corrupt a file the runtime later parses.
- */
-export function validateToolboxContent(
-  category: ToolboxToolCategory,
-  content: string
-): ValidationResult {
-  switch (category) {
-    case "memories":
-      // Free-form markdown; nothing to validate beyond being a string.
-      return { ok: true };
-
-    case "agents": {
-      try {
-        const { data } = matter(content);
-        if (!data || typeof data !== "object") {
-          return { ok: false, error: "Agent frontmatter must be a YAML object." };
-        }
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, error: `Invalid agent frontmatter: ${errMsg(e)}` };
-      }
-    }
-
-    case "skills": {
-      try {
-        const { data } = matter(content);
-        if (!data || typeof data !== "object") {
-          return { ok: false, error: "Skill frontmatter must be a YAML object." };
-        }
-        if (typeof data.trigger !== "string" || data.trigger.trim() === "") {
-          return {
-            ok: false,
-            error: 'Skill frontmatter must include a non-empty "trigger" (keyword|pattern).',
-          };
-        }
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, error: `Invalid skill frontmatter: ${errMsg(e)}` };
-      }
-    }
-
-    case "prompts": {
-      try {
-        const data = YAML.parse(content) as unknown;
-        if (!data || typeof data !== "object") {
-          return { ok: false, error: "Prompt must be a YAML object." };
-        }
-        const template = (data as Record<string, unknown>).template;
-        if (typeof template !== "string" || template.trim() === "") {
-          return { ok: false, error: 'Prompt must include a non-empty "template" string.' };
-        }
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, error: `Invalid prompt YAML: ${errMsg(e)}` };
-      }
-    }
-
-    case "workflows": {
-      try {
-        const data = YAML.parse(content) as unknown;
-        if (!data || typeof data !== "object") {
-          return { ok: false, error: "Workflow must be a YAML object." };
-        }
-        const steps = (data as Record<string, unknown>).steps;
-        if (!Array.isArray(steps) || steps.length === 0) {
-          return { ok: false, error: 'Workflow must include a non-empty "steps" array.' };
-        }
-        for (const [i, step] of steps.entries()) {
-          if (!step || typeof step !== "object" || typeof (step as Record<string, unknown>).prompt !== "string") {
-            return { ok: false, error: `Workflow step ${i} must have a "prompt" string.` };
-          }
-        }
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, error: `Invalid workflow YAML: ${errMsg(e)}` };
-      }
-    }
-
-    default:
-      return { ok: false, error: `Unknown category: ${category}` };
-  }
-}
-
-function errMsg(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
 }
 
 /** Refresh in-memory stores after a write/delete so changes are live. */
