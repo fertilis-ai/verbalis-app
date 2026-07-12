@@ -20,6 +20,7 @@ import { trimMessagesToBudget } from "@/lib/context/trim";
 import { classifyError } from "@/lib/agentic/types";
 import { resolveMemories } from "@/lib/memory/resolve-memories";
 import { resolveSkills, renderSkillsForPrompt } from "@/lib/skills/resolve-skills";
+import { buildToolboxInventory } from "@/lib/toolbox/toolbox-inventory";
 import { useSettingsStore } from "./settings-store";
 import { useAgentStore } from "./agent-store";
 import { useAgenticLoopStore, subscribeToToolEvents } from "./agentic-loop-store";
@@ -522,6 +523,15 @@ export const useChatStore = create<ChatState>((set, get) => {
         systemPrompt += renderSkillsForPrompt(resolvedSkills);
       } catch (error) {
         console.warn("[chat-store] Failed to resolve skills:", error);
+      }
+
+      // Toolbox awareness: compact inventory of every category so the agent
+      // knows what exists without a list_toolbox_items round-trip. Always
+      // injected (read-only), independent of allowSelfEnhancement.
+      try {
+        systemPrompt += await buildToolboxInventory();
+      } catch (error) {
+        console.warn("[chat-store] Failed to build toolbox inventory:", error);
       }
 
       // Inject current agent context
