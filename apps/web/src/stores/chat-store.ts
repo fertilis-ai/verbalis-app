@@ -537,7 +537,7 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       // Inject current agent context
       if (agent) {
-        systemPrompt += `\n\n## Current Agent\nName: ${agent.name}\nModel: ${agent.model}\nTemperature: ${agent.temperature}`;
+        systemPrompt += `\n\n## Current Agent\nName: ${agent.name}${agent.model ? `\nModel: ${agent.model}` : ""}\nTemperature: ${agent.temperature}`;
       }
 
       // Inject file context into system prompt

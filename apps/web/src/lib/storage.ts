@@ -2,6 +2,10 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import YAML from "yaml";
 import { Buffer } from "buffer";
 import matter from "gray-matter";
+import {
+  DEFAULT_TOOLBOX_ITEMS,
+  TOOLBOX_DEFAULTS_VERSION,
+} from "@/lib/toolbox/toolbox-defaults";
 
 // Polyfill Buffer for browser environment (required by gray-matter)
 declare global {
@@ -21,45 +25,45 @@ const STORAGE_PREFIX = "verbalis:";
 
 const DEFAULT_AGENT_FILE = `---
 name: default
-model: claude-sonnet-4-20250514
+description: Your personal assistant for everyday life and work
 temperature: 0.3
 ---
 
-You are the default orchestration agent for chat. Your job is to coordinate tool use and reasoning to solve user requests efficiently, safely, and transparently.
+You are the user's personal assistant — the default agent of a local-first AI
+assistant that lives on their device, remembers what matters, and becomes more
+useful over time.
 
-Core behavior:
-- Be tool-first when tools are available and likely to reduce uncertainty or effort.
-- Keep plans concise and in-line unless the user explicitly wants a longer plan.
-- Ask a brief clarifying question only when it materially reduces risk or rework.
-- If multiple paths exist, present 2-3 options with a clear recommendation.
+Who you are:
+- A capable, trustworthy generalist for everyday life and work: research,
+  writing, planning, organizing files and notes, and small automations.
+- Private by design: the user's data lives on their device and only leaves it
+  through tools the user can see, like web search — never assume otherwise.
 
-Tool use policy:
-- Prefer precise tools over speculation. Use search, file inspection, or commands to verify.
-- Use the minimum number of tools needed to reach a reliable answer.
-- For potentially destructive actions (delete, overwrite, reset, install system-wide), ask for confirmation first.
-- When using shell commands:
-  - Prefer read-only commands first (rg, ls, cat) before edits.
-  - Avoid long-running or noisy commands unless necessary.
-  - Summarize results and show key outputs.
+Memory:
+- Your identity lives in the SOUL memory; what you know about the user lives
+  in the USER memory. Both are always in your context — act on them: tailor
+  tone, defaults, and suggestions instead of asking for what you already know.
+- When you learn a durable fact — a preference, a person, a project, a
+  routine — save it with the remember tool. Skip one-off details and trivia.
 
-Execution strategy:
-1. Restate the goal briefly.
-2. Decide whether tools are required.
-3. Execute tools in a safe, incremental order.
-4. Summarize findings and propose next steps.
-5. Confirm before any risky changes.
+Toolbox:
+- The Toolbox holds prompts, skills, agents, and workflows; its inventory is
+  in your context. Lean on it, and route the user to it: a task that fits a
+  specialized agent (researcher, writer, organizer) is better done there.
+- When the user asks for the same thing repeatedly, offer to save it — a
+  prompt for a reusable request, a skill for standing guidance, a workflow
+  for a recurring multi-step job (optionally on a schedule).
 
-Quality and safety:
-- Never assume facts that can be quickly verified.
-- Preserve user data and existing project structure.
-- Avoid unnecessary edits or churn.
-- If uncertain, be explicit and offer a safe fallback.
+Tools:
+- Verify with tools (web search, reading files) rather than guessing; use the
+  fewest calls that give a reliable answer, and say what you did.
+- Start small and reversible. Ask before anything destructive or hard to undo
+  (deleting, overwriting, sending) — trust is earned action by action.
 
-Response style:
-- Be warm, direct, and collaborative.
-- Keep responses focused and actionable.
-- Use clear formatting for commands and file paths.
-- End with suggested next steps when appropriate.
+Style:
+- Warm, direct, and brief. Lead with the answer or result, not the process.
+- Plain language; concrete suggestions over open-ended questions.
+- End with a next step only when there is a real one.
 `;
 
 // Virtual file system stored in localStorage
@@ -544,7 +548,8 @@ export async function renameChatFolder(oldPath: string, newName: string): Promis
 // Agent storage (markdown with frontmatter)
 export interface AgentData {
   name: string;
-  model: string;
+  /** Optional model override. Undefined = the app's selected model. */
+  model?: string;
   temperature: number;
   systemPrompt: string;
   /** Optional per-agent tool allowlist (tool names). Undefined = all tools. */
@@ -556,9 +561,11 @@ export async function saveAgent(agent: AgentData): Promise<void> {
   const path = `${dir}/agents/${agent.name}.md`;
   const frontmatter: Record<string, unknown> = {
     name: agent.name,
-    model: agent.model,
     temperature: agent.temperature,
   };
+  if (agent.model) {
+    frontmatter.model = agent.model;
+  }
   if (agent.tools && agent.tools.length > 0) {
     frontmatter.tools = agent.tools;
   }
@@ -568,8 +575,14 @@ export async function saveAgent(agent: AgentData): Promise<void> {
 
 export async function loadAgent(name: string): Promise<AgentData | null> {
   const dir = await getAppDataDirCached();
-  const path = `${dir}/agents/${name}.md`;
-  if (!(await pathExists(path))) return null;
+  let path = `${dir}/agents/${name}.md`;
+  if (!(await pathExists(path))) {
+    // Fall back to the settings-directory overlay.
+    const overlay = await getSettingsOverlayDir();
+    if (!overlay) return null;
+    path = `${overlay}/agents/${name}.md`;
+    if (!(await pathExists(path))) return null;
+  }
   const content = await readFile(path);
   const { data, content: systemPrompt } = matter(content);
   const tools = Array.isArray(data.tools)
@@ -577,21 +590,39 @@ export async function loadAgent(name: string): Promise<AgentData | null> {
     : undefined;
   return {
     name: data.name ?? name,
-    model: data.model ?? "claude-sonnet-4-20250514",
     temperature: data.temperature ?? 0.7,
     systemPrompt: systemPrompt.trim(),
+    ...(typeof data.model === "string" ? { model: data.model } : {}),
     ...(tools && tools.length > 0 ? { tools } : {}),
   };
 }
 
 export async function listAgents(): Promise<string[]> {
   const dir = await getAppDataDirCached();
-  return listFiles(`${dir}/agents`, "md");
+  const names = await listFiles(`${dir}/agents`, "md");
+  const overlay = await getSettingsOverlayDir();
+  if (overlay) {
+    const seen = new Set(names);
+    for (const name of await listOverlayFiles(`${overlay}/agents`, "md")) {
+      if (!seen.has(name)) names.push(name);
+    }
+  }
+  return names;
 }
 
 export async function deleteAgent(name: string): Promise<void> {
   const dir = await getAppDataDirCached();
-  await deletePath(`${dir}/agents/${name}.md`);
+  const canonical = `${dir}/agents/${name}.md`;
+  if (await pathExists(canonical)) {
+    await deletePath(canonical);
+  }
+  const overlay = await getSettingsOverlayDir();
+  if (overlay) {
+    const shadow = `${overlay}/agents/${name}.md`;
+    if (await pathExists(shadow)) {
+      await deletePath(shadow);
+    }
+  }
 }
 
 // Task storage
@@ -871,6 +902,43 @@ export async function toggleSchedulerFolderPin(folderPath: string): Promise<void
   }
 }
 
+// ---------------------------------------------------------------------------
+// Settings-directory overlay
+//
+// The user's Settings Directory mirrors the Toolbox layout
+// (<settingsDir>/<category>/*.<ext>) as a second, read-mostly source for
+// every category (agents included). The canonical app-data store always wins
+// on name clashes; writes go to the canonical store (shadowing an overlay
+// file), and deletes remove both copies so an item doesn't resurrect from
+// the overlay.
+// ---------------------------------------------------------------------------
+
+let settingsStorePromise: Promise<typeof import("@/stores/settings-store")> | null = null;
+
+/** The configured settings directory, or null when unset. Imported lazily so
+ * this low-level module doesn't statically depend on a zustand store. */
+async function getSettingsOverlayDir(): Promise<string | null> {
+  try {
+    if (!settingsStorePromise) {
+      settingsStorePromise = import("@/stores/settings-store");
+    }
+    const { useSettingsStore } = await settingsStorePromise;
+    const dir = useSettingsStore.getState().settingsDirectory?.trim();
+    return dir || null;
+  } catch {
+    return null;
+  }
+}
+
+/** List overlay files, tolerating a missing directory. */
+async function listOverlayFiles(dir: string, ext: string): Promise<string[]> {
+  try {
+    return await listFiles(dir, ext);
+  } catch {
+    return [];
+  }
+}
+
 // Generic toolbox item storage (prompts, memories, skills, workflows)
 export interface ToolboxItemData {
   name: string;
@@ -911,8 +979,14 @@ export async function loadToolboxItem(
 ): Promise<ToolboxItemData | null> {
   const dir = await getAppDataDirCached();
   const ext = getToolboxExtension(category);
-  const path = `${dir}/${category}/${name}.${ext}`;
-  if (!(await pathExists(path))) return null;
+  let path = `${dir}/${category}/${name}.${ext}`;
+  if (!(await pathExists(path))) {
+    // Fall back to the settings-directory overlay.
+    const overlay = await getSettingsOverlayDir();
+    if (!overlay) return null;
+    path = `${overlay}/${category}/${name}.${ext}`;
+    if (!(await pathExists(path))) return null;
+  }
   const content = await readFile(path);
   return {
     name,
@@ -927,7 +1001,15 @@ export async function listToolboxItems(
 ): Promise<string[]> {
   const dir = await getAppDataDirCached();
   const ext = getToolboxExtension(category);
-  return listFiles(`${dir}/${category}`, ext);
+  const names = await listFiles(`${dir}/${category}`, ext);
+  const overlay = await getSettingsOverlayDir();
+  if (overlay) {
+    const seen = new Set(names);
+    for (const name of await listOverlayFiles(`${overlay}/${category}`, ext)) {
+      if (!seen.has(name)) names.push(name);
+    }
+  }
+  return names;
 }
 
 export async function deleteToolboxItem(
@@ -936,7 +1018,17 @@ export async function deleteToolboxItem(
 ): Promise<void> {
   const dir = await getAppDataDirCached();
   const ext = getToolboxExtension(category);
-  await deletePath(`${dir}/${category}/${name}.${ext}`);
+  const canonical = `${dir}/${category}/${name}.${ext}`;
+  if (await pathExists(canonical)) {
+    await deletePath(canonical);
+  }
+  const overlay = await getSettingsOverlayDir();
+  if (overlay) {
+    const shadow = `${overlay}/${category}/${name}.${ext}`;
+    if (await pathExists(shadow)) {
+      await deletePath(shadow);
+    }
+  }
 }
 
 export async function renameToolboxItem(
@@ -986,4 +1078,30 @@ export async function ensureWellKnownMemories(): Promise<void> {
   };
   await seed("SOUL", SOUL_TEMPLATE);
   await seed("USER", USER_TEMPLATE);
+}
+
+/**
+ * Seed the default Toolbox items (starter prompts, skills, agents, workflows,
+ * and memory templates from toolbox-defaults.ts) without overwriting existing
+ * files. Guarded by a version marker so items a user deletes stay deleted;
+ * bumping TOOLBOX_DEFAULTS_VERSION seeds newly added defaults on next launch.
+ */
+export async function ensureDefaultToolboxItems(): Promise<void> {
+  const dir = await getAppDataDirCached();
+  const markerPath = `${dir}/toolbox-defaults-version`;
+
+  let seededVersion = 0;
+  if (await pathExists(markerPath)) {
+    seededVersion = Number.parseInt(await readFile(markerPath), 10) || 0;
+  }
+  if (seededVersion >= TOOLBOX_DEFAULTS_VERSION) return;
+
+  for (const item of DEFAULT_TOOLBOX_ITEMS) {
+    const ext = getToolboxExtension(item.category);
+    const path = `${dir}/${item.category}/${item.name}.${ext}`;
+    if (!(await pathExists(path))) {
+      await writeFile(path, item.content);
+    }
+  }
+  await writeFile(markerPath, String(TOOLBOX_DEFAULTS_VERSION));
 }

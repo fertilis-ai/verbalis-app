@@ -315,7 +315,6 @@ Add your memories and context here.`;
     case "agents":
       return `---
 name: ${name}
-model: claude-sonnet-4-20250514
 temperature: 0.7
 ---
 

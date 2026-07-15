@@ -5,15 +5,16 @@
  * Canonical store is the app-data memories dir (the same files the Toolbox
  * "memories" category edits). SOUL and USER are well-known entries that are
  * always injected; any other memory may opt in via `alwaysInclude: true` in
- * its frontmatter. A legacy back-compat read of `<settingsDir>/memories/` is
- * kept so existing SOUL.md/USER.md continue to work.
+ * its frontmatter. The user's Settings Directory (`<settingsDir>/memories/`)
+ * is a second source under the same rules — app-data files win on name
+ * clashes.
  *
  * Total injected size is bounded so memory can't blow the context budget;
  * SOUL/USER are prioritised, then alwaysInclude memories in name order.
  */
 
 import matter from "gray-matter";
-import { listToolboxItems, loadToolboxItem, readFile } from "@/lib/storage";
+import { listFiles, listToolboxItems, loadToolboxItem, readFile } from "@/lib/storage";
 
 export interface ResolvedMemory {
   name: string;
@@ -73,22 +74,32 @@ export async function resolveMemories(opts: {
     if (!body) continue;
     if (isWellKnown(name)) {
       wellKnown.push({ name, heading: headingFor(name), body });
-      seen.add(name.toLowerCase());
     } else if (alwaysInclude) {
       optIn.push({ name, heading: headingFor(name), body });
     }
+    // Every canonical name is claimed, included or not, so a settings-dir
+    // file can never override an app-data memory of the same name.
+    seen.add(name.toLowerCase());
   }
 
-  // 2. Legacy back-compat: read <settingsDir>/memories/SOUL.md & USER.md when
-  //    the canonical store doesn't already provide them.
+  // 2. Merge memories from the Settings Directory under the same rules
+  //    (SOUL/USER always, others via alwaysInclude). SOUL/USER are probed
+  //    directly as well so they survive even when the listing fails.
   if (opts.settingsDir) {
-    for (const legacy of ["SOUL", "USER"]) {
-      if (seen.has(legacy.toLowerCase())) continue;
-      const body = await safeReadLegacy(`${opts.settingsDir}/memories/${legacy}.md`);
-      if (body) {
-        wellKnown.push({ name: legacy, heading: headingFor(legacy), body });
-        seen.add(legacy.toLowerCase());
+    const dir = `${opts.settingsDir}/memories`;
+    const names = new Set([...(await safeListExternal(dir)), "SOUL", "USER"]);
+    for (const name of names) {
+      if (seen.has(name.toLowerCase())) continue;
+      const content = await safeReadExternal(`${dir}/${name}.md`);
+      if (!content) continue;
+      const { alwaysInclude, body } = parseMemory(content);
+      if (!body) continue;
+      if (isWellKnown(name)) {
+        wellKnown.push({ name, heading: headingFor(name), body });
+      } else if (alwaysInclude) {
+        optIn.push({ name, heading: headingFor(name), body });
       }
+      seen.add(name.toLowerCase());
     }
   }
 
@@ -122,14 +133,22 @@ async function safeList(): Promise<string[]> {
   }
 }
 
-async function safeReadLegacy(path: string): Promise<string | null> {
+async function safeListExternal(dir: string): Promise<string[]> {
+  try {
+    return await listFiles(dir, "md");
+  } catch {
+    return [];
+  }
+}
+
+async function safeReadExternal(path: string): Promise<string | null> {
   try {
     const content = await readFile(path);
     return content.trim() || null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/not found|no such file|os error 2/i.test(message)) {
-      console.warn(`[memory] Failed to read legacy memory ${path}:`, error);
+      console.warn(`[memory] Failed to read memory ${path}:`, error);
     }
     return null;
   }

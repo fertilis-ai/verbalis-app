@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ============================================================================
 // Provide a working localStorage for the virtual FS used by storage.ts
@@ -116,7 +116,7 @@ describe("storage", () => {
       expect(vfs["/verbalis-data/agents/default.md"]).toBeDefined();
       expect(vfs["/verbalis-data/agents/default.md"].isDir).toBe(false);
       expect(vfs["/verbalis-data/agents/default.md"].content).toContain("name: default");
-      expect(vfs["/verbalis-data/agents/default.md"].content).toContain("model: claude-sonnet-4-20250514");
+      expect(vfs["/verbalis-data/agents/default.md"].content).toContain("personal assistant");
     });
 
     it("does not overwrite existing default agent file", async () => {
@@ -809,7 +809,7 @@ describe("storage", () => {
       const loaded = await loadAgent("minimal");
       expect(loaded).not.toBeNull();
       expect(loaded!.name).toBe("minimal"); // falls back to name param
-      expect(loaded!.model).toBe("claude-sonnet-4-20250514"); // default
+      expect(loaded!.model).toBeUndefined(); // no model pinned = app default
       expect(loaded!.temperature).toBe(0.7); // default
       expect(loaded!.systemPrompt).toBe("Just a prompt.");
     });
@@ -1386,6 +1386,170 @@ describe("storage", () => {
       const loaded = await loadToolboxItem("agents", "my-agent");
       expect(loaded).not.toBeNull();
       expect(loaded!.content).toBe("Agent content");
+    });
+  });
+
+  // ==========================================================================
+  // Settings-directory overlay
+  // ==========================================================================
+  describe("settings-directory overlay", () => {
+    const OVERLAY = "/settings-app";
+
+    async function setOverlayDir(dir: string) {
+      const { useSettingsStore } = await import("@/stores/settings-store");
+      useSettingsStore.setState({ settingsDirectory: dir });
+    }
+
+    afterEach(async () => {
+      await setOverlayDir("");
+    });
+
+    it("listToolboxItems merges overlay names, canonical first, deduped", async () => {
+      const { initAppDataDir, writeFile, createDirectory, saveToolboxItem, listToolboxItems } =
+        await importStorage();
+      await initAppDataDir();
+      await setOverlayDir(OVERLAY);
+
+      await saveToolboxItem({ name: "shared", category: "prompts", content: "canonical", updatedAt: "" });
+      await createDirectory(`${OVERLAY}/prompts`);
+      await writeFile(`${OVERLAY}/prompts/shared.yaml`, "overlay");
+      await writeFile(`${OVERLAY}/prompts/extra.yaml`, "overlay only");
+
+      const names = await listToolboxItems("prompts");
+      expect(names.filter((n) => n === "shared")).toHaveLength(1);
+      expect(names).toContain("extra");
+    });
+
+    it("loadToolboxItem falls back to the overlay, canonical wins when both exist", async () => {
+      const { initAppDataDir, writeFile, createDirectory, saveToolboxItem, loadToolboxItem } =
+        await importStorage();
+      await initAppDataDir();
+      await setOverlayDir(OVERLAY);
+
+      await createDirectory(`${OVERLAY}/skills`);
+      await writeFile(`${OVERLAY}/skills/only-overlay.md`, "overlay body");
+      await writeFile(`${OVERLAY}/skills/shared.md`, "overlay shared");
+      await saveToolboxItem({ name: "shared", category: "skills", content: "canonical shared", updatedAt: "" });
+
+      expect((await loadToolboxItem("skills", "only-overlay"))!.content).toBe("overlay body");
+      expect((await loadToolboxItem("skills", "shared"))!.content).toBe("canonical shared");
+      expect(await loadToolboxItem("skills", "nowhere")).toBeNull();
+    });
+
+    it("deleteToolboxItem removes both the canonical and the overlay copy", async () => {
+      const { initAppDataDir, writeFile, createDirectory, saveToolboxItem, deleteToolboxItem, loadToolboxItem } =
+        await importStorage();
+      await initAppDataDir();
+      await setOverlayDir(OVERLAY);
+
+      await saveToolboxItem({ name: "doomed", category: "prompts", content: "canonical", updatedAt: "" });
+      await createDirectory(`${OVERLAY}/prompts`);
+      await writeFile(`${OVERLAY}/prompts/doomed.yaml`, "overlay");
+
+      await deleteToolboxItem("prompts", "doomed");
+      expect(await loadToolboxItem("prompts", "doomed")).toBeNull();
+    });
+
+    it("listAgents and loadAgent include overlay agents", async () => {
+      const { initAppDataDir, writeFile, createDirectory, listAgents, loadAgent } =
+        await importStorage();
+      await initAppDataDir();
+      await setOverlayDir(OVERLAY);
+
+      await createDirectory(`${OVERLAY}/agents`);
+      await writeFile(`${OVERLAY}/agents/synced.md`, "---\ntemperature: 0.4\n---\nSynced agent.");
+
+      expect(await listAgents()).toContain("synced");
+      const agent = await loadAgent("synced");
+      expect(agent).not.toBeNull();
+      expect(agent!.temperature).toBe(0.4);
+      expect(agent!.systemPrompt).toBe("Synced agent.");
+    });
+
+    it("is inert when settingsDirectory is unset", async () => {
+      const { initAppDataDir, listToolboxItems, loadToolboxItem } = await importStorage();
+      await initAppDataDir();
+      await setOverlayDir("");
+      expect(await listToolboxItems("prompts")).toEqual([]);
+      expect(await loadToolboxItem("prompts", "anything")).toBeNull();
+    });
+  });
+
+  // ==========================================================================
+  // ensureDefaultToolboxItems
+  // ==========================================================================
+  describe("ensureDefaultToolboxItems", () => {
+    it("seeds every default item on first run and writes the version marker", async () => {
+      const { initAppDataDir, ensureDefaultToolboxItems, loadToolboxItem } =
+        await importStorage();
+      const { DEFAULT_TOOLBOX_ITEMS, TOOLBOX_DEFAULTS_VERSION } = await import(
+        "./toolbox/toolbox-defaults"
+      );
+      await initAppDataDir();
+
+      await ensureDefaultToolboxItems();
+
+      for (const item of DEFAULT_TOOLBOX_ITEMS) {
+        const loaded = await loadToolboxItem(item.category, item.name);
+        expect(loaded, `${item.category}/${item.name}`).not.toBeNull();
+        expect(loaded!.content).toBe(item.content);
+      }
+      const vfs = getVFS();
+      expect(vfs["/verbalis-data/toolbox-defaults-version"]?.content).toBe(
+        String(TOOLBOX_DEFAULTS_VERSION)
+      );
+    });
+
+    it("does not overwrite an existing file with the same name", async () => {
+      const { initAppDataDir, ensureDefaultToolboxItems, saveToolboxItem, loadToolboxItem } =
+        await importStorage();
+      const { DEFAULT_TOOLBOX_ITEMS } = await import("./toolbox/toolbox-defaults");
+      await initAppDataDir();
+
+      const first = DEFAULT_TOOLBOX_ITEMS[0];
+      await saveToolboxItem({
+        name: first.name,
+        category: first.category,
+        content: "user-customized content",
+        updatedAt: "2025-01-01T00:00:00Z",
+      });
+
+      await ensureDefaultToolboxItems();
+
+      const loaded = await loadToolboxItem(first.category, first.name);
+      expect(loaded!.content).toBe("user-customized content");
+    });
+
+    it("does not resurrect a default the user deleted (marker up to date)", async () => {
+      const { initAppDataDir, ensureDefaultToolboxItems, deleteToolboxItem, loadToolboxItem } =
+        await importStorage();
+      const { DEFAULT_TOOLBOX_ITEMS } = await import("./toolbox/toolbox-defaults");
+      await initAppDataDir();
+
+      await ensureDefaultToolboxItems();
+      const first = DEFAULT_TOOLBOX_ITEMS[0];
+      await deleteToolboxItem(first.category, first.name);
+
+      await ensureDefaultToolboxItems();
+
+      expect(await loadToolboxItem(first.category, first.name)).toBeNull();
+    });
+
+    it("re-seeds missing items when the marker version is older", async () => {
+      const { initAppDataDir, ensureDefaultToolboxItems, deleteToolboxItem, loadToolboxItem, writeFile } =
+        await importStorage();
+      const { DEFAULT_TOOLBOX_ITEMS } = await import("./toolbox/toolbox-defaults");
+      await initAppDataDir();
+
+      await ensureDefaultToolboxItems();
+      const first = DEFAULT_TOOLBOX_ITEMS[0];
+      await deleteToolboxItem(first.category, first.name);
+      // Simulate an app upgrade that bumped the defaults version.
+      await writeFile("/verbalis-data/toolbox-defaults-version", "0");
+
+      await ensureDefaultToolboxItems();
+
+      expect(await loadToolboxItem(first.category, first.name)).not.toBeNull();
     });
   });
 

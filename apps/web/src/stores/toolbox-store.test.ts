@@ -196,7 +196,8 @@ describe("toolbox-store", () => {
       vi.clearAllMocks();
       useToolboxStore.setState({ items: [], openItems: [] });
       await getState().createItem("test", "agents");
-      expect(mockSaveToolboxItem.mock.calls[0][0].content).toContain("model:");
+      expect(mockSaveToolboxItem.mock.calls[0][0].content).toContain("temperature:");
+      expect(mockSaveToolboxItem.mock.calls[0][0].content).not.toContain("model:");
 
       vi.clearAllMocks();
       useToolboxStore.setState({ items: [], openItems: [] });
