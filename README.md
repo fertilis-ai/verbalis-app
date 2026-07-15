@@ -4,7 +4,7 @@ A local-first personal AI assistant that runs as a native desktop app (via Tauri
 
 Built by [Fertilis.ai](https://fertilis.ai).
 
-![Verbalis Settings — Model Discovery](assets/screenshot_settings.png)
+![Verbalis Settings — Model Discovery](assets/verbalis_screenshot.png)
 
 ## Features
 
