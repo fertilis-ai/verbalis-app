@@ -1987,6 +1987,78 @@ describe("chat-store", () => {
   });
 
   // -----------------------------------------------------------------------
+  // Zero data retention routing
+  // -----------------------------------------------------------------------
+  //
+  // The Settings checkbox must do more than filter the picker: every OpenRouter
+  // chat request has to carry `provider: { zdr: true }` (pi-ai copies
+  // `compat.openRouterRouting` into the payload), or OpenRouter is free to route
+  // to an endpoint that retains data.
+  describe("zero data retention routing", () => {
+    const ZDR_MODEL = { id: "x-ai/grok-4.5", name: "Grok 4.5", provider: "openrouter", zdr: true };
+    const sentModel = () => mockStreamSimple.mock.calls.at(-1)?.[0];
+
+    const registryModel = {
+      id: ZDR_MODEL.id,
+      name: "Grok 4.5",
+      api: "openai-completions",
+      provider: "openrouter",
+      baseUrl: "https://openrouter.ai/api/v1",
+      reasoning: false,
+      input: ["text"],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 200000,
+      maxTokens: 8192,
+    };
+
+    function setup(modelDiscoveryNoDataCollection: boolean) {
+      mockGetActiveModels.mockReturnValue([ZDR_MODEL]);
+      mockSettingsGetState.mockReturnValue({
+        apiKeys: { openrouter: "sk-or-test" },
+        localLLM: { enabled: false, provider: "lmstudio", baseUrl: "", model: "" },
+        guardrailsConfig: {},
+        selectedModels: [ZDR_MODEL],
+        defaultModel: ZDR_MODEL.id,
+        modelDiscoveryNoDataCollection,
+      });
+      mockStreamSimple.mockReturnValue(
+        (async function* () {
+          yield { type: "text_delta", delta: "Hi" };
+        })(),
+      );
+      useChatStore.setState({
+        conversations: [makeConversation({ id: "c1" })],
+        currentConversationId: "c1",
+        model: ZDR_MODEL.id,
+      });
+    }
+
+    it.each([
+      ["a registry-known model", registryModel],
+      ["a model the registry does not know", undefined],
+    ])("routes %s to ZDR endpoints when the checkbox is on", async (_label, registry) => {
+      setup(true);
+      mockGetModel.mockReturnValue(registry);
+
+      await useChatStore.getState().sendMessage("Hello");
+
+      expect(sentModel()?.compat?.openRouterRouting).toEqual({ zdr: true });
+    });
+
+    it.each([
+      ["a registry-known model", registryModel],
+      ["a model the registry does not know", undefined],
+    ])("adds no routing to %s when the checkbox is off", async (_label, registry) => {
+      setup(false);
+      mockGetModel.mockReturnValue(registry);
+
+      await useChatStore.getState().sendMessage("Hello");
+
+      expect(sentModel()?.compat?.openRouterRouting).toBeUndefined();
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // Reasoning effort on the outgoing request
   // -----------------------------------------------------------------------
   //

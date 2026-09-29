@@ -39,7 +39,7 @@ async function readErrorMessage(resp: Response): Promise<string> {
 /** Transcribe an audio blob via OpenRouter's speech-to-text API. */
 export async function transcribeAudio(
   blob: Blob,
-  opts: { model: string; apiKey: string; format: AudioFormat }
+  opts: { model: string; apiKey: string; format: AudioFormat; zdr?: boolean }
 ): Promise<string> {
   const resp = await appFetch(TRANSCRIPTIONS_API_URL, {
     method: "POST",
@@ -50,6 +50,7 @@ export async function transcribeAudio(
     body: JSON.stringify({
       model: opts.model,
       input_audio: { data: await blobToBase64(blob), format: opts.format },
+      ...(opts.zdr ? { provider: { zdr: true } } : {}),
     }),
     signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
   });

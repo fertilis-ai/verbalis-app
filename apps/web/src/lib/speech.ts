@@ -41,7 +41,7 @@ async function readErrorMessage(resp: Response): Promise<string> {
 /** Synthesize speech for `text` via OpenRouter's TTS API; resolves to an mp3 blob. */
 export async function synthesizeSpeech(
   text: string,
-  opts: { model: string; voice?: string; apiKey: string; signal?: AbortSignal }
+  opts: { model: string; voice?: string; apiKey: string; signal?: AbortSignal; zdr?: boolean }
 ): Promise<Blob> {
   const signals = [AbortSignal.timeout(SPEECH_TIMEOUT_MS)];
   if (opts.signal) signals.push(opts.signal);
@@ -57,6 +57,7 @@ export async function synthesizeSpeech(
       response_format: "mp3",
       // Omit `voice` entirely when unset so the provider default applies.
       ...(opts.voice ? { voice: opts.voice } : {}),
+      ...(opts.zdr ? { provider: { zdr: true } } : {}),
     }),
     signal: AbortSignal.any(signals),
   });

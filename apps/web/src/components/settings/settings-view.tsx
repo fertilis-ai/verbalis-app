@@ -412,7 +412,7 @@ function ModelsSection() {
             <div>
               <span className="text-sm">Zero data retention</span>
               <p className="text-xs text-muted-foreground">
-                Only show OpenRouter models served by endpoints that don't retain your data.
+                Only show OpenRouter models served by endpoints that don't retain your data, and route all OpenRouter requests (chat, speech, transcription, images) to zero-retention endpoints only.
               </p>
             </div>
           </label>

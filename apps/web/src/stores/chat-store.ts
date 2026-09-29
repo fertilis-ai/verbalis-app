@@ -61,11 +61,25 @@ import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree
 import { toggleInSet } from "@/lib/set-utils";
 import { normalizeBaseUrl, buildOpenAiBaseUrl, buildOpenAiUrl } from "@/lib/url-utils";
 
+/**
+ * OpenRouter `provider` preferences: with `zdr`, the request routes only to
+ * Zero Data Retention endpoints (fails with no-endpoints rather than falling
+ * back to one that retains data).
+ */
+function openRouterCompat(zdr: boolean) {
+  return {
+    supportsStore: false,
+    supportsDeveloperRole: false,
+    ...(zdr ? { openRouterRouting: { zdr: true } } : {}),
+  };
+}
+
 /** Resolve a model ID to its pi-ai Model object, provider, and API key. */
 function resolveModelObject(
   modelId: string,
   apiKeys: Record<string, string>,
-  selectedModels?: import("@/lib/models").ProviderModel[]
+  selectedModels?: import("@/lib/models").ProviderModel[],
+  zdr = false
 ): {
   modelObj: Model<Api>;
   provider: string;
@@ -108,10 +122,7 @@ function resolveModelObject(
           ...registryModel,
           ...reasoningFields,
           headers: { ...registryModel.headers, "Authorization": `Bearer ${apiKey}` },
-          compat: {
-            supportsStore: false,
-            supportsDeveloperRole: false,
-          },
+          compat: openRouterCompat(zdr),
         },
         provider: entry.provider,
         apiKey,
@@ -148,10 +159,7 @@ function resolveModelObject(
   // Add explicit auth header for OpenRouter (Tauri fetch may strip SDK-managed auth on redirect)
   if (entry.provider === "openrouter") {
     modelObj.headers = { "Authorization": `Bearer ${apiKey}` };
-    modelObj.compat = {
-      supportsStore: false,
-      supportsDeveloperRole: false,
-    };
+    modelObj.compat = openRouterCompat(zdr);
   }
 
   return { modelObj, provider: entry.provider, apiKey, capability };
@@ -883,7 +891,12 @@ export const useChatStore = create<ChatState>((set, get) => {
           }
         }
       } else {
-        const resolved = resolveModelObject(model, settings.apiKeys, settings.selectedModels);
+        const resolved = resolveModelObject(
+          model,
+          settings.apiKeys,
+          settings.selectedModels,
+          settings.modelDiscoveryNoDataCollection
+        );
         if (!resolved) {
           const active = getActiveModels(settings.selectedModels);
           const entry = active.find((m) => m.id === model);

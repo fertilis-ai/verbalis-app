@@ -99,7 +99,8 @@ export async function executeGenerateImage(
     throw new Error("Image generation is only available in the desktop app");
   }
 
-  const { apiKeys, imageModel, availableImageModels } = useSettingsStore.getState();
+  const { apiKeys, imageModel, availableImageModels, modelDiscoveryNoDataCollection } =
+    useSettingsStore.getState();
   const apiKey = apiKeys.openrouter.trim();
   if (!apiKey) {
     throw new Error("No OpenRouter API key configured. Add one in Settings → API Keys.");
@@ -132,6 +133,7 @@ export async function executeGenerateImage(
       output_format: "png",
       ...(aspect_ratio ? { aspect_ratio } : {}),
       ...(inputReferences ? { input_references: inputReferences } : {}),
+      ...(modelDiscoveryNoDataCollection ? { provider: { zdr: true } } : {}),
     }),
     signal: AbortSignal.timeout(GENERATION_TIMEOUT_MS),
   });

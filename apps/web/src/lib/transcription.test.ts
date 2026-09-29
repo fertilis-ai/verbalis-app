@@ -43,6 +43,19 @@ describe("transcribeAudio", () => {
     vi.clearAllMocks();
   });
 
+  it("requests ZDR routing only when asked", async () => {
+    mockAppFetch.mockResolvedValue(jsonResponse({ text: "x" }));
+    const blob = new Blob(["a"], { type: "audio/webm" });
+    const bodyOf = () =>
+      JSON.parse((mockAppFetch.mock.calls.at(-1)?.[1] as RequestInit).body as string);
+
+    await transcribeAudio(blob, { model: "m", apiKey: "k", format: "webm", zdr: true });
+    expect(bodyOf().provider).toEqual({ zdr: true });
+
+    await transcribeAudio(blob, { model: "m", apiKey: "k", format: "webm" });
+    expect(bodyOf()).not.toHaveProperty("provider");
+  });
+
   it("posts base64 audio and returns the transcript", async () => {
     mockAppFetch.mockResolvedValue(jsonResponse({ text: "hello world" }));
     const blob = new Blob(["audio-bytes"], { type: "audio/webm" });

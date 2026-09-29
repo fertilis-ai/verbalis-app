@@ -44,7 +44,7 @@ export function useSpeechPlayback(text: string): {
   }, []);
 
   const play = React.useCallback(async () => {
-    const { apiKeys, speechModel, speechVoice, availableSpeechModels } =
+    const { apiKeys, speechModel, speechVoice, availableSpeechModels, modelDiscoveryNoDataCollection } =
       useSettingsStore.getState();
     const text = textRef.current;
 
@@ -59,6 +59,7 @@ export function useSpeechPlayback(text: string): {
           voice:
             speechVoice || availableSpeechModels.find((m) => m.id === speechModel)?.voices[0],
           apiKey: apiKeys.openrouter.trim(),
+          zdr: modelDiscoveryNoDataCollection,
           signal: abort.signal,
         });
         abortRef.current = null;

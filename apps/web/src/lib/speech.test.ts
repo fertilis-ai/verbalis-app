@@ -58,6 +58,18 @@ describe("synthesizeSpeech", () => {
     vi.clearAllMocks();
   });
 
+  it("requests ZDR routing only when asked", async () => {
+    mockAppFetch.mockResolvedValue(audioResponse());
+    const bodyOf = () =>
+      JSON.parse((mockAppFetch.mock.calls.at(-1)?.[1] as RequestInit).body as string);
+
+    await synthesizeSpeech("Hi", { model: "m", apiKey: "k", zdr: true });
+    expect(bodyOf().provider).toEqual({ zdr: true });
+
+    await synthesizeSpeech("Hi", { model: "m", apiKey: "k" });
+    expect(bodyOf()).not.toHaveProperty("provider");
+  });
+
   it("posts the text and returns an mp3 blob", async () => {
     mockAppFetch.mockResolvedValue(audioResponse());
 
