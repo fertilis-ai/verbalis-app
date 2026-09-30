@@ -1,6 +1,7 @@
 import CronExpressionParser from "cron-parser";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { useChatStore } from "@/stores/chat-store";
+import { resolveScheduleAgentId, useAgentStore } from "@/stores/agent-store";
 import {
   loadSchedulerTree,
   loadSchedule,
@@ -109,7 +110,10 @@ async function executeSchedule(
     options.onConversationCreated?.(conversation.id);
 
     await chatStore.sendMessageToConversation(conversation.id, prompt, {
-      agentId: schedule.agentId,
+      agentId: resolveScheduleAgentId(
+        schedule.agentId,
+        useAgentStore.getState().agents.map((a) => a.name)
+      ),
       allowAutoRename: false,
       setStreaming: false,
       guardrailsConfig: YOLO_MODE_CONFIG,

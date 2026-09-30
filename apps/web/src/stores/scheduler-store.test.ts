@@ -484,7 +484,7 @@ describe("scheduler-store", () => {
       await useSchedulerStore.getState().createSchedule("Defaults Check");
 
       const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
-      expect(savedSchedule.agentId).toBe("Assistant");
+      expect(savedSchedule.agentId).toBe("default");
       expect(savedSchedule.prompt).toBe("");
       expect(savedSchedule.hasError).toBe(false);
       expect(savedSchedule.lastRun).toBeNull();

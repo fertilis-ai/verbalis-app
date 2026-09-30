@@ -23,8 +23,22 @@ interface AgentState {
   deleteAgent: (name: string) => void;
 }
 
+/** Name of the built-in default agent (seeded as agents/default.md). */
+export const DEFAULT_AGENT_NAME = "default";
+
+/**
+ * Schedules created before they defaulted to DEFAULT_AGENT_NAME stored
+ * "Assistant", which no seeded agent is named. Unless the user has an agent
+ * by that name, such a schedule runs (and displays) as the default agent
+ * rather than silently falling back to a generic prompt.
+ */
+export function resolveScheduleAgentId(agentId: string, agentNames: string[]): string {
+  if (agentId === "Assistant" && !agentNames.includes(agentId)) return DEFAULT_AGENT_NAME;
+  return agentId;
+}
+
 const DEFAULT_AGENT: Agent = {
-  name: "default",
+  name: DEFAULT_AGENT_NAME,
   temperature: 0.3,
   systemPrompt: `You are the user's personal assistant — the default agent of a local-first AI
 assistant that lives on their device, remembers what matters, and becomes more

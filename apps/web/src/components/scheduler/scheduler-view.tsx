@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSchedulerStore, describeCron, type ScheduleData } from "@/stores/scheduler-store";
 import { useToolboxStore } from "@/stores/toolbox-store";
+import { resolveScheduleAgentId } from "@/stores/agent-store";
 import { CronBuilder } from "./cron-builder";
 import { useDebouncedCallback } from "use-debounce";
 
@@ -165,7 +166,10 @@ export function SchedulerView() {
           <div>
             <label className="text-sm font-medium">Agent</label>
             <select
-              value={selectedSchedule.agentId}
+              value={resolveScheduleAgentId(
+                selectedSchedule.agentId,
+                agents.map((a) => a.name)
+              )}
               onChange={(e) => handleImmediateUpdate({ agentId: e.target.value })}
               className="mt-1 w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >

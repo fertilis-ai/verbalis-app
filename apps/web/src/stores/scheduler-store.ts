@@ -16,6 +16,7 @@ import {
   type SchedulerTreeNode,
 } from "@/lib/storage";
 import { runScheduleNow as runScheduleNowByPath } from "@/lib/scheduler-runner";
+import { DEFAULT_AGENT_NAME } from "@/stores/agent-store";
 import { useChatStore, type Message } from "@/stores/chat-store";
 import { useAgenticLoopStore } from "@/stores/agentic-loop-store";
 import { collectFromTree, findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
@@ -176,7 +177,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
       id: crypto.randomUUID(),
       name,
       cron: "0 9 * * *", // Default: 9 AM daily
-      agentId: "Assistant",
+      agentId: DEFAULT_AGENT_NAME,
       prompt: "",
       enabled: false,
       hasError: false,
@@ -352,7 +353,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         id: node.id,
         name: node.name,
         cron: node.cron ?? "0 9 * * *",
-        agentId: "Assistant",
+        agentId: DEFAULT_AGENT_NAME,
         prompt: "",
         enabled: node.enabled ?? false,
         hasError: node.hasError ?? false,

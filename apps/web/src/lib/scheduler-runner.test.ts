@@ -54,6 +54,7 @@ import {
   runScheduleNow,
 } from "./scheduler-runner";
 import type { ScheduleData, SchedulerTreeNode } from "@/lib/storage";
+import { useAgentStore } from "@/stores/agent-store";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -263,6 +264,45 @@ describe("scheduler-runner", () => {
           setStreaming: false,
         })
       );
+    });
+
+    it("runs a legacy \"Assistant\" schedule with the default agent when no such agent exists", async () => {
+      const agents = useAgentStore.getState().agents;
+      useAgentStore.setState({
+        agents: [{ name: "default", temperature: 0.3, systemPrompt: "Default" }],
+      });
+      try {
+        mockLoadSchedule.mockResolvedValue(makeSchedule({ agentId: "Assistant" }));
+        await runScheduleNow("/scheduler/sched-1.yaml");
+        expect(mockSendMessageToConversation).toHaveBeenCalledWith(
+          "conv-1",
+          "Do something",
+          expect.objectContaining({ agentId: "default" })
+        );
+      } finally {
+        useAgentStore.setState({ agents });
+      }
+    });
+
+    it("keeps \"Assistant\" when the user has an agent by that name", async () => {
+      const agents = useAgentStore.getState().agents;
+      useAgentStore.setState({
+        agents: [
+          { name: "default", temperature: 0.3, systemPrompt: "Default" },
+          { name: "Assistant", temperature: 0.7, systemPrompt: "Mine" },
+        ],
+      });
+      try {
+        mockLoadSchedule.mockResolvedValue(makeSchedule({ agentId: "Assistant" }));
+        await runScheduleNow("/scheduler/sched-1.yaml");
+        expect(mockSendMessageToConversation).toHaveBeenCalledWith(
+          "conv-1",
+          "Do something",
+          expect.objectContaining({ agentId: "Assistant" })
+        );
+      } finally {
+        useAgentStore.setState({ agents });
+      }
     });
 
     it("should invoke onConversationCreated callback", async () => {
