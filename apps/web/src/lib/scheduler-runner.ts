@@ -1,5 +1,6 @@
 import CronExpressionParser from "cron-parser";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
+import { appendLogFile } from "@/lib/tauri/commands";
 import { useChatStore } from "@/stores/chat-store";
 import { resolveScheduleAgentId, useAgentStore } from "@/stores/agent-store";
 import {
@@ -22,7 +23,7 @@ let tickInFlight = false;
 
 async function appendSchedulerLog(line: string): Promise<void> {
   if (!isTauri()) return;
-  invoke("append_log_file", { filename: "scheduler.txt", line }).catch(console.warn);
+  appendLogFile("scheduler.txt", line).catch(console.warn);
 }
 
 function collectSchedulePaths(tree: SchedulerTreeNode[]): string[] {

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { appendLogFile } from "@/lib/tauri/commands";
 import { isTauri } from "@/lib/storage";
 import { isLoggingEnabled } from "@/lib/logger";
 import { useChatStore } from "@/stores/chat-store";
@@ -7,7 +7,7 @@ import { YOLO_MODE_CONFIG } from "@/lib/guardrails/presets";
 
 async function appendTaskLog(line: string): Promise<void> {
   if (!isLoggingEnabled() || !isTauri()) return;
-  invoke("append_log_file", { filename: "tasks.txt", line }).catch(console.warn);
+  appendLogFile("tasks.txt", line).catch(console.warn);
 }
 
 export interface ExecuteTaskOptions {

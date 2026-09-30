@@ -326,7 +326,7 @@ describe("storage", () => {
       await readDirectory("/path", 2);
       expect(mockInvoke).toHaveBeenCalledWith("read_directory", {
         path: "/path",
-        max_depth: 2,
+        maxDepth: 2,
       });
     });
   });

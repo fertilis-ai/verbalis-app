@@ -1,5 +1,5 @@
 import { v4 as uuid } from "uuid";
-import { invoke } from "@tauri-apps/api/core";
+import * as commands from "@/lib/tauri/commands";
 import type {
   UndoOperation,
   UndoOperationType,
@@ -74,10 +74,10 @@ class UndoManager {
 
     try {
       // Check if file exists and get its content
-      const exists = await invoke<boolean>("path_exists", { path });
+      const exists = await commands.pathExists(path);
 
       if (exists) {
-        const content = await invoke<string>("read_file", { path });
+        const content = await commands.readFile(path);
         return { path, originalContent: content };
       }
 
@@ -96,7 +96,7 @@ class UndoManager {
     }
 
     try {
-      const exists = await invoke<boolean>("path_exists", { path });
+      const exists = await commands.pathExists(path);
       if (!exists) {
         return null;
       }
@@ -107,7 +107,7 @@ class UndoManager {
       // Create trash directory
       const appDir = await getAppDataDir();
       const trashDir = `${appDir}/trash`;
-      await invoke("create_directory", { path: trashDir });
+      await commands.createDirectory(trashDir);
 
       // Generate unique trash path
       const timestamp = Date.now();
@@ -115,7 +115,7 @@ class UndoManager {
       const trashPath = `${trashDir}/${timestamp}_${filename}`;
 
       // Move to trash
-      await invoke("rename_path", { oldPath: path, newPath: trashPath });
+      await commands.renamePath(path, trashPath);
 
       return {
         originalPath: path,
@@ -138,7 +138,7 @@ class UndoManager {
 
     try {
       // Check if directory already exists
-      const exists = await invoke<boolean>("path_exists", { path });
+      const exists = await commands.pathExists(path);
 
       if (exists) {
         // Directory already exists, can't undo
@@ -223,16 +223,16 @@ class UndoManager {
   private async undoFileWrite(data: FileWriteUndoData): Promise<void> {
     if (data.originalContent === null) {
       // File didn't exist before, delete it
-      await invoke("delete_path", { path: data.path });
+      await commands.deletePath(data.path);
     } else {
       // Restore original content
-      await invoke("write_file", { path: data.path, content: data.originalContent });
+      await commands.writeFile(data.path, data.originalContent);
     }
   }
 
   private async undoFileDelete(data: FileDeleteUndoData): Promise<void> {
     // Move from trash back to original location
-    await invoke("rename_path", { oldPath: data.trashPath, newPath: data.originalPath });
+    await commands.renamePath(data.trashPath, data.originalPath);
   }
 
   private async undoDirectoryCreate(data: DirectoryCreateUndoData): Promise<void> {
@@ -240,7 +240,7 @@ class UndoManager {
       // Check if directory is still empty before deleting
       const isEmpty = await this.isDirectoryEmpty(data.path);
       if (isEmpty) {
-        await invoke("delete_path", { path: data.path });
+        await commands.deletePath(data.path);
       } else {
         throw new Error("Directory is no longer empty, cannot undo");
       }
@@ -325,7 +325,7 @@ class UndoManager {
       const trashDir = `${appDir}/trash`;
 
       // List files in trash
-      const files = await invoke<string[]>("list_files", { dir: trashDir });
+      const files = await commands.listFiles(trashDir);
 
       const now = Date.now();
       const maxAge = 24 * 60 * 60 * 1000; // 24 hours
@@ -336,7 +336,7 @@ class UndoManager {
         if (match) {
           const timestamp = parseInt(match[1], 10);
           if (now - timestamp > maxAge) {
-            await invoke("delete_path", { path: `${trashDir}/${file}` });
+            await commands.deletePath(`${trashDir}/${file}`);
           }
         }
       }
@@ -356,7 +356,7 @@ class UndoManager {
   private async isDirectory(path: string): Promise<boolean> {
     try {
       // Try to read as directory - if it succeeds, it's a directory
-      await invoke("read_directory", { path, maxDepth: 0 });
+      await commands.readDirectory(path, 0);
       return true;
     } catch {
       return false;
@@ -365,7 +365,7 @@ class UndoManager {
 
   private async isDirectoryEmpty(path: string): Promise<boolean> {
     try {
-      const contents = await invoke<Array<{ name: string }>>("read_directory", { path, maxDepth: 1 });
+      const contents = await commands.readDirectory(path, 1);
       return !contents || contents.length === 0;
     } catch {
       return true;

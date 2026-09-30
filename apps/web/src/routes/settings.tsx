@@ -20,9 +20,9 @@ function SettingsPage() {
     const resolve = async () => {
       let resolved = "";
       if (isTauri()) {
-        const { invoke } = await import("@tauri-apps/api/core");
+        const { getHomeDir } = await import("@/lib/tauri/commands");
         try {
-          resolved = await invoke<string>("get_home_dir");
+          resolved = await getHomeDir();
         } catch {
           resolved = "/Users";
         }

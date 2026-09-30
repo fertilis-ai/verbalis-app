@@ -7,7 +7,7 @@
  * Format: [ISO timestamp] [CATEGORY] message
  */
 
-import { invoke } from "@tauri-apps/api/core";
+import * as commands from "@/lib/tauri/commands";
 import { isTauri } from "./storage";
 
 export type LogCategory =
@@ -73,7 +73,7 @@ export function logAgent(category: LogCategory, message: string, data?: unknown)
   const entry = formatLogEntry(category, message, data);
 
   // Fire and forget - don't await to avoid blocking
-  invoke("append_log", { line: entry }).catch((error) => {
+  commands.appendLog(entry).catch((error) => {
     console.warn("[logger] Failed to write log:", error);
   });
 }
@@ -87,7 +87,7 @@ export async function clearLog(): Promise<void> {
   }
 
   try {
-    await invoke("clear_log");
+    await commands.clearLog();
   } catch (error) {
     console.warn("[logger] Failed to clear log:", error);
   }
@@ -103,7 +103,7 @@ export async function readLog(): Promise<string> {
   }
 
   try {
-    return await invoke("read_log");
+    return await commands.readLog();
   } catch (error) {
     console.warn("[logger] Failed to read log:", error);
     return "";

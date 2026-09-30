@@ -186,7 +186,7 @@ describe("file-store", () => {
 
       await getState().loadFileTree("/root");
 
-      expect(mockReadDirectory).toHaveBeenCalledWith("/root", 10);
+      expect(mockReadDirectory).toHaveBeenCalledWith("/root", 3);
       expect(getState().rootPath).toBe("/root");
       expect(getState().isLoading).toBe(false);
 

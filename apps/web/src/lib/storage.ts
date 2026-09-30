@@ -1,4 +1,6 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
+import * as commands from "@/lib/tauri/commands";
+import type { FileNode } from "@/lib/tauri/commands";
 import YAML from "yaml";
 import { Buffer } from "buffer";
 import matter from "gray-matter";
@@ -218,12 +220,7 @@ export interface ChatTreeNode {
 }
 
 // Types for file system operations
-export interface FileNode {
-  name: string;
-  path: string;
-  is_directory: boolean;
-  children?: FileNode[];
-}
+export type { FileNode };
 
 // Re-export isTauri from @tauri-apps/api/core for convenience
 export { isTauri };
@@ -233,7 +230,7 @@ export async function getAppDataDir(): Promise<string> {
   if (!isTauri()) {
     return "/verbalis-data";  // Virtual path for localStorage
   }
-  return invoke<string>("get_app_data_dir");
+  return commands.getAppDataDir();
 }
 
 let appDataDirPromise: Promise<string> | null = null;
@@ -259,24 +256,24 @@ export async function initAppDataDir(): Promise<void> {
     }
     return;
   }
-  return invoke("init_app_data_dir");
+  return commands.initAppDataDir();
 }
 
 export async function readDirectory(
   path: string,
-  _maxDepth?: number
+  maxDepth?: number
 ): Promise<FileNode[]> {
   if (!isTauri()) {
     return webReadDirectory(path);
   }
-  return invoke<FileNode[]>("read_directory", { path, max_depth: _maxDepth });
+  return commands.readDirectory(path, maxDepth);
 }
 
 export async function readFile(path: string): Promise<string> {
   if (!isTauri()) {
     return webReadFile(path);
   }
-  return invoke<string>("read_file", { path });
+  return commands.readFile(path);
 }
 
 export async function writeFile(path: string, content: string): Promise<void> {
@@ -284,7 +281,7 @@ export async function writeFile(path: string, content: string): Promise<void> {
     webWriteFile(path, content);
     return;
   }
-  return invoke("write_file", { path, content });
+  return commands.writeFile(path, content);
 }
 
 export async function deletePath(path: string): Promise<void> {
@@ -292,7 +289,7 @@ export async function deletePath(path: string): Promise<void> {
     webDeletePath(path);
     return;
   }
-  return invoke("delete_path", { path });
+  return commands.deletePath(path);
 }
 
 export async function createDirectory(path: string): Promise<void> {
@@ -300,14 +297,14 @@ export async function createDirectory(path: string): Promise<void> {
     webCreateDirectory(path);
     return;
   }
-  return invoke("create_directory", { path });
+  return commands.createDirectory(path);
 }
 
 export async function pathExists(path: string): Promise<boolean> {
   if (!isTauri()) {
     return webPathExists(path);
   }
-  return invoke<boolean>("path_exists", { path });
+  return commands.pathExists(path);
 }
 
 export async function listFiles(
@@ -317,7 +314,7 @@ export async function listFiles(
   if (!isTauri()) {
     return webListFiles(dir, extension);
   }
-  return invoke<string[]>("list_files", { dir, extension });
+  return commands.listFiles(dir, extension);
 }
 
 // Higher-level storage operations
@@ -364,7 +361,7 @@ export async function renamePath(oldPath: string, newPath: string): Promise<void
     webRenamePath(oldPath, newPath);
     return;
   }
-  return invoke("rename_path", { oldPath, newPath });
+  return commands.renamePath(oldPath, newPath);
 }
 
 // Generic folder creation for any storage section (chats, scheduler, etc.)

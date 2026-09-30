@@ -1,9 +1,10 @@
 import * as React from "react";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { Download, FolderOpen, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isTauri } from "@/lib/storage";
 import { basename } from "@/lib/path-resolution";
+import { copyFile, revealInFolder } from "@/lib/tauri/commands";
 
 interface GeneratedImageProps {
   path: string;
@@ -36,7 +37,7 @@ export function GeneratedImage({ path }: GeneratedImageProps) {
         filters: [{ name: "Image", extensions: [extension] }],
       });
       if (dest) {
-        await invoke("copy_file", { sourcePath: path, destPath: dest });
+        await copyFile(path, dest);
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       }
@@ -48,7 +49,7 @@ export function GeneratedImage({ path }: GeneratedImageProps) {
   const handleShowInFolder = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await invoke("reveal_in_folder", { path });
+      await revealInFolder(path);
     } catch (err) {
       console.error("[generated-image] Show in Folder failed:", err);
     }

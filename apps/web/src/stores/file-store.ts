@@ -10,6 +10,11 @@ import {
 } from "@/lib/storage";
 import { dirname, basename } from "@/lib/path-resolution";
 
+// Depth of the Workspace tree. Until the depth argument actually reached Rust,
+// every tree load got its default of 3, even though 10 was requested; deeper
+// directories show up empty. Raising it walks the whole Working Directory.
+const FILE_TREE_DEPTH = 3;
+
 export interface FileNode {
   name: string;
   path: string;
@@ -270,7 +275,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   loadFileTree: async (rootPath: string) => {
     set({ isLoading: true, rootPath });
     try {
-      const nodes = await readDirectory(rootPath, 10);
+      const nodes = await readDirectory(rootPath, FILE_TREE_DEPTH);
       const tree = sortTree(nodes.map(convertTauriNode));
       set({ tree, isLoading: false });
     } catch (error) {
@@ -283,7 +288,7 @@ export const useFileStore = create<FileState>((set, get) => ({
     const { rootPath } = get();
     if (rootPath) {
       try {
-        const nodes = await readDirectory(rootPath, 10);
+        const nodes = await readDirectory(rootPath, FILE_TREE_DEPTH);
         // Preserve expanded state from current tree
         const currentTree = get().tree;
         const expandedPaths = new Set<string>();

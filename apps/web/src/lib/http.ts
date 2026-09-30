@@ -1,5 +1,6 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
 import { isLoggingEnabled } from "@/lib/logger";
+import { writeLogFile } from "@/lib/tauri/commands";
 
 /**
  * Selectively polyfill globalThis.fetch with Tauri's HTTP plugin fetch.
@@ -39,7 +40,7 @@ export async function initFetchPolyfill(): Promise<void> {
             (!init.method || init.method.toUpperCase() === "POST")
           ) {
             const raw = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
-            try { const pretty = JSON.stringify(JSON.parse(raw), null, 2); invoke("write_log_file", { filename: "api_request.txt", content: pretty }).catch(() => {}); } catch { invoke("write_log_file", { filename: "api_request.txt", content: raw }).catch(() => {}); }
+            try { const pretty = JSON.stringify(JSON.parse(raw), null, 2); writeLogFile("api_request.txt", pretty).catch(() => {}); } catch { writeLogFile("api_request.txt", raw).catch(() => {}); }
           }
           return tauriFetch(input as Parameters<typeof tauriFetch>[0], init);
         }

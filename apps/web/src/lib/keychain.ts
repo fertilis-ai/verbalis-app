@@ -1,22 +1,23 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
+import * as commands from "@/lib/tauri/commands";
 
 export async function storeApiKey(provider: string, key: string): Promise<void> {
   if (!isTauri()) return;
-  await invoke("store_api_key", { provider, key });
+  await commands.storeApiKey(provider, key);
 }
 
 export async function getApiKey(provider: string): Promise<string> {
   if (!isTauri()) return "";
-  const result = await invoke<string | null>("get_api_key", { provider });
+  const result = await commands.getApiKey(provider);
   return result ?? "";
 }
 
 export async function deleteApiKey(provider: string): Promise<void> {
   if (!isTauri()) return;
-  await invoke("delete_api_key", { provider });
+  await commands.deleteApiKey(provider);
 }
 
 export async function loadAllApiKeys(): Promise<Record<string, string>> {
   if (!isTauri()) return {};
-  return invoke<Record<string, string>>("get_all_api_keys");
+  return commands.getAllApiKeys();
 }

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
+import * as commands from "@/lib/tauri/commands";
 import { isTauri } from "@/lib/storage";
 
 interface DebugState {
@@ -25,7 +25,7 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
   loadLogFiles: async () => {
     if (!isTauri()) return;
     try {
-      const files = await invoke<string[]>("list_log_files");
+      const files = await commands.listLogFiles();
       set({ logFiles: files });
     } catch (error) {
       console.warn("[debug-store] Failed to list log files:", error);
@@ -36,7 +36,7 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     if (!isTauri()) return;
     set({ selectedFile: filename, isLoading: true, error: null });
     try {
-      const content = await invoke<string>("read_log_file", { filename });
+      const content = await commands.readLogFile(filename);
       set({ fileContent: content, isLoading: false, error: null });
     } catch (error) {
       console.warn("[debug-store] Failed to read log file:", error);
@@ -50,7 +50,7 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     const { selectedFile } = get();
     if (!selectedFile || !isTauri()) return;
     try {
-      const content = await invoke<string>("read_log_file", { filename: selectedFile });
+      const content = await commands.readLogFile(selectedFile);
       set({ fileContent: content, error: null });
     } catch (error) {
       console.warn("[debug-store] Failed to refresh log file:", error);
@@ -62,7 +62,7 @@ export const useDebugStore = create<DebugState>()((set, get) => ({
     const { selectedFile } = get();
     if (!selectedFile || !isTauri()) return;
     try {
-      await invoke("clear_log_file", { filename: selectedFile });
+      await commands.clearLogFile(selectedFile);
       set({ fileContent: "", error: null });
     } catch (error) {
       console.warn("[debug-store] Failed to clear log file:", error);
