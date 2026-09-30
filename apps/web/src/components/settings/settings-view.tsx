@@ -362,7 +362,7 @@ function ModelsSection() {
   const options: Array<{ value: ChatModelId; label: string }> = [
     ...activeModels.map((model) => ({
       value: model.id,
-      label: `${model.name} (${model.provider})`,
+      label: `${model.name} (${getProviderLabel(model.provider)})`,
     })),
     { value: LOCAL_MODEL_ID, label: localOptionLabel },
   ];

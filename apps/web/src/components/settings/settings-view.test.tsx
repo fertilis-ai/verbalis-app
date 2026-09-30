@@ -372,6 +372,12 @@ describe("SettingsView", () => {
       expect(mockSetDefaultModel).toHaveBeenCalledWith("");
     });
 
+    it("labels default model options with the provider display name", () => {
+      render(<SettingsView />);
+      expect(screen.getByRole("option", { name: "Claude Sonnet 4 (Anthropic)" })).toBeInTheDocument();
+      expect(screen.getByRole("option", { name: "GPT-4o (OpenAI)" })).toBeInTheDocument();
+    });
+
     it("renders Text Model Discovery before Default Text Model", () => {
       render(<SettingsView />);
       const discovery = screen.getByText("Text Model Discovery");
