@@ -91,15 +91,40 @@ Fixes for these (branch `fix/smoke-test-bugs`):
   - New schedules now store `default`.
   - `resolveScheduleAgentId` maps a stored `Assistant` to `default`, in the runner and the Agent select, unless the user has an agent by that name. No YAML is rewritten.
 
-## Phase 3: Single tool registry and typed Tauri boundary
-- **One tool registry.** Merge `TOOL_DEFINITIONS` (`lib/tools.ts:188–360`) and `ALL_TOOLS` (`lib/tools/categories.ts`) into one registry. Each entry holds its definition, metadata and executor.
-  - Keep one `getToolCategory`/`getToolRiskLevel`/`toolSupportsUndo`.
-  - Move the file tools to `tools/fs-tools.ts`, and reduce `tools.ts` to assembling the registry.
-  - Validate LLM-supplied tool arguments with Typebox `Value.Check` before executing (`tools.ts:468–535`).
-- **Typed commands.** `lib/tauri/commands.ts` gets one typed function per Rust command, replacing about 55 raw `invoke("…")` strings in 14 files. `tools.ts` and `undo-manager.ts` then use it instead of calling `invoke` directly.
-- **Rust cleanup:**
-  - Add an `app_dir()` helper (replacing six copies of `home.join(".verbalis")`) and `validate_log_filename()` (four copies).
-  - Keep one source for the default agent file (it is currently in both `commands.rs:44` and `storage.ts:26`).
+## Phase 3: Single tool registry and typed Tauri boundary — ✅ done (branch `refactor/phase-3`, packaged smoke test pending)
+1. ✅ **Typed commands.** `lib/tauri/commands.ts` has one typed function per Rust command. It is a leaf module (it imports only `invoke`), because logger, storage and http depend on it. Every raw `invoke("…")` outside it is gone, including in `tools.ts` and `undo-manager.ts`.
+   - **Latent bug found:** `storage.readDirectory` sent `max_depth`, but Tauri expects camelCase argument keys, so Rust ignored it and every tree load used its default depth of 3 (the Workspace tree asked for 10). The depth now reaches Rust. The Workspace tree asks for 3 explicitly (`FILE_TREE_DEPTH`), keeping the depth it has always had. The other callers ask for 1 and use only top-level entries. All other invoke key casings were checked against the Rust signatures.
+2. ✅ **One tool registry.** Each tool is a `ToolSpec` (`tools/categories.ts`): schema, category, risk level, undo support, path parameters and executor.
+   - Specs live in `fs-tools.ts` (new), `web-tools.ts`, `image-tools.ts`, `toolbox-tools.ts` and `memory-tools.ts`, and schemas and descriptions were moved byte for byte. `tools/registry.ts` assembles them in the order the model has always seen and holds the only `getToolCategory`/`getToolRiskLevel`/`toolSupportsUndo`. The guardrails evaluator uses them.
+   - `tools.ts` keeps `getToolsForContext` (same gates) and `executeTool`, which replaces the switch with a lookup. `TOOL_PATH_PARAMS` became each spec's `pathParams`.
+   - The registry is built on first use, not at module load. The import cycle registry → toolbox-tools → toolbox-schemas → registry (toolbox-schemas needs the tool names to validate an agent's `tools:` list) otherwise reads `TOOLBOX_TOOLS` before it exists when toolbox-tools loads first.
+   - `registry.test.ts` pins every tool's name, category, risk level and undo support, in order.
+   - **Dropped dead metadata:** `requiresConfirmation`, `requiresNetwork` and `estimatedDurationMs`. Nothing read them; confirmation comes from the guardrails matrix (category × risk level). Also dropped the web-tools comment claiming `http_fetch` is "elevated for non-GET methods": the evaluator has no such logic.
+   - **Order change:** the "Valid tools: …" list in the agent `tools:` validation error now follows registry order (file, web, image, toolbox, remember) instead of the old `ALL_TOOLS` order (file, toolbox, remember, web, image).
+3. ✅ **Argument validation.** `executeTool` runs pi-ai's `validateToolArguments` (TypeBox `Value.Convert` + compiled check) before path resolution. Stringly-typed values are coerced (`"2"` → `2`), and a malformed call returns `Validation failed for tool "…"` as an error result instead of reaching an executor.
+   - **Not a behavior change in the app:** pi-agent-core's loop already runs the same validation, with the same schemas, before it calls the adapter's `execute` (`agent-loop.js` `prepareToolCall`), and the adapter is the only caller of `executeTool`. So coercion and `null` handling for optional arguments are unchanged. The check makes executors independent of their caller.
+   - TypeBox compiles with `new Function` when it can. `tools.csp.test.ts` blocks the `Function` constructor as the packaged CSP does, checks that the eval attempt was made and refused, and asserts that validation and coercion still work.
+   - Removed two tests for impossible results (a non-array from `list_files`, an object from `read_file`). The executors are now typed to return strings.
+4. ✅ **Rust cleanup.**
+   - `app_dir()` replaces the `home.join(".verbalis")` copies; there were three, not six, since Phase 1 deleted commands.
+   - `validate_log_filename()` replaces four copies of the traversal check.
+   - Both have unit tests (`cargo test --lib`), the first in the crate.
+   - The default agent lives only in `src/lib/toolbox/default-agent.md`: `include_str!` in `commands.rs`, `?raw` in `storage.ts`. The two copies were byte-identical before the move.
+
+Verified: `tsc`, the full Vitest suite (87 files, 2038 tests), Biome (no new warnings), `cargo check`, `cargo test --lib` and the Vite production build.
+
+Packaged smoke test (`cd apps/web && bunx tauri build --bundles dmg`); these cover the rewired commands and argument validation, which the dev build can't check:
+- Any agent tool call (e.g. `read_directory`). Validation compiles TypeBox schemas, which must fall back from `new Function` under the CSP; it already did in the pi loop, so this is a regression check.
+- Undo of an agent `write_file`, `delete_path` and `rename_path`.
+- The debug log viewer: list, read and clear a log.
+- Keychain: save an API key, restart, and check that it reloads.
+- Generated image: Copy and Reveal in Finder.
+- Workspace file tree: directories nested more than 3 levels still show empty past depth 3, as before.
+- A self-authored agent with an unknown tool in `tools:` shows the "Valid tools" list.
+
+Follow-ups found in Phase 3 (not done here):
+- **Undo trash is never cleaned.** `undo-manager.ts` `cleanupTrash` lists `~/.verbalis/trash` with `list_files`. That command returns file *stems* and skips directories, so `deletePath(trash/<stem>)` misses any trashed file with an extension, and trashed directories are never considered. Needs a listing that returns full names, including directories.
+- `FILE_TREE_DEPTH` could be raised now that the depth reaches Rust, if deep folders should show in the Workspace tree.
 
 ## Phase 4: Split `chat-store.ts` (1550 lines)
 Extract pure modules and keep the store as a thin coordinator:
