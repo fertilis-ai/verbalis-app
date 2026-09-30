@@ -1,7 +1,7 @@
 import { Type, type Static } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { invoke } from "@tauri-apps/api/core";
-import type { ToolDefinitionV2 } from "./categories";
+import { readFileBase64, writeFileBase64 } from "@/lib/tauri/commands";
+import { defineTool, type ToolSpec } from "./categories";
 import { isTauri, getAppDataDir } from "@/lib/storage";
 import { readErrorBody } from "@/lib/http";
 import { openRouterFetch } from "@/lib/openrouter";
@@ -76,7 +76,7 @@ async function buildInputReference(sourceImage: string): Promise<{
 }> {
   const extension = sourceImage.split(".").pop()?.toLowerCase() ?? "";
   const mime = MIME_BY_EXTENSION[extension] ?? "image/png";
-  const base64 = await invoke<string>("read_file_base64", { path: sourceImage });
+  const base64 = await readFileBase64(sourceImage);
   return { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } };
 }
 
@@ -136,7 +136,7 @@ export async function executeGenerateImage(
 
   const extension = EXTENSION_BY_MEDIA_TYPE[image.media_type ?? "image/png"] ?? "png";
   const path = `${await getAppDataDir()}/images/${timestamp()}-${promptSlug(prompt)}.${extension}`;
-  await invoke("write_file_base64", { path, dataBase64: image.b64_json });
+  await writeFileBase64(path, image.b64_json);
 
   const lines = [
     source_image ? "Image edited successfully." : "Image generated successfully.",
@@ -150,19 +150,19 @@ export async function executeGenerateImage(
 }
 
 // ============================================================================
-// Tool Definitions
+// Tool Spec
 // ============================================================================
 
-export const IMAGE_TOOL_DEFINITIONS: Record<string, ToolDefinitionV2> = {
-  generate_image: {
-    name: "generate_image",
-    description:
-      "Generate an image from a text prompt (or edit an existing image when source_image is provided) using the configured OpenRouter image model. The image is saved locally and displayed in chat automatically.",
-    category: "web",
-    riskLevel: "low",
-    parameters: GenerateImageParams,
-    requiresNetwork: true,
-    supportsUndo: false,
-    estimatedDurationMs: 30000,
-  },
-};
+// Only offered when an OpenRouter key and image model are configured (see
+// getToolsForContext).
+export const GENERATE_IMAGE_TOOL: ToolSpec = defineTool({
+  name: "generate_image",
+  description:
+    "Generate an image from a text prompt (or edit an existing image when source_image is provided) using the configured OpenRouter image model. The image is saved locally and displayed in chat automatically.",
+  category: "web",
+  riskLevel: "low",
+  parameters: GenerateImageParams,
+  supportsUndo: false,
+  pathParams: ["source_image"],
+  execute: executeGenerateImage,
+});

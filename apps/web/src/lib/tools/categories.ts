@@ -1,6 +1,4 @@
-import type { TSchema } from "typebox";
-import { WEB_TOOL_DEFINITIONS } from "./web-tools";
-import { IMAGE_TOOL_DEFINITIONS } from "./image-tools";
+import type { Static, TSchema } from "typebox";
 
 // ============================================================================
 // Tool Categories
@@ -99,104 +97,35 @@ export const CATEGORY_CONFIG: Record<ToolCategory, {
 };
 
 // ============================================================================
-// Enhanced Tool Definition
+// Tool Spec
 // ============================================================================
 
-export interface ToolDefinitionV2<T extends TSchema = TSchema> {
+export interface ToolContext {
+  /** Appends `(resolved "x" → "y")` for each path argument that was resolved. */
+  withResolutionNotes(message: string): string;
+}
+
+/**
+ * One tool in the registry (`tools/registry.ts`): what the model sees, the
+ * guardrail metadata, and the executor. Whether a call needs confirmation is
+ * decided by the guardrails matrix from `category` and `riskLevel`.
+ */
+export interface ToolSpec<T extends TSchema = TSchema> {
   name: string;
   description: string;
-  category: ToolCategory;
-  riskLevel: RiskLevel;
   parameters: T;
-
-  // Metadata
-  estimatedDurationMs?: number;
-  requiresNetwork: boolean;
-  supportsUndo: boolean;
-  confirmationOverride?: "always" | "never" | "use_category_default";
-
-  // Execution
-  execute?: (args: Record<string, unknown>) => Promise<string>;
-}
-
-// ============================================================================
-// Tool Inventory
-// ============================================================================
-
-export interface ToolInventoryItem {
-  name: string;
   category: ToolCategory;
   riskLevel: RiskLevel;
   supportsUndo: boolean;
-  description: string;
+  /** Argument keys holding file paths, resolved against the Working Directory before `execute`. */
+  pathParams?: readonly string[];
+  /** Receives arguments already validated against `parameters`. */
+  execute(args: Static<T>, ctx: ToolContext): Promise<string>;
 }
 
-export const FILE_SYSTEM_TOOLS: ToolInventoryItem[] = [
-  { name: "read_file", category: "file_system", riskLevel: "low", supportsUndo: false, description: "Read file contents" },
-  { name: "write_file", category: "file_system", riskLevel: "medium", supportsUndo: true, description: "Write content to file" },
-  { name: "delete_path", category: "file_system", riskLevel: "high", supportsUndo: true, description: "Delete file or directory" },
-  { name: "create_directory", category: "file_system", riskLevel: "medium", supportsUndo: true, description: "Create a directory" },
-  { name: "read_directory", category: "file_system", riskLevel: "low", supportsUndo: false, description: "List directory contents" },
-  { name: "path_exists", category: "file_system", riskLevel: "low", supportsUndo: false, description: "Check if path exists" },
-  { name: "list_files", category: "file_system", riskLevel: "low", supportsUndo: false, description: "List files with filter" },
-  { name: "rename_path", category: "file_system", riskLevel: "medium", supportsUndo: true, description: "Rename/move file or directory" },
-];
-
-function toInventoryItem(def: ToolDefinitionV2): ToolInventoryItem {
-  return {
-    name: def.name,
-    category: def.category,
-    riskLevel: def.riskLevel,
-    supportsUndo: def.supportsUndo,
-    description: def.description,
-  };
-}
-
-// Self-enhancement (Toolbox CRUD) tools. Classified as file_system so the
-// confirmation matrix gates writes (medium) and deletes (high) while leaving
-// read/list (low) un-prompted.
-export const TOOLBOX_TOOLS: ToolInventoryItem[] = [
-  { name: "list_toolbox_items", category: "file_system", riskLevel: "low", supportsUndo: false, description: "List Toolbox items" },
-  { name: "read_toolbox_item", category: "file_system", riskLevel: "low", supportsUndo: false, description: "Read a Toolbox item" },
-  { name: "write_toolbox_item", category: "file_system", riskLevel: "medium", supportsUndo: false, description: "Create/overwrite a Toolbox item" },
-  { name: "edit_toolbox_item", category: "file_system", riskLevel: "medium", supportsUndo: false, description: "Targeted string replacement in a Toolbox item" },
-  { name: "delete_toolbox_item", category: "file_system", riskLevel: "high", supportsUndo: false, description: "Delete a Toolbox item" },
-  // `remember` is a memory-category append; medium risk so it learns without
-  // a confirmation prompt on every fact (memory matrix only gates high+).
-  { name: "remember", category: "memory", riskLevel: "medium", supportsUndo: false, description: "Persist a fact to long-term memory" },
-];
-
-export const WEB_TOOLS: ToolInventoryItem[] =
-  Object.values(WEB_TOOL_DEFINITIONS).map(toInventoryItem);
-
-export const IMAGE_TOOLS: ToolInventoryItem[] =
-  Object.values(IMAGE_TOOL_DEFINITIONS).map(toInventoryItem);
-
-export const ALL_TOOLS: ToolInventoryItem[] = [
-  ...FILE_SYSTEM_TOOLS,
-  ...TOOLBOX_TOOLS,
-  ...WEB_TOOLS,
-  ...IMAGE_TOOLS,
-];
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-const TOOL_LOOKUP: Map<string, ToolInventoryItem> = new Map(
-  ALL_TOOLS.map(t => [t.name, t])
-);
-
-export function getToolCategory(toolName: string): ToolCategory {
-  return TOOL_LOOKUP.get(toolName)?.category ?? "custom";
-}
-
-export function getToolRiskLevel(toolName: string): RiskLevel {
-  return TOOL_LOOKUP.get(toolName)?.riskLevel ?? "high"; // Default to high for unknown tools
-}
-
-export function getToolSupportsUndo(toolName: string): boolean {
-  return TOOL_LOOKUP.get(toolName)?.supportsUndo ?? false;
+/** Identity helper that types `execute`'s arguments from `parameters`. */
+export function defineTool<T extends TSchema>(spec: ToolSpec<T>): ToolSpec {
+  return spec as unknown as ToolSpec;
 }
 
 export function compareRiskLevels(a: RiskLevel, b: RiskLevel): number {

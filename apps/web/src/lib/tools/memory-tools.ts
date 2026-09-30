@@ -12,9 +12,11 @@
  */
 
 import matter from "gray-matter";
+import { Type } from "typebox";
 import { loadToolboxItem, saveToolboxItem } from "@/lib/storage";
 import { useToolboxStore } from "@/stores/toolbox-store";
 import { isWellKnownMemory } from "@/lib/toolbox/toolbox-schemas";
+import { defineTool, type ToolSpec } from "./categories";
 
 /** Default memory file the agent appends learned facts to. */
 export const DEFAULT_MEMORY_NAME = "learned";
@@ -82,3 +84,21 @@ export async function executeRemember(args: RememberArgs): Promise<string> {
 
   return `Remembered in "${name}".`;
 }
+
+const RememberParams = Type.Object({
+  content: Type.String({ description: "The fact to remember (a short statement)" }),
+  name: Type.Optional(
+    Type.String({ description: "Memory file to append to (default: 'learned'). Use 'USER' for facts about the user." })
+  ),
+});
+
+export const REMEMBER_TOOL: ToolSpec = defineTool({
+  name: "remember",
+  description:
+    "Persist a fact to long-term memory so it is available in future conversations. Use this when you learn something durable about the user or task.",
+  parameters: RememberParams,
+  category: "memory",
+  riskLevel: "medium",
+  supportsUndo: false,
+  execute: executeRemember,
+});

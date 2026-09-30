@@ -22,7 +22,7 @@ vi.mock("@/lib/http", async (importOriginal) => ({
   appFetch: (...args: unknown[]) => mockAppFetch(...args),
 }));
 
-import { IMAGE_TOOL_DEFINITIONS, executeGenerateImage } from "./image-tools";
+import { GENERATE_IMAGE_TOOL, executeGenerateImage } from "./image-tools";
 import { isTauri } from "@/lib/storage";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -51,14 +51,14 @@ function configureSettings(overrides: Record<string, unknown> = {}) {
   });
 }
 
-describe("IMAGE_TOOL_DEFINITIONS", () => {
+describe("GENERATE_IMAGE_TOOL", () => {
   it("defines generate_image with expected metadata", () => {
-    const def = IMAGE_TOOL_DEFINITIONS.generate_image;
+    const def = GENERATE_IMAGE_TOOL;
     expect(def.name).toBe("generate_image");
     expect(def.category).toBe("web");
     expect(def.riskLevel).toBe("low");
-    expect(def.requiresNetwork).toBe(true);
     expect(def.supportsUndo).toBe(false);
+    expect(def.pathParams).toEqual(["source_image"]);
   });
 });
 

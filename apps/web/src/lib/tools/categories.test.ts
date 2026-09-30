@@ -1,101 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
-  getToolCategory,
-  getToolRiskLevel,
-  getToolSupportsUndo,
   compareRiskLevels,
   RISK_LEVEL_CONFIG,
   CATEGORY_CONFIG,
-  FILE_SYSTEM_TOOLS,
-  TOOLBOX_TOOLS,
-  WEB_TOOLS,
-  IMAGE_TOOLS,
-  ALL_TOOLS,
   type RiskLevel,
   type ToolCategory,
 } from "./categories";
-
-// ============================================================================
-// getToolCategory
-// ============================================================================
-
-describe("getToolCategory", () => {
-  it("returns 'file_system' for known file system tools", () => {
-    expect(getToolCategory("read_file")).toBe("file_system");
-    expect(getToolCategory("write_file")).toBe("file_system");
-    expect(getToolCategory("delete_path")).toBe("file_system");
-    expect(getToolCategory("create_directory")).toBe("file_system");
-    expect(getToolCategory("read_directory")).toBe("file_system");
-    expect(getToolCategory("path_exists")).toBe("file_system");
-    expect(getToolCategory("list_files")).toBe("file_system");
-    expect(getToolCategory("rename_path")).toBe("file_system");
-  });
-
-  it("returns 'web' for known web tools", () => {
-    expect(getToolCategory("http_fetch")).toBe("web");
-    expect(getToolCategory("web_search")).toBe("web");
-    expect(getToolCategory("scrape_webpage")).toBe("web");
-  });
-
-  it("returns 'custom' for unknown tool names", () => {
-    expect(getToolCategory("unknown_tool")).toBe("custom");
-    expect(getToolCategory("")).toBe("custom");
-    expect(getToolCategory("my_custom_tool")).toBe("custom");
-  });
-});
-
-// ============================================================================
-// getToolRiskLevel
-// ============================================================================
-
-describe("getToolRiskLevel", () => {
-  it("returns correct risk levels for file system tools", () => {
-    expect(getToolRiskLevel("read_file")).toBe("low");
-    expect(getToolRiskLevel("write_file")).toBe("medium");
-    expect(getToolRiskLevel("delete_path")).toBe("high");
-    expect(getToolRiskLevel("create_directory")).toBe("medium");
-    expect(getToolRiskLevel("read_directory")).toBe("low");
-    expect(getToolRiskLevel("path_exists")).toBe("low");
-    expect(getToolRiskLevel("list_files")).toBe("low");
-    expect(getToolRiskLevel("rename_path")).toBe("medium");
-  });
-
-  it("returns correct risk levels for web tools", () => {
-    expect(getToolRiskLevel("http_fetch")).toBe("medium");
-    expect(getToolRiskLevel("web_search")).toBe("low");
-    expect(getToolRiskLevel("scrape_webpage")).toBe("low");
-  });
-
-  it("defaults to 'high' for unknown tool names", () => {
-    expect(getToolRiskLevel("unknown_tool")).toBe("high");
-    expect(getToolRiskLevel("")).toBe("high");
-  });
-});
-
-// ============================================================================
-// getToolSupportsUndo
-// ============================================================================
-
-describe("getToolSupportsUndo", () => {
-  it("returns true for tools that support undo", () => {
-    expect(getToolSupportsUndo("write_file")).toBe(true);
-    expect(getToolSupportsUndo("delete_path")).toBe(true);
-    expect(getToolSupportsUndo("create_directory")).toBe(true);
-    expect(getToolSupportsUndo("rename_path")).toBe(true);
-  });
-
-  it("returns false for tools that do not support undo", () => {
-    expect(getToolSupportsUndo("read_file")).toBe(false);
-    expect(getToolSupportsUndo("read_directory")).toBe(false);
-    expect(getToolSupportsUndo("http_fetch")).toBe(false);
-    expect(getToolSupportsUndo("web_search")).toBe(false);
-  });
-
-  it("defaults to false for unknown tools", () => {
-    expect(getToolSupportsUndo("unknown_tool")).toBe(false);
-    expect(getToolSupportsUndo("")).toBe(false);
-  });
-});
 
 // ============================================================================
 // compareRiskLevels
@@ -181,57 +91,3 @@ describe("CATEGORY_CONFIG", () => {
     }
   });
 });
-
-// ============================================================================
-// Tool inventory arrays
-// ============================================================================
-
-describe("ALL_TOOLS", () => {
-  it("contains all file system and web tools", () => {
-    const allNames = ALL_TOOLS.map(t => t.name);
-    for (const tool of FILE_SYSTEM_TOOLS) {
-      expect(allNames).toContain(tool.name);
-    }
-    for (const tool of WEB_TOOLS) {
-      expect(allNames).toContain(tool.name);
-    }
-  });
-
-  it("has the expected total count", () => {
-    expect(ALL_TOOLS.length).toBe(
-      FILE_SYSTEM_TOOLS.length + TOOLBOX_TOOLS.length + WEB_TOOLS.length + IMAGE_TOOLS.length
-    );
-  });
-
-  it("has no duplicate tool names", () => {
-    const names = ALL_TOOLS.map(t => t.name);
-    expect(new Set(names).size).toBe(names.length);
-  });
-
-  it("every tool has required inventory fields", () => {
-    for (const tool of ALL_TOOLS) {
-      expect(typeof tool.name).toBe("string");
-      expect(typeof tool.category).toBe("string");
-      expect(typeof tool.riskLevel).toBe("string");
-      expect(typeof tool.supportsUndo).toBe("boolean");
-      expect(typeof tool.description).toBe("string");
-    }
-  });
-});
-
-describe("FILE_SYSTEM_TOOLS", () => {
-  it("all have category 'file_system'", () => {
-    for (const tool of FILE_SYSTEM_TOOLS) {
-      expect(tool.category).toBe("file_system");
-    }
-  });
-});
-
-describe("WEB_TOOLS", () => {
-  it("all have category 'web'", () => {
-    for (const tool of WEB_TOOLS) {
-      expect(tool.category).toBe("web");
-    }
-  });
-});
-

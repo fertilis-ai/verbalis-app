@@ -260,7 +260,7 @@ When helping the user plan:
 
 // ---------------------------------------------------------------------------
 // Agents — markdown frontmatter + system prompt body. `tools:` must name
-// tools that exist in categories.ts ALL_TOOLS. Model is omitted so agents
+// tools that exist in tools/registry.ts. Model is omitted so agents
 // track the app's default model.
 // ---------------------------------------------------------------------------
 

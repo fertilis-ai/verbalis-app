@@ -1,6 +1,6 @@
 import { minimatch } from "minimatch";
 import type { ToolCategory, RiskLevel } from "@/lib/tools/categories";
-import { getToolCategory, getToolRiskLevel } from "@/lib/tools/categories";
+import { getToolCategory, getToolRiskLevel } from "@/lib/tools/registry";
 import type {
   GuardrailsConfig,
   GuardrailsEvaluation,

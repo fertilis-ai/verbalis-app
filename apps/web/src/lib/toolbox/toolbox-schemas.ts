@@ -16,7 +16,7 @@
 import matter from "gray-matter";
 import YAML from "yaml";
 import { z } from "zod";
-import { ALL_TOOLS } from "@/lib/tools/categories";
+import { getToolNames } from "@/lib/tools/registry";
 import { useAgentStore } from "@/stores/agent-store";
 
 export const TOOLBOX_CATEGORIES = [
@@ -50,7 +50,7 @@ export interface ValidationContext {
 
 function defaultContext(): Required<ValidationContext> {
   return {
-    validToolNames: ALL_TOOLS.map((t) => t.name),
+    validToolNames: getToolNames(),
     agentNames: (useAgentStore.getState().agents ?? []).map((a) => a.name),
   };
 }

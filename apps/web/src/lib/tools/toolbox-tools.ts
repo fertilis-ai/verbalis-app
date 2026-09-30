@@ -5,14 +5,15 @@
  * These wrap the generic toolbox storage helpers rather than touching the
  * filesystem directly, so web/localStorage parity and the app-data sandbox are
  * preserved. Every write/delete is validated against the category schema
- * before it lands, routed through guardrails for confirmation (see
- * categories.ts risk levels), and triggers a live reload of the in-memory
+ * before it lands, routed through guardrails for confirmation (see the
+ * risk levels in TOOLBOX_TOOLS), and triggers a live reload of the in-memory
  * stores so a self-authored item is usable in the same session.
  *
  * The tools are only offered to the model when `allowSelfEnhancement` is on
- * (see getToolsForContext); this module is the execution backend.
+ * (see getToolsForContext).
  */
 
+import { Type } from "typebox";
 import {
   saveToolboxItem,
   loadToolboxItem,
@@ -28,6 +29,7 @@ import {
   validateToolboxContent,
   type ToolboxToolCategory,
 } from "@/lib/toolbox/toolbox-schemas";
+import { defineTool, type ToolSpec } from "./categories";
 
 export {
   TOOLBOX_CATEGORIES,
@@ -36,13 +38,6 @@ export {
   type ValidationResult,
 } from "@/lib/toolbox/toolbox-schemas";
 
-export const TOOLBOX_TOOL_NAMES = [
-  "list_toolbox_items",
-  "read_toolbox_item",
-  "write_toolbox_item",
-  "edit_toolbox_item",
-  "delete_toolbox_item",
-] as const;
 
 function isValidCategory(value: unknown): value is ToolboxToolCategory {
   return typeof value === "string" && (TOOLBOX_CATEGORIES as readonly string[]).includes(value);
@@ -216,3 +211,94 @@ export async function executeToolboxTool(
       throw new Error(`Unknown toolbox tool: ${toolName}`);
   }
 }
+
+// ============================================================================
+// Tool Specs
+// ============================================================================
+
+const TOOLBOX_CATEGORY_DESC =
+  "Toolbox category: prompts, memories, agents, skills, or workflows";
+
+const ListToolboxItemsParams = Type.Object({
+  category: Type.Optional(Type.String({ description: `${TOOLBOX_CATEGORY_DESC}. Omit to list all categories.` })),
+});
+
+const ReadToolboxItemParams = Type.Object({
+  category: Type.String({ description: TOOLBOX_CATEGORY_DESC }),
+  name: Type.String({ description: "Item name (without extension)" }),
+});
+
+const WriteToolboxItemParams = Type.Object({
+  category: Type.String({ description: TOOLBOX_CATEGORY_DESC }),
+  name: Type.String({ description: "Item name (without extension)" }),
+  content: Type.String({
+    description:
+      "Full file content. memories/agents/skills are markdown (skills/agents need YAML frontmatter); prompts/workflows are YAML.",
+  }),
+});
+
+const EditToolboxItemParams = Type.Object({
+  category: Type.String({ description: TOOLBOX_CATEGORY_DESC }),
+  name: Type.String({ description: "Item name (without extension)" }),
+  old_string: Type.String({
+    description: "Exact text to replace. Must match the item's content exactly and appear only once.",
+  }),
+  new_string: Type.String({ description: "Replacement text" }),
+});
+
+const DeleteToolboxItemParams = Type.Object({
+  category: Type.String({ description: TOOLBOX_CATEGORY_DESC }),
+  name: Type.String({ description: "Item name (without extension)" }),
+});
+
+export const TOOLBOX_TOOLS: ToolSpec[] = [
+  defineTool({
+    name: "list_toolbox_items",
+    description: "List the agent's Toolbox items (prompts, memories, agents, skills, workflows)",
+    parameters: ListToolboxItemsParams,
+    category: "file_system",
+    riskLevel: "low",
+    supportsUndo: false,
+    execute: (args) => executeToolboxTool("list_toolbox_items", args),
+  }),
+  defineTool({
+    name: "read_toolbox_item",
+    description: "Read the full content of a Toolbox item by category and name",
+    parameters: ReadToolboxItemParams,
+    category: "file_system",
+    riskLevel: "low",
+    supportsUndo: false,
+    execute: (args) => executeToolboxTool("read_toolbox_item", args),
+  }),
+  defineTool({
+    name: "write_toolbox_item",
+    description:
+      "Create or overwrite a Toolbox item (prompt, memory, agent, skill, or workflow). Content is validated against the category schema before saving.",
+    parameters: WriteToolboxItemParams,
+    category: "file_system",
+    riskLevel: "medium",
+    supportsUndo: false,
+    execute: (args) => executeToolboxTool("write_toolbox_item", args),
+  }),
+  defineTool({
+    name: "edit_toolbox_item",
+    description:
+      "Make a targeted edit to an existing Toolbox item by replacing an exact string. Preferred over write_toolbox_item for small changes. The edited result is validated against the category schema before saving.",
+    parameters: EditToolboxItemParams,
+    category: "file_system",
+    riskLevel: "medium",
+    supportsUndo: false,
+    execute: (args) => executeToolboxTool("edit_toolbox_item", args),
+  }),
+  defineTool({
+    name: "delete_toolbox_item",
+    description: "Delete a Toolbox item by category and name",
+    parameters: DeleteToolboxItemParams,
+    category: "file_system",
+    riskLevel: "high",
+    supportsUndo: false,
+    execute: (args) => executeToolboxTool("delete_toolbox_item", args),
+  }),
+];
+
+export const TOOLBOX_TOOL_NAMES: readonly string[] = TOOLBOX_TOOLS.map((t) => t.name);

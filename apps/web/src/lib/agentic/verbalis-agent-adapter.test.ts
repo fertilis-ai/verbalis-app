@@ -69,7 +69,6 @@ vi.mock("@/lib/tools", () => ({
   getToolRiskLevel: () => "medium",
   getToolsForContext: (...args: unknown[]) => mockGetToolsForContext(...args),
   toolSupportsUndo: (...args: any[]) => mockToolSupportsUndo(args[0]),
-  TOOL_DEFINITIONS: {},
 }));
 
 import { createVerbalisAdapter } from "./verbalis-agent-adapter";

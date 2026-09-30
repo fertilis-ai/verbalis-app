@@ -11,8 +11,7 @@ vi.mock("@/lib/storage", () => ({
 }));
 
 import {
-  WEB_TOOL_DEFINITIONS,
-  executeWebTool,
+  WEB_TOOLS,
   executeHttpFetch,
   executeWebSearch,
   executeScrapeWebpage,
@@ -29,45 +28,23 @@ const mockInvoke = vi.mocked(invoke);
 // We'll test them through the public functions that use them.
 // ============================================================================
 
-describe("WEB_TOOL_DEFINITIONS", () => {
-  it("defines http_fetch tool", () => {
-    const def = WEB_TOOL_DEFINITIONS.http_fetch;
-    expect(def.name).toBe("http_fetch");
-    expect(def.category).toBe("web");
-    expect(def.riskLevel).toBe("medium");
-    expect(def.requiresNetwork).toBe(true);
-    expect(def.supportsUndo).toBe(false);
+describe("WEB_TOOLS", () => {
+  it("defines http_fetch, web_search and scrape_webpage in order", () => {
+    expect(WEB_TOOLS.map((t) => t.name)).toEqual(["http_fetch", "web_search", "scrape_webpage"]);
   });
 
-  it("defines web_search tool", () => {
-    const def = WEB_TOOL_DEFINITIONS.web_search;
-    expect(def.name).toBe("web_search");
-    expect(def.category).toBe("web");
-    expect(def.riskLevel).toBe("low");
-    expect(def.requiresNetwork).toBe(true);
-    expect(def.supportsUndo).toBe(false);
-  });
-
-  it("defines scrape_webpage tool", () => {
-    const def = WEB_TOOL_DEFINITIONS.scrape_webpage;
-    expect(def.name).toBe("scrape_webpage");
-    expect(def.category).toBe("web");
-    expect(def.riskLevel).toBe("low");
-    expect(def.requiresNetwork).toBe(true);
-    expect(def.supportsUndo).toBe(false);
-  });
-
-  it("all definitions have required fields", () => {
-    for (const def of Object.values(WEB_TOOL_DEFINITIONS)) {
-      expect(def).toHaveProperty("name");
-      expect(def).toHaveProperty("description");
-      expect(def).toHaveProperty("category");
-      expect(def).toHaveProperty("riskLevel");
-      expect(def).toHaveProperty("parameters");
-      expect(def).toHaveProperty("requiresNetwork");
-      expect(def).toHaveProperty("supportsUndo");
+  it("are all web tools without undo", () => {
+    for (const tool of WEB_TOOLS) {
+      expect(tool.category).toBe("web");
+      expect(tool.supportsUndo).toBe(false);
     }
   });
+
+  it("rates http_fetch medium risk and the read-only tools low", () => {
+    const risk = Object.fromEntries(WEB_TOOLS.map((t) => [t.name, t.riskLevel]));
+    expect(risk).toEqual({ http_fetch: "medium", web_search: "low", scrape_webpage: "low" });
+  });
+
 });
 
 // ============================================================================
@@ -375,10 +352,17 @@ describe("executeScrapeWebpage", () => {
 });
 
 // ============================================================================
-// executeWebTool router
+// WEB_TOOLS executors
 // ============================================================================
 
-describe("executeWebTool", () => {
+describe("WEB_TOOLS executors", () => {
+  const ctx = { withResolutionNotes: (message: string) => message };
+  const run = (name: string, args: Record<string, unknown>) => {
+    const tool = WEB_TOOLS.find((t) => t.name === name);
+    if (!tool) throw new Error(`missing ${name}`);
+    return tool.execute(args, ctx);
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsTauri.mockReturnValue(true);
@@ -392,7 +376,7 @@ describe("executeWebTool", () => {
       duration_ms: 10,
     });
 
-    const result = await executeWebTool("http_fetch", {
+    const result = await run("http_fetch", {
       url: "https://example.com",
     });
     expect(result).toContain("Status: 200");
@@ -406,7 +390,7 @@ describe("executeWebTool", () => {
       duration_ms: 100,
     });
 
-    const result = await executeWebTool("web_search", {
+    const result = await run("web_search", {
       query: "test",
     });
     expect(result).toContain("No results found");
@@ -420,15 +404,9 @@ describe("executeWebTool", () => {
       duration_ms: 50,
     });
 
-    const result = await executeWebTool("scrape_webpage", {
+    const result = await run("scrape_webpage", {
       url: "https://example.com",
     });
     expect(result).toContain("Title: Page");
-  });
-
-  it("throws for unknown tool names", async () => {
-    await expect(
-      executeWebTool("unknown_tool", {})
-    ).rejects.toThrow("Unknown web tool: unknown_tool");
   });
 });

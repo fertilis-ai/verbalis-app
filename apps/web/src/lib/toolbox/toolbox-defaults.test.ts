@@ -11,7 +11,7 @@ import {
   DEFAULT_TOOLBOX_ITEMS,
   TOOLBOX_DEFAULTS_VERSION,
 } from "./toolbox-defaults";
-import { ALL_TOOLS } from "@/lib/tools/categories";
+import { getToolNames } from "@/lib/tools/registry";
 
 // Agents available once the defaults are seeded: the seeded ones plus the
 // "default" agent that initAppDataDir creates on both platforms.
@@ -19,7 +19,7 @@ const seededAgentNames = DEFAULT_TOOLBOX_ITEMS.filter(
   (i) => i.category === "agents"
 ).map((i) => i.name);
 const ctx = {
-  validToolNames: ALL_TOOLS.map((t) => t.name),
+  validToolNames: getToolNames(),
   agentNames: [...seededAgentNames, "default"],
 };
 

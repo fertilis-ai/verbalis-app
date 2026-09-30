@@ -1,7 +1,7 @@
 import { Type, type Static } from "typebox";
 import { StringEnum } from "@earendil-works/pi-ai";
-import { invoke } from "@tauri-apps/api/core";
-import type { ToolDefinitionV2 } from "./categories";
+import { httpRequest, type HttpResponse } from "@/lib/tauri/commands";
+import { defineTool, type ToolSpec } from "./categories";
 import { isTauri } from "@/lib/storage";
 import { truncateText } from "@/lib/utils";
 
@@ -45,12 +45,7 @@ export const ScrapeWebpageParams = Type.Object({
 // Response Types
 // ============================================================================
 
-export interface HttpResponse {
-  status: number;
-  headers: Record<string, string>;
-  body: string;
-  duration_ms: number;
-}
+export type { HttpResponse };
 
 export interface SearchResult {
   title: string;
@@ -74,7 +69,7 @@ export async function executeHttpFetch(
   const { url, method = "GET", headers, body, timeout_ms } = args;
 
   if (isTauri()) {
-    const response = await invoke<HttpResponse>("http_request", {
+    const response = await httpRequest({
       url,
       method,
       headers: headers || null,
@@ -123,7 +118,7 @@ export async function executeWebSearch(
   const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
 
   if (isTauri()) {
-    const response = await invoke<HttpResponse>("http_request", {
+    const response = await httpRequest({
       url: searchUrl,
       method: "GET",
       headers: {
@@ -148,7 +143,7 @@ export async function executeScrapeWebpage(
   const { url, selector, timeout_ms = 10000 } = args;
 
   if (isTauri()) {
-    const response = await invoke<HttpResponse>("http_request", {
+    const response = await httpRequest({
       url,
       method: "GET",
       headers: {
@@ -304,58 +299,35 @@ function decodeHtmlEntities(text: string): string {
 }
 
 // ============================================================================
-// Tool Definitions
+// Tool Specs
 // ============================================================================
 
-export const WEB_TOOL_DEFINITIONS: Record<string, ToolDefinitionV2> = {
-  http_fetch: {
+export const WEB_TOOLS: ToolSpec[] = [
+  defineTool({
     name: "http_fetch",
     description: "Make an HTTP request to a URL and return the response",
     category: "web",
-    riskLevel: "medium", // Will be elevated for non-GET methods
+    riskLevel: "medium",
     parameters: HttpFetchParams,
-    requiresNetwork: true,
     supportsUndo: false,
-    estimatedDurationMs: 2000,
-  },
-  web_search: {
+    execute: executeHttpFetch,
+  }),
+  defineTool({
     name: "web_search",
     description: "Search the web using a search engine and return results",
     category: "web",
     riskLevel: "low",
     parameters: WebSearchParams,
-    requiresNetwork: true,
     supportsUndo: false,
-    estimatedDurationMs: 3000,
-  },
-  scrape_webpage: {
+    execute: executeWebSearch,
+  }),
+  defineTool({
     name: "scrape_webpage",
     description: "Fetch and extract text content from a webpage",
     category: "web",
     riskLevel: "low",
     parameters: ScrapeWebpageParams,
-    requiresNetwork: true,
     supportsUndo: false,
-    estimatedDurationMs: 3000,
-  },
-};
-
-// ============================================================================
-// Execution Router
-// ============================================================================
-
-export async function executeWebTool(
-  toolName: string,
-  args: Record<string, unknown>
-): Promise<string> {
-  switch (toolName) {
-    case "http_fetch":
-      return executeHttpFetch(args as Static<typeof HttpFetchParams>);
-    case "web_search":
-      return executeWebSearch(args as Static<typeof WebSearchParams>);
-    case "scrape_webpage":
-      return executeScrapeWebpage(args as Static<typeof ScrapeWebpageParams>);
-    default:
-      throw new Error(`Unknown web tool: ${toolName}`);
-  }
-}
+    execute: executeScrapeWebpage,
+  }),
+];
