@@ -1,4 +1,5 @@
-import { appFetch } from "@/lib/http";
+import { appFetch, readErrorBody } from "@/lib/http";
+import { openRouterFetch } from "@/lib/openrouter";
 import type {
   ImageProviderModel,
   OpenRouterReasoning,
@@ -24,25 +25,6 @@ function isOpenAiChatModel(id: string): boolean {
   if (OPENAI_EXCLUDE_PATTERNS.some((p) => lower.includes(p))) return false;
   if (OPENAI_EXCLUDE_PREFIXES.some((p) => lower.startsWith(p))) return false;
   return OPENAI_CHAT_PREFIXES.some((p) => lower.startsWith(p));
-}
-
-/** Read error detail from a non-OK response */
-async function readErrorBody(resp: Response): Promise<string> {
-  try {
-    const body = await resp.text();
-    // Try to extract a message from JSON error responses
-    try {
-      const json = JSON.parse(body) as { error?: { message?: string }; message?: string };
-      const msg = json.error?.message ?? json.message;
-      if (msg) return `HTTP ${resp.status}: ${msg}`;
-    } catch {
-      // not JSON
-    }
-    if (body.length > 0 && body.length < 200) return `HTTP ${resp.status}: ${body}`;
-  } catch {
-    // couldn't read body
-  }
-  return `HTTP ${resp.status}`;
 }
 
 async function fetchAnthropic(apiKey: string): Promise<FetchModelsResult> {
@@ -122,9 +104,9 @@ function isTextModel(architecture?: { input_modalities?: string[]; output_modali
 }
 
 /** Fetch the set of model ids with at least one zero-data-retention endpoint. */
-async function fetchZdrModelIds(headers: Record<string, string>): Promise<Set<string>> {
+async function fetchZdrModelIds(apiKey?: string): Promise<Set<string>> {
   try {
-    const resp = await appFetch("https://openrouter.ai/api/v1/endpoints/zdr", { headers });
+    const resp = await openRouterFetch("/endpoints/zdr", { apiKey });
     if (!resp.ok) return new Set();
     const data = (await resp.json()) as { data?: Array<{ model_id?: string }> };
     return new Set((data.data ?? []).map((e) => e.model_id).filter((id): id is string => !!id));
@@ -135,11 +117,9 @@ async function fetchZdrModelIds(headers: Record<string, string>): Promise<Set<st
 
 async function fetchOpenRouter(apiKey?: string): Promise<FetchModelsResult> {
   try {
-    const headers: Record<string, string> = {};
-    if (apiKey?.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
     const [resp, zdrIds] = await Promise.all([
-      appFetch("https://openrouter.ai/api/v1/models", { headers }),
-      fetchZdrModelIds(headers),
+      openRouterFetch("/models", { apiKey }),
+      fetchZdrModelIds(apiKey),
     ]);
     if (!resp.ok) return { provider: "openrouter", models: [], error: await readErrorBody(resp) };
     const data = (await resp.json()) as {
@@ -173,9 +153,7 @@ export interface FetchImageModelsResult {
 /** Fetch image-generation models from OpenRouter's dedicated Image API. */
 export async function fetchOpenRouterImageModels(apiKey?: string): Promise<FetchImageModelsResult> {
   try {
-    const headers: Record<string, string> = {};
-    if (apiKey?.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
-    const resp = await appFetch("https://openrouter.ai/api/v1/images/models", { headers });
+    const resp = await openRouterFetch("/images/models", { apiKey });
     if (!resp.ok) return { models: [], error: await readErrorBody(resp) };
     const data = (await resp.json()) as {
       data?: Array<{
@@ -207,12 +185,7 @@ export async function fetchOpenRouterTranscriptionModels(
   apiKey?: string
 ): Promise<FetchTranscriptionModelsResult> {
   try {
-    const headers: Record<string, string> = {};
-    if (apiKey?.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
-    const resp = await appFetch(
-      "https://openrouter.ai/api/v1/models?output_modalities=transcription",
-      { headers }
-    );
+    const resp = await openRouterFetch("/models?output_modalities=transcription", { apiKey });
     if (!resp.ok) return { models: [], error: await readErrorBody(resp) };
     const data = (await resp.json()) as { data?: Array<{ id: string; name?: string }> };
     const models: TranscriptionProviderModel[] = (data.data ?? []).map((m) => ({
@@ -235,11 +208,7 @@ export async function fetchOpenRouterSpeechModels(
   apiKey?: string
 ): Promise<FetchSpeechModelsResult> {
   try {
-    const headers: Record<string, string> = {};
-    if (apiKey?.trim()) headers.Authorization = `Bearer ${apiKey.trim()}`;
-    const resp = await appFetch("https://openrouter.ai/api/v1/models?output_modalities=speech", {
-      headers,
-    });
+    const resp = await openRouterFetch("/models?output_modalities=speech", { apiKey });
     if (!resp.ok) return { models: [], error: await readErrorBody(resp) };
     const data = (await resp.json()) as {
       data?: Array<{ id: string; name?: string; supported_voices?: string[] }>;

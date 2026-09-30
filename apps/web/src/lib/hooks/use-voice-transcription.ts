@@ -45,14 +45,14 @@ export function useVoiceTranscription({ onText }: UseVoiceTranscriptionOptions):
   const transcribeSegment = React.useCallback((blob: Blob) => {
     if (!mountedRef.current || blob.size < MIN_BLOB_BYTES) return;
     queueRef.current = queueRef.current.then(async () => {
-      const { apiKeys, transcriptionModel, modelDiscoveryNoDataCollection } =
+      const { apiKeys, transcriptionModel, openRouterZdrOnly } =
         useSettingsStore.getState();
       try {
         const text = await transcribeAudio(blob, {
           model: transcriptionModel,
           apiKey: apiKeys.openrouter.trim(),
           format: formatFromMimeType(blob.type),
-          zdr: modelDiscoveryNoDataCollection,
+          zdr: openRouterZdrOnly,
         });
         if (text && mountedRef.current) onTextRef.current(text);
       } catch (e) {

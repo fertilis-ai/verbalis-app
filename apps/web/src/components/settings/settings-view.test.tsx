@@ -30,7 +30,7 @@ const mockSettingsStore = {
   selectedModels: [],
   modelFetchStatus: "idle" as string,
   modelFetchError: null as string | null,
-  modelDiscoveryNoDataCollection: false,
+  openRouterZdrOnly: false,
   availableSpeechModels: [] as unknown[],
   guardrailsConfig: { enabled: true },
   setHue: mockSetHue,
@@ -42,7 +42,7 @@ const mockSettingsStore = {
   setAgentDebugLogging: mockSetAgentDebugLogging,
   setAllowSelfEnhancement: mockSetAllowSelfEnhancement,
   fetchModels: vi.fn(),
-  setModelDiscoveryNoDataCollection: vi.fn(),
+  setOpenRouterZdrOnly: vi.fn(),
   addSelectedModels: vi.fn(),
   removeSelectedModels: vi.fn(),
   setSelectedModels: vi.fn(),
@@ -65,7 +65,8 @@ vi.mock("@/components/theme-provider", () => ({
   }),
 }));
 
-vi.mock("@/lib/models", () => ({
+vi.mock("@/lib/models", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/models")>()),
   LOCAL_MODEL_ID: "local",
   getActiveModels: () => [
     { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic" },
@@ -346,7 +347,7 @@ describe("SettingsView", () => {
       const checkbox = screen.getByRole("checkbox", { name: /Zero data retention/i });
       expect(checkbox).not.toBeChecked();
       await user.click(checkbox);
-      expect(mockSettingsStore.setModelDiscoveryNoDataCollection).toHaveBeenCalledWith(true);
+      expect(mockSettingsStore.setOpenRouterZdrOnly).toHaveBeenCalledWith(true);
     });
 
     it("selects the stored default model when it is still available", () => {

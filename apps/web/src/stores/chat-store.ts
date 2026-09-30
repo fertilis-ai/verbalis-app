@@ -56,22 +56,11 @@ import {
   type ChatData,
 } from "@/lib/storage";
 import { logAgent } from "@/lib/logger";
+import { openRouterCompat, openRouterHeaders } from "@/lib/openrouter";
+import { dirname, basename } from "@/lib/path-resolution";
 import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
 import { toggleInSet } from "@/lib/set-utils";
 import { normalizeBaseUrl, buildOpenAiBaseUrl, buildOpenAiUrl } from "@/lib/url-utils";
-
-/**
- * OpenRouter `provider` preferences: with `zdr`, the request routes only to
- * Zero Data Retention endpoints (fails with no-endpoints rather than falling
- * back to one that retains data).
- */
-function openRouterCompat(zdr: boolean) {
-  return {
-    supportsStore: false,
-    supportsDeveloperRole: false,
-    ...(zdr ? { openRouterRouting: { zdr: true } } : {}),
-  };
-}
 
 /** Resolve a model ID to its pi-ai Model object, provider, and API key. */
 function resolveModelObject(
@@ -120,7 +109,7 @@ function resolveModelObject(
         modelObj: {
           ...registryModel,
           ...reasoningFields,
-          headers: { ...registryModel.headers, "Authorization": `Bearer ${apiKey}` },
+          headers: { ...registryModel.headers, ...openRouterHeaders(apiKey) },
           compat: openRouterCompat(zdr),
         },
         provider: entry.provider,
@@ -134,14 +123,7 @@ function resolveModelObject(
   const api = PROVIDER_API_MAP[entry.provider];
   if (!api) return null;
 
-  // Default base URLs for each provider
-  const defaultBaseUrls: Record<string, string> = {
-    anthropic: "https://api.anthropic.com",
-    openai: "https://api.openai.com/v1",
-    google: "https://generativelanguage.googleapis.com/v1beta",
-    openrouter: "https://openrouter.ai/api/v1",
-  };
-  const baseUrl = PROVIDER_BASE_URL_MAP[entry.provider] ?? defaultBaseUrls[entry.provider] ?? "";
+  const baseUrl = PROVIDER_BASE_URL_MAP[entry.provider] ?? "";
   const modelObj: Model<Api> = {
     id: modelId,
     name: entry.name,
@@ -157,7 +139,7 @@ function resolveModelObject(
 
   // Add explicit auth header for OpenRouter (Tauri fetch may strip SDK-managed auth on redirect)
   if (entry.provider === "openrouter") {
-    modelObj.headers = { "Authorization": `Bearer ${apiKey}` };
+    modelObj.headers = openRouterHeaders(apiKey);
     modelObj.compat = openRouterCompat(zdr);
   }
 
@@ -856,7 +838,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           model,
           settings.apiKeys,
           settings.selectedModels,
-          settings.modelDiscoveryNoDataCollection
+          settings.openRouterZdrOnly
         );
         if (!resolved) {
           const active = getActiveModels(settings.selectedModels);
@@ -926,7 +908,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         const finalConversation = get().conversations.find((c) => c.id === conversationId);
         if (finalConversation?.path && !finalConversation.background) {
           const chatData = conversationToChatData(finalConversation, model, agentId);
-          const folderPath = finalConversation.path.substring(0, finalConversation.path.lastIndexOf("/"));
+          const folderPath = dirname(finalConversation.path);
           const dir = await getAppDataDir();
           await saveChatToFolder(chatData, folderPath === `${dir}/chats` ? undefined : folderPath);
         }
@@ -1012,7 +994,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     let newPath = conversation.path;
     if (isLegacyYaml && isTauri()) {
       try {
-        const dir = conversation.path.substring(0, conversation.path.lastIndexOf("/"));
+        const dir = dirname(conversation.path);
         newPath = `${dir}/${loaded.id}.json`;
         await saveChatToFolder(loaded, dir === `${await getAppDataDir()}/chats` ? undefined : dir);
         await deletePath(conversation.path);
@@ -1262,7 +1244,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         const updated = get().conversations.find((c) => c.id === chatId);
         if (updated?.path) {
           const chatData = conversationToChatData(updated, get().model, get().agentId);
-          const folderPath = updated.path.substring(0, updated.path.lastIndexOf("/"));
+          const folderPath = dirname(updated.path);
           const dir = await getAppDataDir();
           await saveChatToFolder(chatData, folderPath === `${dir}/chats` ? undefined : folderPath);
           await get().loadChatsFromDisk();
@@ -1287,7 +1269,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         targetDir = folder.path;
       }
 
-      const fileName = conversation.path.substring(conversation.path.lastIndexOf("/") + 1);
+      const fileName = basename(conversation.path);
       const newPath = `${targetDir}/${fileName}`;
       if (newPath === conversation.path) return;
 
@@ -1317,7 +1299,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         if (content.length > MAX_CONTENT_LENGTH) {
           content = `${content.slice(0, MAX_CONTENT_LENGTH)}\n... (truncated)`;
         }
-        const name = filePath.split("/").pop() ?? filePath;
+        const name = basename(filePath);
         files.push({ path: filePath, name, content });
       } catch (error) {
         console.error(`[chat-store] Failed to read file: ${filePath}`, error);

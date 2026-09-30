@@ -4,14 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
 import { cn } from "@/lib/utils";
-import type { ProviderModel } from "@/lib/models";
-
-const providerDisplayName: Record<string, string> = {
-  anthropic: "Anthropic",
-  openai: "OpenAI",
-  google: "Google",
-  openrouter: "OpenRouter",
-};
+import { getProviderLabel, type ProviderModel } from "@/lib/models";
 
 /**
  * Only OpenRouter models carry `zdr`, and a failed ZDR fetch degrades to "untagged"
@@ -51,7 +44,7 @@ export function ModelPicker() {
     addSelectedModels,
     removeSelectedModels,
     setSelectedModels,
-    modelDiscoveryNoDataCollection,
+    openRouterZdrOnly,
   } = useSettingsStore();
 
   const [leftSearch, setLeftSearch] = React.useState("");
@@ -65,9 +58,9 @@ export function ModelPicker() {
   const availableFiltered = React.useMemo(() => {
     return availableModels
       .filter((m) => !selectedIds.has(m.id))
-      .filter((m) => !modelDiscoveryNoDataCollection || m.provider !== "openrouter" || m.zdr)
+      .filter((m) => !openRouterZdrOnly || m.provider !== "openrouter" || m.zdr)
       .filter((m) => !leftSearch || matchesSearch(m, leftSearch));
-  }, [availableModels, selectedIds, leftSearch, modelDiscoveryNoDataCollection]);
+  }, [availableModels, selectedIds, leftSearch, openRouterZdrOnly]);
 
   const selectedFiltered = React.useMemo(() => {
     return selectedModels.filter((m) => !rightSearch || matchesSearch(m, rightSearch));
@@ -184,7 +177,7 @@ export function ModelPicker() {
                     ) : (
                       <ChevronDown className="h-3 w-3" />
                     )}
-                    <span>{providerDisplayName[provider] ?? provider}</span>
+                    <span>{getProviderLabel(provider)}</span>
                     <span className="ml-auto text-[10px]">({models.length})</span>
                   </button>
                   {!isCollapsed &&
@@ -284,7 +277,7 @@ export function ModelPicker() {
                 <span className="truncate">{m.name !== m.id ? m.name : m.id}</span>
                 <span className="ml-auto flex shrink-0 items-center gap-1.5">
                   <ZdrBadge model={m} />
-                  <span className="text-[10px] text-muted-foreground">{providerDisplayName[m.provider] ?? m.provider}</span>
+                  <span className="text-[10px] text-muted-foreground">{getProviderLabel(m.provider)}</span>
                 </span>
               </button>
             ))}

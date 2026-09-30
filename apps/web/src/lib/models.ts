@@ -52,6 +52,21 @@ export type ModelProvider = string;
 export const LOCAL_MODEL_ID = "local" as const;
 export type ChatModelId = string;
 
+/** Display names for cloud and local LLM providers */
+export const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  google: "Google",
+  openrouter: "OpenRouter",
+  lmstudio: "LM Studio",
+  ollama: "Ollama",
+};
+
+/** Display name for a provider id, falling back to the id itself */
+export function getProviderLabel(provider: string): string {
+  return PROVIDER_LABELS[provider] ?? provider;
+}
+
 /** Maps provider name to pi-ai API type */
 export const PROVIDER_API_MAP: Record<string, string> = {
   anthropic: "anthropic-messages",
@@ -60,8 +75,12 @@ export const PROVIDER_API_MAP: Record<string, string> = {
   openrouter: "openai-completions",
 };
 
-/** Maps provider name to base URL (only needed for providers that don't use the default) */
+/** Maps provider name to the base URL used for models built outside pi-ai's registry */
 export const PROVIDER_BASE_URL_MAP: Record<string, string> = {
+  anthropic: "https://api.anthropic.com",
+  openai: "https://api.openai.com/v1",
+  google: "https://generativelanguage.googleapis.com/v1beta",
+  // Same value as OPENROUTER_BASE_URL; not imported so this module stays dependency-free.
   openrouter: "https://openrouter.ai/api/v1",
 };
 

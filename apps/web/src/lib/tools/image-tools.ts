@@ -3,7 +3,8 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { invoke } from "@tauri-apps/api/core";
 import type { ToolDefinitionV2 } from "./categories";
 import { isTauri, getAppDataDir } from "@/lib/storage";
-import { appFetch } from "@/lib/http";
+import { readErrorBody } from "@/lib/http";
+import { openRouterFetch } from "@/lib/openrouter";
 import { useSettingsStore } from "@/stores/settings-store";
 
 // ============================================================================
@@ -35,7 +36,6 @@ interface ImageApiResponse {
   error?: { message?: string };
 }
 
-const IMAGES_API_URL = "https://openrouter.ai/api/v1/images";
 const GENERATION_TIMEOUT_MS = 120_000;
 
 const MIME_BY_EXTENSION: Record<string, string> = {
@@ -70,16 +70,6 @@ function timestamp(): string {
   return new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "").replace("T", "-");
 }
 
-async function readErrorMessage(resp: Response): Promise<string> {
-  try {
-    const body = (await resp.json()) as ImageApiResponse;
-    if (body.error?.message) return `HTTP ${resp.status}: ${body.error.message}`;
-  } catch {
-    // not JSON
-  }
-  return `HTTP ${resp.status}`;
-}
-
 async function buildInputReference(sourceImage: string): Promise<{
   type: "image_url";
   image_url: { url: string };
@@ -99,7 +89,7 @@ export async function executeGenerateImage(
     throw new Error("Image generation is only available in the desktop app");
   }
 
-  const { apiKeys, imageModel, availableImageModels, modelDiscoveryNoDataCollection } =
+  const { apiKeys, imageModel, availableImageModels, openRouterZdrOnly } =
     useSettingsStore.getState();
   const apiKey = apiKeys.openrouter.trim();
   if (!apiKey) {
@@ -121,25 +111,21 @@ export async function executeGenerateImage(
     inputReferences = [await buildInputReference(source_image)];
   }
 
-  const resp = await appFetch(IMAGES_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const resp = await openRouterFetch("/images", {
+    apiKey,
+    zdr: openRouterZdrOnly,
+    body: {
       model: imageModel,
       prompt,
       output_format: "png",
       ...(aspect_ratio ? { aspect_ratio } : {}),
       ...(inputReferences ? { input_references: inputReferences } : {}),
-      ...(modelDiscoveryNoDataCollection ? { provider: { zdr: true } } : {}),
-    }),
+    },
     signal: AbortSignal.timeout(GENERATION_TIMEOUT_MS),
   });
 
   if (!resp.ok) {
-    throw new Error(`Image generation failed (${await readErrorMessage(resp)})`);
+    throw new Error(`Image generation failed (${await readErrorBody(resp)})`);
   }
 
   const result = (await resp.json()) as ImageApiResponse;

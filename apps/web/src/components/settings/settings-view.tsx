@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTheme } from "@/components/theme-provider";
-import { LOCAL_MODEL_ID, getActiveModels, type ChatModelId } from "@/lib/models";
+import { LOCAL_MODEL_ID, getActiveModels, getProviderLabel, type ChatModelId } from "@/lib/models";
 import { ModelPicker } from "./model-picker";
 import { GuardrailsSection } from "./guardrails-section";
 import { isTauri } from "@/lib/storage";
@@ -195,10 +195,10 @@ function ApiKeysSection() {
   const [showKeys, setShowKeys] = React.useState<Record<string, boolean>>({});
 
   const providers = [
-    { id: "anthropic" as const, name: "Anthropic", placeholder: "sk-ant-..." },
-    { id: "openai" as const, name: "OpenAI", placeholder: "sk-..." },
-    { id: "google" as const, name: "Google", placeholder: "AIza..." },
-    { id: "openrouter" as const, name: "OpenRouter", placeholder: "sk-or-...", url: "https://openrouter.ai/keys" },
+    { id: "anthropic" as const, placeholder: "sk-ant-..." },
+    { id: "openai" as const, placeholder: "sk-..." },
+    { id: "google" as const, placeholder: "AIza..." },
+    { id: "openrouter" as const, placeholder: "sk-or-...", url: "https://openrouter.ai/keys" },
   ];
 
   return (
@@ -208,7 +208,7 @@ function ApiKeysSection() {
         {providers.map((provider) => (
           <div key={provider.id}>
             <label className="text-sm font-medium">
-              {provider.name}
+              {getProviderLabel(provider.id)}
               {provider.url && (
                 <button
                   type="button"
@@ -349,14 +349,14 @@ function LocalLlmSection() {
 function ModelsSection() {
   const {
     defaultModel, setDefaultModel, localLLM, selectedModels, modelFetchStatus, modelFetchError, fetchModels,
-    modelDiscoveryNoDataCollection, setModelDiscoveryNoDataCollection,
+    openRouterZdrOnly, setOpenRouterZdrOnly,
     apiKeys, imageModel, setImageModel, availableImageModels, imageModelFetchStatus, imageModelFetchError, fetchImageModels,
     transcriptionModel, setTranscriptionModel, availableTranscriptionModels, transcriptionModelFetchStatus, transcriptionModelFetchError, fetchTranscriptionModels,
     speechModel, setSpeechModel, speechVoice, setSpeechVoice, availableSpeechModels, speechModelFetchStatus, speechModelFetchError, fetchSpeechModels,
   } = useSettingsStore();
   const speechVoices = availableSpeechModels.find((m) => m.id === speechModel)?.voices ?? [];
   const activeModels = getActiveModels(selectedModels);
-  const localProviderLabel = localLLM.provider === "lmstudio" ? "LM Studio" : "Ollama";
+  const localProviderLabel = getProviderLabel(localLLM.provider);
   const localModelLabel = localLLM.model.trim() || `${localProviderLabel} (default)`;
   const localOptionLabel = localLLM.enabled ? `Local LLM - ${localModelLabel}` : "Local LLM (disabled)";
   const options: Array<{ value: ChatModelId; label: string }> = [
@@ -405,8 +405,8 @@ function ModelsSection() {
           <label className="mt-2 flex items-center gap-3 cursor-pointer">
             <input
               type="checkbox"
-              checked={modelDiscoveryNoDataCollection}
-              onChange={(e) => setModelDiscoveryNoDataCollection(e.target.checked)}
+              checked={openRouterZdrOnly}
+              onChange={(e) => setOpenRouterZdrOnly(e.target.checked)}
               className="h-4 w-4 rounded border-input"
             />
             <div>

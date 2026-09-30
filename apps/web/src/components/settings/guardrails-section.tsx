@@ -17,6 +17,7 @@ import type { CategoryConfirmationMatrix } from "@/lib/guardrails/types";
 import type { ToolCategory } from "@/lib/tools/categories";
 import { CATEGORY_CONFIG, RISK_LEVEL_CONFIG } from "@/lib/tools/categories";
 import { PRESET_LABELS, type UserModePreset, detectPreset } from "@/lib/guardrails/presets";
+import { downloadFile } from "@/lib/download";
 
 // ============================================================================
 // Types
@@ -210,14 +211,7 @@ export function GuardrailsSection() {
   // ============================================================================
 
   const handleExport = () => {
-    const json = exportGuardrailsConfig();
-    const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "verbalis-guardrails.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadFile(exportGuardrailsConfig(), "verbalis-guardrails.json", "application/json");
   };
 
   const handleImport = () => {

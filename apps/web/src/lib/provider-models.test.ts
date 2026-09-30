@@ -9,7 +9,8 @@ import {
 
 const mockAppFetch = vi.fn();
 
-vi.mock("@/lib/http", () => ({
+vi.mock("@/lib/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/http")>()),
   appFetch: (...args: unknown[]) => mockAppFetch(...args),
 }));
 

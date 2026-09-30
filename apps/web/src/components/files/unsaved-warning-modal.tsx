@@ -1,6 +1,7 @@
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Button } from "@/components/ui/button";
 import { useFileStore } from "@/stores/file-store";
+import { basename } from "@/lib/path-resolution";
 
 export function UnsavedWarningModal() {
   const {
@@ -11,7 +12,7 @@ export function UnsavedWarningModal() {
   } = useFileStore();
 
   const isOpen = pendingCloseFilePath !== null;
-  const fileName = pendingCloseFilePath?.split("/").pop() ?? "file";
+  const fileName = pendingCloseFilePath ? basename(pendingCloseFilePath) : "file";
 
   return (
     <DialogPrimitive.Root

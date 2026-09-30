@@ -1,6 +1,6 @@
-import { appFetch } from "@/lib/http";
+import { readErrorBody } from "@/lib/http";
+import { openRouterFetch } from "@/lib/openrouter";
 
-const SPEECH_API_URL = "https://openrouter.ai/api/v1/audio/speech";
 // Long answers synthesize slowly; give upstream providers plenty of headroom.
 const SPEECH_TIMEOUT_MS = 120_000;
 // OpenAI-compatible speech endpoints cap input at 4096 characters.
@@ -28,16 +28,6 @@ export function stripMarkdownForSpeech(markdown: string): string {
   );
 }
 
-async function readErrorMessage(resp: Response): Promise<string> {
-  try {
-    const body = (await resp.json()) as { error?: { message?: string } };
-    if (body.error?.message) return `HTTP ${resp.status}: ${body.error.message}`;
-  } catch {
-    // not JSON
-  }
-  return `HTTP ${resp.status}`;
-}
-
 /** Synthesize speech for `text` via OpenRouter's TTS API; resolves to an mp3 blob. */
 export async function synthesizeSpeech(
   text: string,
@@ -45,22 +35,18 @@ export async function synthesizeSpeech(
 ): Promise<Blob> {
   const signals = [AbortSignal.timeout(SPEECH_TIMEOUT_MS)];
   if (opts.signal) signals.push(opts.signal);
-  const resp = await appFetch(SPEECH_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${opts.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const resp = await openRouterFetch("/audio/speech", {
+    apiKey: opts.apiKey,
+    zdr: opts.zdr,
+    body: {
       model: opts.model,
       input: text,
       response_format: "mp3",
       // Omit `voice` entirely when unset so the provider default applies.
       ...(opts.voice ? { voice: opts.voice } : {}),
-      ...(opts.zdr ? { provider: { zdr: true } } : {}),
-    }),
+    },
     signal: AbortSignal.any(signals),
   });
-  if (!resp.ok) throw new Error(`Speech synthesis failed (${await readErrorMessage(resp)})`);
+  if (!resp.ok) throw new Error(`Speech synthesis failed (${await readErrorBody(resp)})`);
   return new Blob([await resp.arrayBuffer()], { type: "audio/mpeg" });
 }

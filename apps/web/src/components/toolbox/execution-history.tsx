@@ -23,6 +23,7 @@ import {
 import type { ExecutionStatus } from "@/lib/tools/execution-tracker";
 import type { ToolCategory } from "@/lib/tools/categories";
 import { CATEGORY_CONFIG } from "@/lib/tools/categories";
+import { downloadFile } from "@/lib/download";
 
 // ============================================================================
 // Status Icons
@@ -95,15 +96,7 @@ export function ExecutionHistory() {
     setIsExporting(true);
     try {
       const content = format === "json" ? exportAsJson() : exportAsCsv();
-      const blob = new Blob([content], {
-        type: format === "json" ? "application/json" : "text/csv",
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `tool-history.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadFile(content, `tool-history.${format}`, format === "json" ? "application/json" : "text/csv");
     } finally {
       setIsExporting(false);
     }

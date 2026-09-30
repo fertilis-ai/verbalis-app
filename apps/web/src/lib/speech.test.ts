@@ -3,7 +3,8 @@ import { stripMarkdownForSpeech, synthesizeSpeech } from "./speech";
 
 const mockAppFetch = vi.fn();
 
-vi.mock("@/lib/http", () => ({
+vi.mock("@/lib/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/http")>()),
   appFetch: (...args: unknown[]) => mockAppFetch(...args),
 }));
 
@@ -20,6 +21,7 @@ function errorResponse(data: unknown, status = 400): Response {
     ok: false,
     status,
     json: () => Promise.resolve(data),
+    text: () => Promise.resolve(JSON.stringify(data)),
   } as unknown as Response;
 }
 
@@ -114,12 +116,10 @@ describe("synthesizeSpeech", () => {
     );
   });
 
-  it("falls back to the bare status when the error body is not JSON", async () => {
-    mockAppFetch.mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: () => Promise.reject(new Error("not json")),
-    } as unknown as Response);
+  it("falls back to the bare status when the error body is a long non-JSON page", async () => {
+    mockAppFetch.mockResolvedValue(
+      new Response(`<html>${"x".repeat(300)}</html>`, { status: 500 })
+    );
     await expect(synthesizeSpeech("Hi", { model: "m", apiKey: "k" })).rejects.toThrow(
       "Speech synthesis failed (HTTP 500)"
     );

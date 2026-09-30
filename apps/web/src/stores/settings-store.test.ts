@@ -152,7 +152,7 @@ describe("settings-store", () => {
     type Migrate = (state: unknown, version: number) => unknown;
 
     it("is versioned", () => {
-      expect(persistCapture.options?.version).toBe(2);
+      expect(persistCapture.options?.version).toBe(3);
     });
 
     it("v0 → v1 flips allowSelfEnhancement to true (old default was persisted, not chosen)", () => {
@@ -201,13 +201,54 @@ describe("settings-store", () => {
       expect(migrated.defaultModel).toBe("local");
     });
 
-    it("leaves v2 states untouched", () => {
+    it("does not re-run the v1 → v2 defaultModel check on v2 states", () => {
       const migrate = persistCapture.options?.migrate as Migrate;
       const migrated = migrate({ defaultModel: "gone", selectedModels: [] }, 2) as Record<
         string,
         unknown
       >;
       expect(migrated.defaultModel).toBe("gone");
+    });
+
+    it("v2 → v3 carries an enabled ZDR setting over to openRouterZdrOnly", () => {
+      const migrate = persistCapture.options?.migrate as Migrate;
+      const migrated = migrate({ modelDiscoveryNoDataCollection: true }, 2) as Record<
+        string,
+        unknown
+      >;
+      expect(migrated.openRouterZdrOnly).toBe(true);
+      expect(migrated).not.toHaveProperty("modelDiscoveryNoDataCollection");
+    });
+
+    it("v2 → v3 carries a disabled ZDR setting over to openRouterZdrOnly", () => {
+      const migrate = persistCapture.options?.migrate as Migrate;
+      const migrated = migrate({ modelDiscoveryNoDataCollection: false }, 2) as Record<
+        string,
+        unknown
+      >;
+      expect(migrated.openRouterZdrOnly).toBe(false);
+      expect(migrated).not.toHaveProperty("modelDiscoveryNoDataCollection");
+    });
+
+    it("v2 → v3 leaves openRouterZdrOnly unset when the old key is absent", () => {
+      const migrate = persistCapture.options?.migrate as Migrate;
+      const migrated = migrate({ theme: "dark" }, 2) as Record<string, unknown>;
+      expect(migrated).not.toHaveProperty("openRouterZdrOnly");
+    });
+
+    it("v0 → v3 also carries the ZDR setting over", () => {
+      const migrate = persistCapture.options?.migrate as Migrate;
+      const migrated = migrate({ modelDiscoveryNoDataCollection: true }, 0) as Record<
+        string,
+        unknown
+      >;
+      expect(migrated.openRouterZdrOnly).toBe(true);
+    });
+
+    it("leaves v3 states untouched", () => {
+      const migrate = persistCapture.options?.migrate as Migrate;
+      const state = { defaultModel: "gone", selectedModels: [], openRouterZdrOnly: true };
+      expect(migrate({ ...state }, 3)).toEqual(state);
     });
   });
 

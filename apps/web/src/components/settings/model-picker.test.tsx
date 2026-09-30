@@ -17,7 +17,7 @@ const mockSettingsStore = {
   selectedModels: [] as any[],
   modelFetchStatus: "idle" as string,
   modelFetchError: null as string | null,
-  modelDiscoveryNoDataCollection: false,
+  openRouterZdrOnly: false,
   fetchModels: mockFetchModels,
   addSelectedModels: mockAddSelectedModels,
   removeSelectedModels: mockRemoveSelectedModels,
@@ -83,7 +83,7 @@ describe("ModelPicker", () => {
     mockSettingsStore.selectedModels = [];
     mockSettingsStore.modelFetchStatus = "idle";
     mockSettingsStore.modelFetchError = null;
-    mockSettingsStore.modelDiscoveryNoDataCollection = false;
+    mockSettingsStore.openRouterZdrOnly = false;
   });
 
   // -------------------------------------------------------------------------
@@ -217,7 +217,7 @@ describe("ModelPicker", () => {
     });
 
     it("hides non-ZDR OpenRouter models when Zero data retention is enabled", () => {
-      mockSettingsStore.modelDiscoveryNoDataCollection = true;
+      mockSettingsStore.openRouterZdrOnly = true;
       mockSettingsStore.availableModels = [
         { id: "anthropic/claude-3", name: "Claude 3 (OR)", provider: "openrouter", zdr: true },
         { id: "meta/llama-3", name: "Llama 3 (OR)", provider: "openrouter" },
@@ -230,7 +230,7 @@ describe("ModelPicker", () => {
     });
 
     it("shows all models when Zero data retention is disabled", () => {
-      mockSettingsStore.modelDiscoveryNoDataCollection = false;
+      mockSettingsStore.openRouterZdrOnly = false;
       mockSettingsStore.availableModels = [
         { id: "anthropic/claude-3", name: "Claude 3 (OR)", provider: "openrouter", zdr: true },
         { id: "meta/llama-3", name: "Llama 3 (OR)", provider: "openrouter" },
@@ -241,7 +241,7 @@ describe("ModelPicker", () => {
     });
 
     it("badges ZDR models in the available panel, and only those", () => {
-      mockSettingsStore.modelDiscoveryNoDataCollection = false;
+      mockSettingsStore.openRouterZdrOnly = false;
       mockSettingsStore.availableModels = [
         { id: "anthropic/claude-3", name: "Claude 3 (OR)", provider: "openrouter", zdr: true },
         { id: "meta/llama-3", name: "Llama 3 (OR)", provider: "openrouter" },
@@ -253,7 +253,7 @@ describe("ModelPicker", () => {
     });
 
     it("does not badge models that are merely untagged", () => {
-      mockSettingsStore.modelDiscoveryNoDataCollection = false;
+      mockSettingsStore.openRouterZdrOnly = false;
       mockSettingsStore.availableModels = [
         { id: "meta/llama-3", name: "Llama 3 (OR)", provider: "openrouter" },
         { id: "claude-1", name: "Claude 1", provider: "anthropic" },

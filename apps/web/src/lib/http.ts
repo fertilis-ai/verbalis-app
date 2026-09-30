@@ -59,3 +59,25 @@ export async function appFetch(input: RequestInfo | URL, init?: RequestInit) {
   }
   return fetch(input, init);
 }
+
+/**
+ * Describe a non-OK response for an error message: `HTTP <status>`, plus the
+ * API's error message (`error.message` or `message` in a JSON body) or a short
+ * plain-text body when there is one.
+ */
+export async function readErrorBody(resp: Response): Promise<string> {
+  try {
+    const body = await resp.text();
+    try {
+      const json = JSON.parse(body) as { error?: { message?: string }; message?: string };
+      const msg = json.error?.message ?? json.message;
+      if (msg) return `HTTP ${resp.status}: ${msg}`;
+    } catch {
+      // not JSON
+    }
+    if (body.length > 0 && body.length < 200) return `HTTP ${resp.status}: ${body}`;
+  } catch {
+    // couldn't read body
+  }
+  return `HTTP ${resp.status}`;
+}

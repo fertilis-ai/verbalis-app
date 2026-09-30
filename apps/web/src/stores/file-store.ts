@@ -8,6 +8,7 @@ import {
   renamePath,
   type FileNode as TauriFileNode,
 } from "@/lib/storage";
+import { dirname, basename } from "@/lib/path-resolution";
 
 export interface FileNode {
   name: string;
@@ -88,7 +89,7 @@ interface FileState {
 // Helper to detect language from file extension
 function getLanguageFromPath(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  const fileName = path.split("/").pop() ?? "";
+  const fileName = basename(path);
 
   // Extensionless file handling
   const nameMap: Record<string, string> = {
@@ -460,7 +461,7 @@ export const useFileStore = create<FileState>((set, get) => ({
 
   renameItem: async (oldPath: string, newName: string) => {
     const { refreshTree, openFiles } = get();
-    const parentDir = oldPath.substring(0, oldPath.lastIndexOf("/"));
+    const parentDir = dirname(oldPath);
     const newPath = `${parentDir}/${newName}`;
     try {
       await renamePath(oldPath, newPath);
@@ -499,7 +500,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   startEditing: (path: string) => {
-    const name = path.split("/").pop() ?? "";
+    const name = basename(path);
     set({ editingPath: path, editingName: name });
   },
 

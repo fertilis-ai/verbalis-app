@@ -20,6 +20,7 @@ import { useChatStore, type Message } from "@/stores/chat-store";
 import { useAgenticLoopStore } from "@/stores/agentic-loop-store";
 import { collectFromTree, findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
 import { toggleInSet } from "@/lib/set-utils";
+import { dirname, basename } from "@/lib/path-resolution";
 
 export type { ScheduleData, SchedulerTreeNode };
 
@@ -234,7 +235,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     };
 
     // Get folder path from schedule path
-    const folderPath = node.path.substring(0, node.path.lastIndexOf("/"));
+    const folderPath = dirname(node.path);
     await saveSchedule(updatedSchedule, folderPath);
 
     // Update in-memory schedules immediately for UI responsiveness
@@ -282,7 +283,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
         targetDir = folder.path;
       }
 
-      const fileName = node.path.substring(node.path.lastIndexOf("/") + 1);
+      const fileName = basename(node.path);
       const newPath = `${targetDir}/${fileName}`;
       if (newPath === node.path) return;
 

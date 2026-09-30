@@ -40,18 +40,21 @@ Follow-ups found in Phase 1 (not done here):
 - The guardrails **shell-command UI and config** now govern tools that no longer exist: "Shell Command Restrictions", the Shell/min rate limit, `sandbox.shellCommands`, and `shellCommands` allow/deny lists. Removing them changes persisted config shape, so it needs a settings migration.
 - The loop events `loop_paused` and `loop_resumed` and the `"paused"` loop status are still handled in the store and UI, but nothing can emit them now. Remove them together with the UI branches.
 
-## Phase 2: Shared helpers (removes duplication)
-- **`lib/openrouter.ts`:**
-  - `OPENROUTER_BASE_URL`
-  - `openRouterHeaders(apiKey)`
-  - `withZdr(body, zdr)`
-  - `openRouterFetch(path, {apiKey, zdr, body, signal})`
-  - Callers to switch over: `speech.ts`, `transcription.ts`, `tools/image-tools.ts`, `provider-models.ts` (5 sites), and `openRouterCompat` in chat-store.
-- **`http.ts`:** move `readErrorBody` here (from `provider-models.ts:30`) and delete the three identical copies of `readErrorMessage`.
-- **Path helpers:** add `dirname`/`basename` next to `lib/path-resolution.ts`, replacing about 20 ad-hoc `lastIndexOf("/")`/`split("/").pop()` sites.
-- **Provider labels:** `PROVIDER_LABELS`/`getProviderLabel()` in `lib/models.ts`, replacing the maps in `chat-input.tsx:25`, `model-picker.tsx:9` and `settings-view.tsx:198,359`. Merge chat-store's `defaultBaseUrls` into `PROVIDER_BASE_URL_MAP`.
-- **Downloads:** `lib/download.ts`, replacing the blob-download code in `execution-history.tsx` and `guardrails-section.tsx`.
-- **Rename the ZDR setting:** `modelDiscoveryNoDataCollection` becomes `openRouterZdrOnly`. Add a persist migration (version 2 to 3) and update the outdated comment in `settings-store.ts:49`.
+## Phase 2: Shared helpers (removes duplication) — ✅ done
+1. ✅ **`lib/openrouter.ts`:** `OPENROUTER_BASE_URL`, `openRouterHeaders(apiKey)`, `withZdr(body, zdr)`, `openRouterFetch(path, {apiKey, zdr, body, signal})` and `openRouterCompat(zdr)`.
+   - `openRouterHeaders` returns only `Authorization`, and nothing for a blank key, so model listing still works unauthenticated. chat-store spreads it into pi-ai's `model.headers`.
+   - `openRouterFetch` is a GET with just the auth header, or a JSON POST with `withZdr` applied when a `body` is given. It returns the raw `Response`; callers keep their own non-OK handling (throw in speech/transcription/image, `{ models: [], error }` in provider-models, swallow in the ZDR id fetch).
+   - `openRouterCompat` moved over unchanged from chat-store. It is pi-ai's `openRouterRouting` compat shape, not the `provider: { zdr }` body shape, so it is not built on `withZdr`.
+   - Switched over: `speech.ts`, `transcription.ts`, `tools/image-tools.ts`, the five OpenRouter sites in `provider-models.ts`, and chat-store. The speech key is now trimmed like the others.
+2. ✅ **`readErrorBody`** moved to `http.ts`; the three `readErrorMessage` copies are gone. **Intentional behavior change:** speech, transcription and image errors now also show a top-level `message` or a short plain-text body, where they used to show only `HTTP <status>`.
+   - Tests that mock `@/lib/http` now spread `importOriginal()`, so `readErrorBody` is real under test instead of `undefined`.
+3. ✅ **Path helpers:** `dirname`/`basename` in `lib/path-resolution.ts`, with exactly the old `substring`/`split("/").pop()` semantics (`dirname` is `""` without a slash). 20 sites replaced; per-caller fallbacks (`|| "unknown"`, the optional `pendingCloseFilePath`) stay at the call site.
+4. ✅ **Provider labels:** `PROVIDER_LABELS`/`getProviderLabel()` in `lib/models.ts` (including `lmstudio`/`ollama`) replace the maps in `chat-input.tsx`, `model-picker.tsx` and the API-key names and local-provider labels in `settings-view.tsx`. chat-store's `defaultBaseUrls` is merged into `PROVIDER_BASE_URL_MAP`. `models.ts` keeps its own OpenRouter URL literal: importing `lib/openrouter.ts` would drag `http` → `logger` → `storage` into a dependency-free module.
+5. ✅ **Downloads:** `lib/download.ts` (`downloadFile(content, filename, type)`) is used by `execution-history.tsx` and `guardrails-section.tsx`.
+6. ✅ **ZDR setting renamed** to `openRouterZdrOnly` (setter `setOpenRouterZdrOnly`). Persist version 2 → 3 copies `modelDiscoveryNoDataCollection` into the new key and deletes the old one. Without it, Zustand would drop the old key and ZDR routing would silently switch off. The state comment now says the setting also enforces ZDR routing on chat, image, transcription and speech requests.
+
+Follow-up found in Phase 2 (not done here):
+- The default-model select in `settings-view.tsx` still labels options with the raw provider id (`GPT-4o (openai)`). Switching it to `getProviderLabel` is a visible UI change, so it was left alone.
 
 ## Phase 3: Single tool registry and typed Tauri boundary
 - **One tool registry.** Merge `TOOL_DEFINITIONS` (`lib/tools.ts:188–360`) and `ALL_TOOLS` (`lib/tools/categories.ts`) into one registry. Each entry holds its definition, metadata and executor.

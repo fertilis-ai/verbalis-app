@@ -3,6 +3,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { Download, FolderOpen, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isTauri } from "@/lib/storage";
+import { basename } from "@/lib/path-resolution";
 
 interface GeneratedImageProps {
   path: string;
@@ -15,7 +16,7 @@ export function GeneratedImage({ path }: GeneratedImageProps) {
 
   if (!isTauri()) return null;
 
-  const filename = path.split("/").pop() ?? "image.png";
+  const filename = basename(path);
   const extension = filename.split(".").pop() ?? "png";
 
   if (failed) {

@@ -46,7 +46,8 @@ vi.mock("@earendil-works/pi-ai", () => ({
   getModel: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock("@/lib/http", () => ({
+vi.mock("@/lib/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/http")>()),
   appFetch: vi.fn(),
 }));
 

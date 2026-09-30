@@ -148,7 +148,8 @@ vi.mock("@earendil-works/pi-ai", () => ({
   }),
 }));
 
-vi.mock("@/lib/http", () => ({
+vi.mock("@/lib/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/http")>()),
   appFetch: vi.fn(),
 }));
 
@@ -2095,7 +2096,7 @@ describe("chat-store", () => {
       maxTokens: 8192,
     };
 
-    function setup(modelDiscoveryNoDataCollection: boolean) {
+    function setup(openRouterZdrOnly: boolean) {
       mockGetActiveModels.mockReturnValue([ZDR_MODEL]);
       mockSettingsGetState.mockReturnValue({
         apiKeys: { openrouter: "sk-or-test" },
@@ -2103,7 +2104,7 @@ describe("chat-store", () => {
         guardrailsConfig: {},
         selectedModels: [ZDR_MODEL],
         defaultModel: ZDR_MODEL.id,
-        modelDiscoveryNoDataCollection,
+        openRouterZdrOnly,
       });
       mockStreamSimple.mockReturnValue(
         (async function* () {

@@ -42,7 +42,8 @@ vi.mock("@/lib/hooks/use-voice-transcription", () => ({
 }));
 
 // `reasoning` objects are verbatim from OpenRouter's GET /api/v1/models.
-vi.mock("@/lib/models", () => ({
+vi.mock("@/lib/models", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/models")>()),
   getActiveModels: () => [
     { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", provider: "anthropic" },
     { id: "gpt-4o", name: "GPT-4o", provider: "openai" },

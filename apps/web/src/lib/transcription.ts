@@ -1,6 +1,6 @@
-import { appFetch } from "@/lib/http";
+import { readErrorBody } from "@/lib/http";
+import { openRouterFetch } from "@/lib/openrouter";
 
-const TRANSCRIPTIONS_API_URL = "https://openrouter.ai/api/v1/audio/transcriptions";
 // OpenRouter's transcription upstream times out around 60s.
 const TRANSCRIPTION_TIMEOUT_MS = 60_000;
 
@@ -26,35 +26,21 @@ export function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-async function readErrorMessage(resp: Response): Promise<string> {
-  try {
-    const body = (await resp.json()) as { error?: { message?: string } };
-    if (body.error?.message) return `HTTP ${resp.status}: ${body.error.message}`;
-  } catch {
-    // not JSON
-  }
-  return `HTTP ${resp.status}`;
-}
-
 /** Transcribe an audio blob via OpenRouter's speech-to-text API. */
 export async function transcribeAudio(
   blob: Blob,
   opts: { model: string; apiKey: string; format: AudioFormat; zdr?: boolean }
 ): Promise<string> {
-  const resp = await appFetch(TRANSCRIPTIONS_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${opts.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const resp = await openRouterFetch("/audio/transcriptions", {
+    apiKey: opts.apiKey,
+    zdr: opts.zdr,
+    body: {
       model: opts.model,
       input_audio: { data: await blobToBase64(blob), format: opts.format },
-      ...(opts.zdr ? { provider: { zdr: true } } : {}),
-    }),
+    },
     signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
   });
-  if (!resp.ok) throw new Error(`Transcription failed (${await readErrorMessage(resp)})`);
+  if (!resp.ok) throw new Error(`Transcription failed (${await readErrorBody(resp)})`);
   const result = (await resp.json()) as { text?: string };
   return result.text ?? "";
 }

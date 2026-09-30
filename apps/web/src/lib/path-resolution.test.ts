@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizePath, resolvePath } from "./path-resolution";
+import { normalizePath, resolvePath, dirname, basename } from "./path-resolution";
 
 describe("normalizePath", () => {
   it("collapses repeated slashes", () => {
@@ -151,5 +151,27 @@ describe("resolvePath", () => {
       expect(result.originalPath).toBe("  ./test.txt  ");
       expect(result.resolvedPath).toBe(`${wd}/test.txt`);
     });
+  });
+});
+
+describe("dirname", () => {
+  it("returns everything before the last slash", () => {
+    expect(dirname("/a/b/c.md")).toBe("/a/b");
+    expect(dirname("chats/work/x.json")).toBe("chats/work");
+  });
+
+  it("returns an empty string without a slash", () => {
+    expect(dirname("file.md")).toBe("");
+  });
+});
+
+describe("basename", () => {
+  it("returns everything after the last slash", () => {
+    expect(basename("/a/b/c.md")).toBe("c.md");
+  });
+
+  it("returns the whole path without a slash, and empty for a trailing slash", () => {
+    expect(basename("file.md")).toBe("file.md");
+    expect(basename("/a/b/")).toBe("");
   });
 });

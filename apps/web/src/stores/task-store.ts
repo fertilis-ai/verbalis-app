@@ -15,6 +15,7 @@ import {
 } from "@/lib/storage";
 import { executeTask } from "@/lib/task-runner";
 import { useAgenticLoopStore } from "@/stores/agentic-loop-store";
+import { basename } from "@/lib/path-resolution";
 
 export type { TaskData, TaskTreeNode, TaskResultStatus, TaskStage, TaskFolderData };
 
@@ -102,7 +103,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const path = await createTaskFolder(name);
     await get().loadTasksFromDisk();
     // Select the newly created folder
-    const folderId = path.split("/").pop() ?? "";
+    const folderId = basename(path);
     set({ selectedFolderId: folderId, selectedFolderPath: path });
   },
 

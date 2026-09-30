@@ -11,6 +11,7 @@ import {
 import { YOLO_MODE_CONFIG } from "@/lib/guardrails/presets";
 import { collectFromTree } from "@/lib/tree-utils";
 import { listWorkflows, loadWorkflow, runWorkflow } from "@/lib/workflows/run-workflow";
+import { dirname } from "@/lib/path-resolution";
 
 const DEFAULT_TICK_MS = 60_000;
 const DEFAULT_SCHEDULE_TITLE = "Scheduled Run";
@@ -37,7 +38,7 @@ function computeNextRun(cron: string, fromDate: Date): string | null {
 }
 
 async function saveScheduleAtPath(schedule: ScheduleData, schedulePath: string): Promise<void> {
-  const folderPath = schedulePath.substring(0, schedulePath.lastIndexOf("/"));
+  const folderPath = dirname(schedulePath);
   await saveSchedule(schedule, folderPath);
 }
 

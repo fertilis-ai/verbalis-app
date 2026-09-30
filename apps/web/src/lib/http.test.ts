@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { appFetch, initFetchPolyfill } from "./http";
+import { appFetch, initFetchPolyfill, readErrorBody } from "./http";
 import { setLoggingEnabled } from "./logger";
 
 const mockIsTauri = vi.fn(() => false);
@@ -265,5 +265,28 @@ describe("initFetchPolyfill", () => {
       expect(savedFetch).toHaveBeenCalled();
       expect(mockTauriFetch).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("readErrorBody", () => {
+  it("extracts error.message from a JSON body", async () => {
+    const resp = new Response(JSON.stringify({ error: { message: "Invalid key" } }), { status: 401 });
+    expect(await readErrorBody(resp)).toBe("HTTP 401: Invalid key");
+  });
+
+  it("extracts a top-level message from a JSON body", async () => {
+    const resp = new Response(JSON.stringify({ message: "Not found" }), { status: 404 });
+    expect(await readErrorBody(resp)).toBe("HTTP 404: Not found");
+  });
+
+  it("includes a short plain-text body", async () => {
+    expect(await readErrorBody(new Response("Bad Gateway", { status: 502 }))).toBe(
+      "HTTP 502: Bad Gateway"
+    );
+  });
+
+  it("falls back to the bare status for an empty or long body", async () => {
+    expect(await readErrorBody(new Response("", { status: 500 }))).toBe("HTTP 500");
+    expect(await readErrorBody(new Response("x".repeat(500), { status: 500 }))).toBe("HTTP 500");
   });
 });

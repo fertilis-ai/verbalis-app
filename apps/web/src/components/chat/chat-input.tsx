@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { getActiveModels } from "@/lib/models";
+import { getActiveModels, getProviderLabel } from "@/lib/models";
 import {
   EFFORT_LABELS,
   getEffortCapability,
@@ -21,13 +21,6 @@ import { useChatStore, type ContextFile } from "@/stores/chat-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { expandPromptInput } from "@/lib/prompts/expand-prompt";
 import { useVoiceTranscription } from "@/lib/hooks/use-voice-transcription";
-
-const providerDisplayName: Record<string, string> = {
-  anthropic: "Anthropic",
-  openai: "OpenAI",
-  google: "Google",
-  openrouter: "OpenRouter",
-};
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -51,7 +44,7 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const selectedModel = activeModels.find((m) => m.id === model) ?? activeModels[0];
-  const localProviderLabel = localLLM.provider === "lmstudio" ? "LM Studio" : "Ollama";
+  const localProviderLabel = getProviderLabel(localLLM.provider);
   const localModelLabel = localLLM.model.trim() || `${localProviderLabel} (default)`;
   const selectedLocalLabel = localLLM.enabled ? localModelLabel : "Local LLM (disabled)";
   const selectedModelLabel =
@@ -200,7 +193,7 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles
                   {activeModels.map((m) => (
                     <DropdownMenuRadioItem key={m.id} value={m.id} className="whitespace-nowrap">
                       <span>{m.name}</span>
-                      <span className="ml-2 text-muted-foreground">({providerDisplayName[m.provider] ?? m.provider})</span>
+                      <span className="ml-2 text-muted-foreground">({getProviderLabel(m.provider)})</span>
                     </DropdownMenuRadioItem>
                   ))}
                 </DropdownMenuRadioGroup>

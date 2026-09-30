@@ -43,8 +43,10 @@ interface SettingsState {
   selectedModels: ProviderModel[];
   modelFetchStatus: "idle" | "fetching" | "done" | "error";
   modelFetchError: string | null;
-  // When true, hide OpenRouter models without a zero-data-retention endpoint.
-  modelDiscoveryNoDataCollection: boolean;
+  // Zero data retention: when true, hide OpenRouter models without a ZDR
+  // endpoint, and route every OpenRouter request (chat, image, transcription,
+  // speech) to ZDR endpoints only.
+  openRouterZdrOnly: boolean;
   // Reasoning effort per model id. Only reasoning-capable models get an entry;
   // every read is clamped to what the model supports, so stale values are safe.
   modelEffort: Record<string, EffortLevel>;
@@ -99,7 +101,7 @@ interface SettingsState {
   addSelectedModels: (models: ProviderModel[]) => void;
   removeSelectedModels: (modelIds: string[]) => void;
   fetchModels: () => Promise<void>;
-  setModelDiscoveryNoDataCollection: (enabled: boolean) => void;
+  setOpenRouterZdrOnly: (enabled: boolean) => void;
 
   // Image generation actions
   setImageModel: (modelId: string) => void;
@@ -153,7 +155,7 @@ export const useSettingsStore = create<SettingsState>()(
       selectedModels: [],
       modelFetchStatus: "idle" as const,
       modelFetchError: null,
-      modelDiscoveryNoDataCollection: false,
+      openRouterZdrOnly: false,
       modelEffort: {},
       imageModel: "",
       availableImageModels: [],
@@ -250,8 +252,8 @@ export const useSettingsStore = create<SettingsState>()(
           set({ modelFetchStatus: "error", modelFetchError: String(e) });
         }
       },
-      setModelDiscoveryNoDataCollection: (modelDiscoveryNoDataCollection) =>
-        set({ modelDiscoveryNoDataCollection }),
+      setOpenRouterZdrOnly: (openRouterZdrOnly) =>
+        set({ openRouterZdrOnly }),
 
       // Image generation actions
       setImageModel: (imageModel) => set({ imageModel }),
@@ -364,7 +366,7 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: "verbalis-settings",
-      version: 2,
+      version: 3,
       // v0 → v1: allowSelfEnhancement's default flipped to true. The old
       // default (false) was persisted on every save whether or not the user
       // ever touched the toggle, so a stored false can't be read as a choice —
@@ -374,17 +376,27 @@ export const useSettingsStore = create<SettingsState>()(
       // getActiveModels fell back to the MODEL_OPTIONS catalog, so a stored
       // default that isn't in selectedModels was never actually chosen. Clear
       // it rather than leave a model id that no longer resolves to anything.
+      //
+      // v2 → v3: modelDiscoveryNoDataCollection was renamed openRouterZdrOnly.
+      // Carry the value over — an unmigrated key would silently turn ZDR
+      // routing off for everyone who enabled it.
       migrate: (persistedState, version) => {
         if (!persistedState || typeof persistedState !== "object") return persistedState;
         const state = persistedState as {
           allowSelfEnhancement?: boolean;
           defaultModel?: string;
           selectedModels?: ProviderModel[];
+          modelDiscoveryNoDataCollection?: boolean;
+          openRouterZdrOnly?: boolean;
         };
         if (version === 0) state.allowSelfEnhancement = true;
         if (version < 2 && state.defaultModel !== LOCAL_MODEL_ID) {
           const selected = state.selectedModels ?? [];
           if (!selected.some((m) => m.id === state.defaultModel)) state.defaultModel = "";
+        }
+        if (version < 3 && "modelDiscoveryNoDataCollection" in state) {
+          state.openRouterZdrOnly = state.modelDiscoveryNoDataCollection === true;
+          delete state.modelDiscoveryNoDataCollection;
         }
         return persistedState;
       },
@@ -401,7 +413,7 @@ export const useSettingsStore = create<SettingsState>()(
         selectedAgentId: state.selectedAgentId,
         availableModels: state.availableModels,
         selectedModels: state.selectedModels,
-        modelDiscoveryNoDataCollection: state.modelDiscoveryNoDataCollection,
+        openRouterZdrOnly: state.openRouterZdrOnly,
         modelEffort: state.modelEffort,
         imageModel: state.imageModel,
         availableImageModels: state.availableImageModels,

@@ -4,6 +4,7 @@ import {
   PROVIDER_API_MAP,
   PROVIDER_BASE_URL_MAP,
   getActiveModels,
+  getProviderLabel,
   type ProviderModel,
 } from "./models";
 
@@ -65,5 +66,17 @@ describe("getActiveModels", () => {
 
   it("returns nothing when called with no arguments", () => {
     expect(getActiveModels()).toEqual([]);
+  });
+});
+
+describe("getProviderLabel", () => {
+  it("returns display names for known providers", () => {
+    expect(getProviderLabel("openai")).toBe("OpenAI");
+    expect(getProviderLabel("openrouter")).toBe("OpenRouter");
+    expect(getProviderLabel("lmstudio")).toBe("LM Studio");
+  });
+
+  it("falls back to the provider id", () => {
+    expect(getProviderLabel("mistral")).toBe("mistral");
   });
 });

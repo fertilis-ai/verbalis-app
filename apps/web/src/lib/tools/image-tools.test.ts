@@ -17,7 +17,8 @@ vi.mock("@/lib/storage", () => ({
   getAppDataDir: vi.fn(async () => "/Users/test/.verbalis"),
 }));
 
-vi.mock("@/lib/http", () => ({
+vi.mock("@/lib/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/http")>()),
   appFetch: (...args: unknown[]) => mockAppFetch(...args),
 }));
 
@@ -34,6 +35,7 @@ function jsonResponse(data: unknown, ok = true, status = 200): Response {
     ok,
     status,
     json: () => Promise.resolve(data),
+    text: () => Promise.resolve(JSON.stringify(data)),
   } as unknown as Response;
 }
 

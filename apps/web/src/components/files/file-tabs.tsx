@@ -2,6 +2,7 @@ import * as React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFileStore } from "@/stores/file-store";
+import { basename } from "@/lib/path-resolution";
 
 export function FileTabs() {
   const { openFiles, activeFilePath, setActiveFile, closeFile } = useFileStore();
@@ -36,7 +37,7 @@ interface FileTabProps {
 
 function FileTab({ path, isModified, isActive, onSelect, onClose }: FileTabProps) {
   const [isCloseHovered, setIsCloseHovered] = React.useState(false);
-  const fileName = path.split("/").pop() ?? path;
+  const fileName = basename(path);
 
   return (
     <div

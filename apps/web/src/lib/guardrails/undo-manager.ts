@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import { isTauri, getAppDataDir } from "@/lib/storage";
 import { createSingleton } from "@/lib/utils";
+import { basename } from "@/lib/path-resolution";
 
 // ============================================================================
 // Undo Manager
@@ -110,7 +111,7 @@ class UndoManager {
 
       // Generate unique trash path
       const timestamp = Date.now();
-      const filename = path.split("/").pop() || "unknown";
+      const filename = basename(path) || "unknown";
       const trashPath = `${trashDir}/${timestamp}_${filename}`;
 
       // Move to trash

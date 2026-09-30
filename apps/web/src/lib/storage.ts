@@ -7,6 +7,7 @@ import {
   SUPERSEDED_TOOLBOX_DEFAULTS,
   TOOLBOX_DEFAULTS_VERSION,
 } from "@/lib/toolbox/toolbox-defaults";
+import { dirname } from "@/lib/path-resolution";
 
 // Polyfill Buffer for browser environment (required by gray-matter)
 declare global {
@@ -95,7 +96,7 @@ function webCreateDirectory(path: string): void {
 function webWriteFile(path: string, content: string): void {
   const vfs = getVirtualFS();
   // Ensure parent directory exists
-  const parentPath = path.substring(0, path.lastIndexOf("/"));
+  const parentPath = dirname(path);
   if (parentPath && !vfs[parentPath]) {
     webCreateDirectory(parentPath);
   }
@@ -532,7 +533,7 @@ export async function deleteChatFolder(folderPath: string): Promise<void> {
 
 // Rename a chat file
 export async function renameChat(oldPath: string, newId: string): Promise<string> {
-  const dir = oldPath.substring(0, oldPath.lastIndexOf("/"));
+  const dir = dirname(oldPath);
   const newPath = `${dir}/${newId}.json`;
   await renamePath(oldPath, newPath);
   return newPath;
@@ -540,7 +541,7 @@ export async function renameChat(oldPath: string, newId: string): Promise<string
 
 // Rename a folder
 export async function renameChatFolder(oldPath: string, newName: string): Promise<string> {
-  const parentDir = oldPath.substring(0, oldPath.lastIndexOf("/"));
+  const parentDir = dirname(oldPath);
   const newPath = `${parentDir}/${newName}`;
   await renamePath(oldPath, newPath);
   return newPath;
@@ -881,7 +882,7 @@ export async function deleteSchedulerFolder(folderPath: string): Promise<void> {
 
 // Rename a scheduler folder (directory rename)
 export async function renameSchedulerFolder(oldPath: string, newName: string): Promise<string> {
-  const parentDir = oldPath.substring(0, oldPath.lastIndexOf("/"));
+  const parentDir = dirname(oldPath);
   const newPath = `${parentDir}/${newName}`;
   await renamePath(oldPath, newPath);
   return newPath;

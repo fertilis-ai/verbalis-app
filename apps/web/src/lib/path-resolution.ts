@@ -31,6 +31,16 @@ export interface ResolvePathResult {
   resolution: ResolutionKind;
 }
 
+/** Everything before the last `/` ("" when there is none). */
+export function dirname(path: string): string {
+  return path.substring(0, path.lastIndexOf("/"));
+}
+
+/** Everything after the last `/` (the whole path when there is none). */
+export function basename(path: string): string {
+  return path.substring(path.lastIndexOf("/") + 1);
+}
+
 /** Trim, collapse repeated slashes, strip trailing slash, strip leading `./`. */
 export function normalizePath(path: string): string {
   let p = path.trim();
