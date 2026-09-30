@@ -8,7 +8,7 @@ import { LOCAL_MODEL_ID, getActiveModels, type ChatModelId } from "@/lib/models"
 import { ModelPicker } from "./model-picker";
 import { GuardrailsSection } from "./guardrails-section";
 import { isTauri } from "@/lib/storage";
-import { open } from "@tauri-apps/plugin-shell";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { SettingsSection } from "./settings-sidebar";
 import { HUE_PRESETS } from "@/lib/hue-presets";
 
@@ -215,7 +215,7 @@ function ApiKeysSection() {
                   className="ml-1 text-xs text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
                   onClick={() => {
                     if (isTauri()) {
-                      open(provider.url!);
+                      openUrl(provider.url!);
                     } else {
                       window.open(provider.url, "_blank", "noopener,noreferrer");
                     }

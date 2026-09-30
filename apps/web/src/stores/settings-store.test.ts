@@ -64,9 +64,6 @@ function resetStore() {
     workingDirectory: "",
     settingsDirectory: "",
     userMode: "normal",
-    yolo: false,
-    sandboxed: true,
-    guardrails: true,
     apiKeys: { anthropic: "", openai: "", google: "", openrouter: "" },
     localLLM: { enabled: false, provider: "lmstudio", baseUrl: "http://localhost:1234/v1", model: "" },
     defaultModel: "",
@@ -116,16 +113,10 @@ describe("settings-store", () => {
       expect(useSettingsStore.getState().defaultModel).toBe("");
     });
 
-    it("has guardrails enabled", () => {
-      expect(useSettingsStore.getState().guardrails).toBe(true);
-    });
-
-    it("has sandbox enabled", () => {
-      expect(useSettingsStore.getState().sandboxed).toBe(true);
-    });
-
-    it("has yolo disabled", () => {
-      expect(useSettingsStore.getState().yolo).toBe(false);
+    it("has guardrails and sandbox enabled", () => {
+      const { guardrailsConfig } = useSettingsStore.getState();
+      expect(guardrailsConfig.enabled).toBe(true);
+      expect(guardrailsConfig.sandbox.enabled).toBe(true);
     });
 
     it("has normal user mode", () => {
@@ -254,50 +245,6 @@ describe("settings-store", () => {
     it("setDefaultModel updates defaultModel", () => {
       useSettingsStore.getState().setDefaultModel("gpt-4o");
       expect(useSettingsStore.getState().defaultModel).toBe("gpt-4o");
-    });
-  });
-
-  describe("setYolo", () => {
-    it("sets yolo flag", () => {
-      useSettingsStore.getState().setYolo(true);
-      expect(useSettingsStore.getState().yolo).toBe(true);
-    });
-
-    it("disables guardrails config when yolo enabled", () => {
-      useSettingsStore.getState().setYolo(true);
-      expect(useSettingsStore.getState().guardrailsConfig.enabled).toBe(false);
-    });
-
-    it("does not re-enable guardrails config when yolo disabled", () => {
-      useSettingsStore.getState().setYolo(true);
-      useSettingsStore.getState().setYolo(false);
-      expect(useSettingsStore.getState().yolo).toBe(false);
-      // guardrailsConfig.enabled stays false because setYolo(false) doesn't re-enable it
-      expect(useSettingsStore.getState().guardrailsConfig.enabled).toBe(false);
-    });
-  });
-
-  describe("setSandboxed", () => {
-    it("sets sandboxed flag", () => {
-      useSettingsStore.getState().setSandboxed(false);
-      expect(useSettingsStore.getState().sandboxed).toBe(false);
-    });
-
-    it("syncs with guardrails sandbox config", () => {
-      useSettingsStore.getState().setSandboxed(false);
-      expect(useSettingsStore.getState().guardrailsConfig.sandbox.enabled).toBe(false);
-    });
-  });
-
-  describe("setGuardrails", () => {
-    it("sets guardrails flag", () => {
-      useSettingsStore.getState().setGuardrails(false);
-      expect(useSettingsStore.getState().guardrails).toBe(false);
-    });
-
-    it("syncs with guardrails config enabled", () => {
-      useSettingsStore.getState().setGuardrails(false);
-      expect(useSettingsStore.getState().guardrailsConfig.enabled).toBe(false);
     });
   });
 
@@ -682,34 +629,19 @@ describe("settings-store", () => {
     it("setGuardrailsConfig merges partial config", () => {
       useSettingsStore.getState().setGuardrailsConfig({ enabled: false });
       expect(useSettingsStore.getState().guardrailsConfig.enabled).toBe(false);
-      expect(useSettingsStore.getState().guardrails).toBe(false);
-    });
-
-    it("setGuardrailsConfig syncs sandbox to sandboxed", () => {
-      useSettingsStore.getState().setGuardrailsConfig({
-        sandbox: { enabled: false, shellCommands: false, networkAccess: true, tempDirectory: "/tmp" },
-      });
-      expect(useSettingsStore.getState().sandboxed).toBe(false);
     });
 
     it("resetGuardrailsToDefaults restores all defaults", () => {
       useSettingsStore.setState({
         guardrailsConfig: { ...DEFAULT_GUARDRAILS_CONFIG, enabled: false },
-        guardrails: false,
-        sandboxed: false,
-        yolo: true,
       });
       useSettingsStore.getState().resetGuardrailsToDefaults();
       expect(useSettingsStore.getState().guardrailsConfig).toEqual(DEFAULT_GUARDRAILS_CONFIG);
-      expect(useSettingsStore.getState().guardrails).toBe(true);
-      expect(useSettingsStore.getState().sandboxed).toBe(true);
-      expect(useSettingsStore.getState().yolo).toBe(false);
     });
 
     it("applyGuardrailsPreset applies yolo preset", () => {
       mockGetPresetConfig.mockReturnValue(YOLO_MODE_CONFIG);
       useSettingsStore.getState().applyGuardrailsPreset("yolo");
-      expect(useSettingsStore.getState().yolo).toBe(true);
       expect(useSettingsStore.getState().guardrailsConfig).toEqual(YOLO_MODE_CONFIG);
       expect(useSettingsStore.getState().userMode).toBe("advanced");
     });
@@ -717,14 +649,14 @@ describe("settings-store", () => {
     it("applyGuardrailsPreset applies normal preset", () => {
       mockGetPresetConfig.mockReturnValue(NORMAL_MODE_CONFIG);
       useSettingsStore.getState().applyGuardrailsPreset("normal");
-      expect(useSettingsStore.getState().yolo).toBe(false);
+      expect(useSettingsStore.getState().guardrailsConfig).toEqual(NORMAL_MODE_CONFIG);
       expect(useSettingsStore.getState().userMode).toBe("normal");
     });
 
     it("applyGuardrailsPreset applies advanced preset", () => {
       mockGetPresetConfig.mockReturnValue(ADVANCED_MODE_CONFIG);
       useSettingsStore.getState().applyGuardrailsPreset("advanced");
-      expect(useSettingsStore.getState().yolo).toBe(false);
+      expect(useSettingsStore.getState().guardrailsConfig).toEqual(ADVANCED_MODE_CONFIG);
       expect(useSettingsStore.getState().userMode).toBe("advanced");
     });
   });
@@ -757,12 +689,6 @@ describe("settings-store", () => {
         JSON.stringify({ enabled: true })
       );
       expect(result).toBe(false);
-    });
-
-    it("syncs yolo flag based on enabled", () => {
-      const config = { ...DEFAULT_GUARDRAILS_CONFIG, enabled: false };
-      useSettingsStore.getState().importGuardrailsConfig(JSON.stringify(config));
-      expect(useSettingsStore.getState().yolo).toBe(true);
     });
   });
 

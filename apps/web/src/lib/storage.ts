@@ -4,6 +4,7 @@ import { Buffer } from "buffer";
 import matter from "gray-matter";
 import {
   DEFAULT_TOOLBOX_ITEMS,
+  SUPERSEDED_TOOLBOX_DEFAULTS,
   TOOLBOX_DEFAULTS_VERSION,
 } from "@/lib/toolbox/toolbox-defaults";
 
@@ -1089,6 +1090,16 @@ export async function ensureWellKnownMemories(): Promise<void> {
 export async function ensureDefaultToolboxItems(): Promise<void> {
   const dir = await getAppDataDirCached();
   const markerPath = `${dir}/toolbox-defaults-version`;
+
+  // Upgrade untouched copies of defaults that have since changed. Not gated by
+  // the version marker, so it needs no bump (which would resurrect deleted items).
+  for (const { category, name, previous } of SUPERSEDED_TOOLBOX_DEFAULTS) {
+    const path = `${dir}/${category}/${name}.${getToolboxExtension(category)}`;
+    if (!(await pathExists(path))) continue;
+    if (!previous.includes(await readFile(path))) continue;
+    const current = DEFAULT_TOOLBOX_ITEMS.find((i) => i.category === category && i.name === name);
+    if (current) await writeFile(path, current.content);
+  }
 
   let seededVersion = 0;
   if (await pathExists(markerPath)) {

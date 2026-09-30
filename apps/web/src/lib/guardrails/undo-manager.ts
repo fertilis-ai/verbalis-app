@@ -6,7 +6,6 @@ import type {
   FileWriteUndoData,
   FileDeleteUndoData,
   DirectoryCreateUndoData,
-  ClipboardWriteUndoData,
 } from "./types";
 import { isTauri, getAppDataDir } from "@/lib/storage";
 import { createSingleton } from "@/lib/utils";
@@ -151,22 +150,6 @@ class UndoManager {
     }
   }
 
-  /**
-   * Prepare undo data for clipboard write
-   */
-  async prepareClipboardWriteUndo(): Promise<ClipboardWriteUndoData | null> {
-    if (!this.requireTauri()) {
-      return null;
-    }
-
-    try {
-      const previousContent = await invoke<string>("read_clipboard");
-      return { previousContent };
-    } catch {
-      return { previousContent: "" };
-    }
-  }
-
   // ============================================================================
   // Undo Execution
   // ============================================================================
@@ -208,10 +191,6 @@ class UndoManager {
 
         case "directory_create":
           await this.undoDirectoryCreate(operation.undoData as DirectoryCreateUndoData);
-          break;
-
-        case "clipboard_write":
-          await this.undoClipboardWrite(operation.undoData as ClipboardWriteUndoData);
           break;
 
         default:
@@ -265,10 +244,6 @@ class UndoManager {
         throw new Error("Directory is no longer empty, cannot undo");
       }
     }
-  }
-
-  private async undoClipboardWrite(data: ClipboardWriteUndoData): Promise<void> {
-    await invoke("write_clipboard", { content: data.previousContent });
   }
 
   // ============================================================================

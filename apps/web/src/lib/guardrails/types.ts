@@ -230,8 +230,7 @@ export const createInitialRateLimitState = (): RateLimitState => {
 export type UndoOperationType =
   | "file_write"
   | "file_delete"
-  | "directory_create"
-  | "clipboard_write";
+  | "directory_create";
 
 export interface UndoOperation {
   id: string;
@@ -257,9 +256,5 @@ export interface FileDeleteUndoData {
 export interface DirectoryCreateUndoData {
   path: string;
   wasEmpty: boolean;
-}
-
-export interface ClipboardWriteUndoData {
-  previousContent: string;
 }
 

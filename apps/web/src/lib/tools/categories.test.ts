@@ -9,7 +9,6 @@ import {
   FILE_SYSTEM_TOOLS,
   TOOLBOX_TOOLS,
   WEB_TOOLS,
-  SYSTEM_TOOLS,
   IMAGE_TOOLS,
   ALL_TOOLS,
   type RiskLevel,
@@ -36,13 +35,6 @@ describe("getToolCategory", () => {
     expect(getToolCategory("http_fetch")).toBe("web");
     expect(getToolCategory("web_search")).toBe("web");
     expect(getToolCategory("scrape_webpage")).toBe("web");
-  });
-
-  it("returns 'system' for known system tools", () => {
-    expect(getToolCategory("shell_execute")).toBe("system");
-    expect(getToolCategory("clipboard_read")).toBe("system");
-    expect(getToolCategory("clipboard_write")).toBe("system");
-    expect(getToolCategory("notification_send")).toBe("system");
   });
 
   it("returns 'custom' for unknown tool names", () => {
@@ -74,13 +66,6 @@ describe("getToolRiskLevel", () => {
     expect(getToolRiskLevel("scrape_webpage")).toBe("low");
   });
 
-  it("returns correct risk levels for system tools", () => {
-    expect(getToolRiskLevel("shell_execute")).toBe("critical");
-    expect(getToolRiskLevel("clipboard_read")).toBe("medium");
-    expect(getToolRiskLevel("clipboard_write")).toBe("medium");
-    expect(getToolRiskLevel("notification_send")).toBe("low");
-  });
-
   it("defaults to 'high' for unknown tool names", () => {
     expect(getToolRiskLevel("unknown_tool")).toBe("high");
     expect(getToolRiskLevel("")).toBe("high");
@@ -97,7 +82,6 @@ describe("getToolSupportsUndo", () => {
     expect(getToolSupportsUndo("delete_path")).toBe(true);
     expect(getToolSupportsUndo("create_directory")).toBe(true);
     expect(getToolSupportsUndo("rename_path")).toBe(true);
-    expect(getToolSupportsUndo("clipboard_write")).toBe(true);
   });
 
   it("returns false for tools that do not support undo", () => {
@@ -105,9 +89,6 @@ describe("getToolSupportsUndo", () => {
     expect(getToolSupportsUndo("read_directory")).toBe(false);
     expect(getToolSupportsUndo("http_fetch")).toBe(false);
     expect(getToolSupportsUndo("web_search")).toBe(false);
-    expect(getToolSupportsUndo("shell_execute")).toBe(false);
-    expect(getToolSupportsUndo("clipboard_read")).toBe(false);
-    expect(getToolSupportsUndo("notification_send")).toBe(false);
   });
 
   it("defaults to false for unknown tools", () => {
@@ -206,7 +187,7 @@ describe("CATEGORY_CONFIG", () => {
 // ============================================================================
 
 describe("ALL_TOOLS", () => {
-  it("contains all file system, web, and system tools", () => {
+  it("contains all file system and web tools", () => {
     const allNames = ALL_TOOLS.map(t => t.name);
     for (const tool of FILE_SYSTEM_TOOLS) {
       expect(allNames).toContain(tool.name);
@@ -214,14 +195,11 @@ describe("ALL_TOOLS", () => {
     for (const tool of WEB_TOOLS) {
       expect(allNames).toContain(tool.name);
     }
-    for (const tool of SYSTEM_TOOLS) {
-      expect(allNames).toContain(tool.name);
-    }
   });
 
   it("has the expected total count", () => {
     expect(ALL_TOOLS.length).toBe(
-      FILE_SYSTEM_TOOLS.length + TOOLBOX_TOOLS.length + WEB_TOOLS.length + SYSTEM_TOOLS.length + IMAGE_TOOLS.length
+      FILE_SYSTEM_TOOLS.length + TOOLBOX_TOOLS.length + WEB_TOOLS.length + IMAGE_TOOLS.length
     );
   });
 
@@ -257,10 +235,3 @@ describe("WEB_TOOLS", () => {
   });
 });
 
-describe("SYSTEM_TOOLS", () => {
-  it("all have category 'system'", () => {
-    for (const tool of SYSTEM_TOOLS) {
-      expect(tool.category).toBe("system");
-    }
-  });
-});

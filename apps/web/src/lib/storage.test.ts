@@ -1551,6 +1551,50 @@ describe("storage", () => {
 
       expect(await loadToolboxItem(first.category, first.name)).not.toBeNull();
     });
+
+    it("upgrades an untouched superseded default and leaves edited copies alone", async () => {
+      const { initAppDataDir, ensureDefaultToolboxItems, saveToolboxItem, loadToolboxItem } =
+        await importStorage();
+      const { DEFAULT_TOOLBOX_ITEMS, SUPERSEDED_TOOLBOX_DEFAULTS } = await import(
+        "./toolbox/toolbox-defaults"
+      );
+      await initAppDataDir();
+      await ensureDefaultToolboxItems();
+
+      const [superseded] = SUPERSEDED_TOOLBOX_DEFAULTS;
+      const current = DEFAULT_TOOLBOX_ITEMS.find(
+        (i) => i.category === superseded.category && i.name === superseded.name
+      )!;
+      const save = (content: string) =>
+        saveToolboxItem({
+          name: superseded.name,
+          category: superseded.category,
+          content,
+          updatedAt: "2025-01-01T00:00:00Z",
+        });
+
+      await save(superseded.previous[0]);
+      await ensureDefaultToolboxItems();
+      expect((await loadToolboxItem(superseded.category, superseded.name))!.content).toBe(
+        current.content
+      );
+
+      const edited = `${superseded.previous[0]}\nMy own note.\n`;
+      await save(edited);
+      await ensureDefaultToolboxItems();
+      expect((await loadToolboxItem(superseded.category, superseded.name))!.content).toBe(edited);
+    });
+
+    it("every superseded entry names an existing default and differs from it", async () => {
+      const { DEFAULT_TOOLBOX_ITEMS, SUPERSEDED_TOOLBOX_DEFAULTS } = await import(
+        "./toolbox/toolbox-defaults"
+      );
+      for (const { category, name, previous } of SUPERSEDED_TOOLBOX_DEFAULTS) {
+        const current = DEFAULT_TOOLBOX_ITEMS.find((i) => i.category === category && i.name === name);
+        expect(current, `${category}/${name}`).toBeDefined();
+        for (const old of previous) expect(old).not.toBe(current!.content);
+      }
+    });
   });
 
   // ==========================================================================

@@ -301,7 +301,7 @@ Output:
 name: writer
 description: Drafts and edits documents, emails, and other text
 temperature: 0.8
-tools: [read_file, write_file, list_files, read_directory, clipboard_read, clipboard_write]
+tools: [read_file, write_file, list_files, read_directory]
 ---
 You are a writing agent. You draft new text and edit existing text.
 
@@ -431,4 +431,32 @@ export const DEFAULT_TOOLBOX_ITEMS: DefaultToolboxItem[] = [
   ...AGENTS,
   ...WORKFLOWS,
   ...MEMORIES,
+];
+
+// ---------------------------------------------------------------------------
+// Superseded defaults — earlier contents of items that have since changed.
+// A seeded file still byte-identical to one of these is upgraded to the
+// current default; a file the user edited never matches and is left alone.
+// ---------------------------------------------------------------------------
+
+export interface SupersededToolboxDefault {
+  category: DefaultToolboxCategory;
+  name: string;
+  previous: string[];
+}
+
+const WRITER = AGENTS.find((item) => item.name === "writer")!;
+
+export const SUPERSEDED_TOOLBOX_DEFAULTS: SupersededToolboxDefault[] = [
+  {
+    // The clipboard tools were removed along with the other system tools.
+    category: "agents",
+    name: "writer",
+    previous: [
+      WRITER.content.replace(
+        "tools: [read_file, write_file, list_files, read_directory]",
+        "tools: [read_file, write_file, list_files, read_directory, clipboard_read, clipboard_write]",
+      ),
+    ],
+  },
 ];

@@ -2,10 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::Duration;
-use tauri_plugin_shell::process::CommandEvent;
-use tauri_plugin_shell::ShellExt;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileNode {
@@ -14,31 +12,6 @@ pub struct FileNode {
     pub is_directory: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<FileNode>>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AppConfig {
-    pub theme: String,
-    pub working_directory: String,
-    pub user_mode: String,
-    pub yolo: bool,
-    pub sandboxed: bool,
-    pub guardrails: bool,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            theme: "dark".to_string(),
-            working_directory: dirs::home_dir()
-                .map(|h| h.join("Projects").to_string_lossy().to_string())
-                .unwrap_or_else(|| "~/Projects".to_string()),
-            user_mode: "normal".to_string(),
-            yolo: false,
-            sandboxed: true,
-            guardrails: true,
-        }
-    }
 }
 
 const DEFAULT_AGENT_CONTENT: &str = r#"---
@@ -123,15 +96,6 @@ pub fn init_app_data_dir() -> Result<(), String> {
     for subdir in subdirs {
         let path = app_dir.join(subdir);
         fs::create_dir_all(&path).map_err(|e| format!("Failed to create {}: {}", subdir, e))?;
-    }
-
-    // Create default config if it doesn't exist
-    let config_path = app_dir.join("config.yaml");
-    if !config_path.exists() {
-        let default_config = AppConfig::default();
-        let yaml = serde_yaml::to_string(&default_config)
-            .map_err(|e| format!("Failed to serialize config: {}", e))?;
-        fs::write(&config_path, yaml).map_err(|e| format!("Failed to write config: {}", e))?;
     }
 
     // Create default agent if it doesn't exist
@@ -375,54 +339,6 @@ pub fn list_files(dir: String, extension: Option<String>) -> Result<Vec<String>,
     Ok(files)
 }
 
-/// Run the bundled pi sidecar with args and return combined stdout/stderr.
-#[tauri::command]
-pub async fn run_pi_sidecar(
-    app: tauri::AppHandle,
-    args: Vec<String>,
-) -> Result<String, String> {
-    let mut output = String::new();
-
-    let (mut rx, _child) = app
-        .shell()
-        .sidecar("pi-sidecar")
-        .map_err(|e| e.to_string())?
-        .args(args)
-        .spawn()
-        .map_err(|e| e.to_string())?;
-    let mut exit_code: Option<i32> = None;
-    let mut exit_signal: Option<String> = None;
-
-    while let Some(event) = rx.recv().await {
-        match event {
-            CommandEvent::Stdout(data) => {
-                output.push_str(&String::from_utf8_lossy(&data));
-            }
-            CommandEvent::Stderr(data) => {
-                output.push_str(&String::from_utf8_lossy(&data));
-            }
-            CommandEvent::Terminated(payload) => {
-                exit_code = payload.code;
-                exit_signal = payload.signal.map(|signal| signal.to_string());
-                break;
-            }
-            _ => {}
-        }
-    }
-
-    if let Some(signal) = exit_signal {
-        return Err(format!("pi sidecar terminated by signal: {}", signal));
-    }
-
-    if let Some(code) = exit_code {
-        if code != 0 {
-            return Err(format!("pi sidecar exited with code {}: {}", code, output));
-        }
-    }
-
-    Ok(output)
-}
-
 /// Expand ~ to home directory
 fn expand_tilde(path: &str) -> String {
     if path.starts_with("~/") {
@@ -431,113 +347,6 @@ fn expand_tilde(path: &str) -> String {
         }
     }
     path.to_string()
-}
-
-// ============================================================================
-// Shell Execution
-// ============================================================================
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ShellOutput {
-    pub stdout: String,
-    pub stderr: String,
-    pub exit_code: Option<i32>,
-    pub duration_ms: u64,
-}
-
-/// Execute a shell command with optional timeout
-#[tauri::command]
-pub async fn execute_shell(
-    command: String,
-    cwd: Option<String>,
-    timeout_ms: Option<u64>,
-) -> Result<ShellOutput, String> {
-    let start = std::time::Instant::now();
-    let timeout = Duration::from_millis(timeout_ms.unwrap_or(60000)); // Default 60s
-
-    let shell = if cfg!(target_os = "windows") {
-        "cmd"
-    } else {
-        "sh"
-    };
-
-    let shell_arg = if cfg!(target_os = "windows") {
-        "/C"
-    } else {
-        "-c"
-    };
-
-    let mut cmd = Command::new(shell);
-    cmd.arg(shell_arg)
-        .arg(&command)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    if let Some(ref dir) = cwd {
-        let expanded = expand_tilde(dir);
-        cmd.current_dir(&expanded);
-    }
-
-    let child = cmd.spawn().map_err(|e| format!("Failed to spawn command: {}", e))?;
-
-    // Wait with timeout
-    let output = tokio::time::timeout(timeout, async {
-        child.wait_with_output()
-    })
-    .await
-    .map_err(|_| format!("Command timed out after {}ms", timeout.as_millis()))?
-    .map_err(|e| format!("Failed to wait for command: {}", e))?;
-
-    let duration_ms = start.elapsed().as_millis() as u64;
-
-    Ok(ShellOutput {
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        exit_code: output.status.code(),
-        duration_ms,
-    })
-}
-
-// ============================================================================
-// Clipboard Operations
-// ============================================================================
-
-/// Read from clipboard
-#[tauri::command]
-pub fn read_clipboard() -> Result<String, String> {
-    // Use arboard for cross-platform clipboard
-    let mut clipboard = arboard::Clipboard::new()
-        .map_err(|e| format!("Failed to access clipboard: {}", e))?;
-
-    clipboard.get_text()
-        .map_err(|e| format!("Failed to read clipboard: {}", e))
-}
-
-/// Write to clipboard
-#[tauri::command]
-pub fn write_clipboard(content: String) -> Result<(), String> {
-    let mut clipboard = arboard::Clipboard::new()
-        .map_err(|e| format!("Failed to access clipboard: {}", e))?;
-
-    clipboard.set_text(content)
-        .map_err(|e| format!("Failed to write to clipboard: {}", e))
-}
-
-// ============================================================================
-// Notifications
-// ============================================================================
-
-/// Send a system notification
-#[tauri::command]
-pub fn send_notification(title: String, body: String) -> Result<(), String> {
-    notify_rust::Notification::new()
-        .summary(&title)
-        .body(&body)
-        .appname("Verbalis")
-        .show()
-        .map_err(|e| format!("Failed to send notification: {}", e))?;
-
-    Ok(())
 }
 
 // ============================================================================
@@ -618,92 +427,6 @@ pub async fn http_request(
         body,
         duration_ms,
     })
-}
-
-// ============================================================================
-// Backup/Restore for Undo
-// ============================================================================
-
-/// Backup a file before modification (returns backup path)
-#[tauri::command]
-pub fn backup_file(path: String) -> Result<String, String> {
-    let path = expand_tilde(&path);
-    let source = Path::new(&path);
-
-    if !source.exists() {
-        return Err(format!("File does not exist: {}", path));
-    }
-
-    // Create backup directory
-    let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let backup_dir = home.join(".verbalis").join("backups");
-    fs::create_dir_all(&backup_dir)
-        .map_err(|e| format!("Failed to create backup directory: {}", e))?;
-
-    // Generate backup filename with timestamp
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-
-    let filename = source.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("unknown");
-
-    let backup_path = backup_dir.join(format!("{}_{}", timestamp, filename));
-
-    // Copy file to backup
-    fs::copy(source, &backup_path)
-        .map_err(|e| format!("Failed to backup file: {}", e))?;
-
-    Ok(backup_path.to_string_lossy().to_string())
-}
-
-/// Restore a file from backup
-#[tauri::command]
-pub fn restore_file(backup_path: String, original_path: String) -> Result<(), String> {
-    let backup = Path::new(&backup_path);
-    let expanded_original = expand_tilde(&original_path);
-    let original = Path::new(&expanded_original);
-
-    if !backup.exists() {
-        return Err(format!("Backup file does not exist: {}", backup_path));
-    }
-
-    // Restore the file
-    fs::copy(backup, original)
-        .map_err(|e| format!("Failed to restore file: {}", e))?;
-
-    // Optionally delete the backup
-    let _ = fs::remove_file(backup);
-
-    Ok(())
-}
-
-/// Read the app config
-#[tauri::command]
-pub fn read_config() -> Result<AppConfig, String> {
-    let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let config_path = home.join(".verbalis").join("config.yaml");
-
-    if !config_path.exists() {
-        return Ok(AppConfig::default());
-    }
-
-    let content =
-        fs::read_to_string(&config_path).map_err(|e| format!("Failed to read config: {}", e))?;
-    serde_yaml::from_str(&content).map_err(|e| format!("Failed to parse config: {}", e))
-}
-
-/// Save the app config
-#[tauri::command]
-pub fn save_config(config: AppConfig) -> Result<(), String> {
-    let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let config_path = home.join(".verbalis").join("config.yaml");
-
-    let yaml =
-        serde_yaml::to_string(&config).map_err(|e| format!("Failed to serialize config: {}", e))?;
-    fs::write(&config_path, yaml).map_err(|e| format!("Failed to write config: {}", e))
 }
 
 /// Rename/move a file or directory

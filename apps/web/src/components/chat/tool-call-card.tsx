@@ -48,10 +48,6 @@ const TOOL_ICONS: Record<string, React.ElementType> = {
   http_fetch: Globe,
   web_search: Globe,
   scrape_webpage: Globe,
-  shell_execute: Terminal,
-  clipboard_read: FileText,
-  clipboard_write: FileText,
-  notification_send: AlertCircle,
   generate_image: ImageIcon,
 };
 

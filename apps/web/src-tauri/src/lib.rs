@@ -6,7 +6,7 @@ use commands::*;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // Info-level logging in debug builds, Warn in release so
@@ -44,18 +44,8 @@ pub fn run() {
             create_directory,
             path_exists,
             list_files,
-            read_config,
-            save_config,
             rename_path,
-            run_pi_sidecar,
-            // New agentic commands
-            execute_shell,
-            read_clipboard,
-            write_clipboard,
-            send_notification,
             http_request,
-            backup_file,
-            restore_file,
             // Debug logging
             append_log,
             clear_log,

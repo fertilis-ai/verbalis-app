@@ -33,9 +33,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "externalBin": [
-      "bin/pi-sidecar"
-    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -50,11 +47,6 @@
         "windowSize": { "width": 660, "height": 400 },
         "background": "dmg-background.png"
       }
-    }
-  },
-  "plugins": {
-    "shell": {
-      "open": true
     }
   }
 }

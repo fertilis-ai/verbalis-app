@@ -16,24 +16,29 @@ Decisions already made: delete the unused system tools (shell, clipboard, notifi
 4. ✅ **Adapter leak.** A new `releaseAdapter(conversationId, adapter)` runs when each `run()` finishes. It removes the adapter and its event subscription, keeps the loop context and UI status visible, and does nothing if the adapter has already been replaced.
 5. ✅ **Guardrails parameter removed** from `VerbalisAgentAdapter` and `createVerbalisAdapter`. The config comes only from `run(config)`. Also removed the unused `totalIterations`.
 
-## Phase 1: Delete dead code and dependencies
-- **System tools:**
-  - `lib/tools/system-tools.ts` and its entries in `categories.ts`
-  - Clipboard undo in `guardrails/undo-manager.ts:152–170, 271`
-  - The Rust `execute_shell` (which also has a blocking-timeout bug), `read_clipboard`, `write_clipboard` and `send_notification`, plus their registrations in `lib.rs`
-- **pi-sidecar:**
-  - `packages/pi-sidecar`, `lib/pi-sidecar.ts`, `externalBin` in `tauri.conf.json`, and `run_pi_sidecar` (`commands.rs:379–425`)
-  - `tauri-plugin-shell` on both the Rust and JS sides
-- **Unused Rust commands:** `read_config`, `save_config`, `backup_file`, `restore_file`, and the `AppConfig` struct. Also evaluate `http_request`, which duplicates `tauri-plugin-http`.
-- **Unused TS modules and exports:**
-  - `lib/agentic/context-sharing.ts` and its barrel `lib/agentic/index.ts`
-  - The unused barrels `lib/tools/index.ts` and `lib/guardrails/index.ts`
-  - `classifyError` import and the `includeTools` path (chat-store)
-  - `isLocal` and `pause`/`resume`/`abort` (adapter)
-  - `selectUniqueAgentIds` and `selectRecentRecords`
-  - `stopConfigSync`
-  - Legacy `setYolo`/`setSandboxed`/`setGuardrails`, after migrating `config-sync.ts:138–140`
-- **Unused npm packages:** `@hookform/resolvers`, `@tanstack/react-form`, `dotenv`, `@verbalis-app/env` (and `packages/env`), `@tauri-apps/plugin-shell`.
+## Phase 1: Delete dead code and dependencies — ✅ done (manual smoke test pending)
+1. ✅ **System tools:**
+   - Removed `lib/tools/system-tools.ts` and its test, `SYSTEM_TOOLS` in `categories.ts`, clipboard undo in `undo-manager.ts` (`clipboard_write` type and `ClipboardWriteUndoData`), the tool-card icons, and `clipboard_read`/`clipboard_write` from the default writer agent in `toolbox-defaults.ts`. Seeded files are never overwritten, so `SUPERSEDED_TOOLBOX_DEFAULTS` plus an upgrade pass in `ensureDefaultToolboxItems` rewrite a `writer.md` that is still byte-identical to the old default. Edited copies are left alone, and `TOOLBOX_DEFAULTS_VERSION` is not bumped, because a bump would resurrect deleted defaults.
+   - Removed the Rust `execute_shell`, `read_clipboard`, `write_clipboard` and `send_notification`, and the `arboard` and `notify-rust` crates.
+   - The system tools were never executed; only the unused barrel imported `executeSystemTool`.
+   - The `"system"` `ToolCategory` and `CATEGORY_CONFIG.system` are **kept**. Persisted `guardrailsConfig.categoryConfirmation.system`, the presets and the evaluator all key on them.
+2. ✅ **pi-sidecar:** removed `packages/pi-sidecar`, `lib/pi-sidecar.ts`, the `bin/pi-sidecar*` binaries, `externalBin` and `plugins.shell` in `tauri.conf.json`, `run_pi_sidecar`, and the `build:sidecar` script.
+   - `tauri-plugin-shell` was only used to open URLs ("(Get key)" in settings). It is replaced by `tauri-plugin-opener` (capability `opener:default`).
+   - The JS side is pinned to `@tauri-apps/plugin-opener` **2.5.3** to match the Rust crate. `^2` resolved to 2.7.0, which pulls `@tauri-apps/api` 2.12 against Rust `tauri` 2.9.5. The pin keeps `api` at 2.10.1.
+3. ✅ **Rust commands:**
+   - Removed `read_config`, `save_config`, `backup_file`, `restore_file`, the `AppConfig` struct, the default `config.yaml` write in `init_app_data_dir`, and the `serde_yaml` and `tokio` crates.
+   - `config-sync` already writes `config.yaml` when it is missing. The only value in the Rust default (`theme: dark`) equals the store default.
+   - `http_request` is **kept**: `lib/tools/web-tools.ts` calls it three times. Replacing it with `tauri-plugin-http` is a separate change that needs CSP and scope work.
+4. ✅ **TS modules and exports:**
+   - Removed `context-sharing.ts`, the unused barrels (`lib/agentic/index.ts`, `lib/tools/index.ts`, `lib/guardrails/index.ts`), and the `classifyError` import and `includeTools` path in chat-store.
+   - Removed from the adapter: `isLocal`, `pause`/`resume`/`checkPause`, and `abort`. `stop(reason)` is the single stop path.
+   - Removed `selectUniqueAgentIds`/`selectRecentRecords` and the legacy `yolo`/`sandboxed`/`guardrails` fields and setters. They were neither read nor persisted, and `config-sync` now only calls `setGuardrailsConfig`.
+   - `stopConfigSync` is **kept**. It is the only way to reset config-sync's module state (subscription, poll timer, `lastKnownContent`) between tests.
+5. ✅ **npm packages:** removed `@hookform/resolvers`, `@tanstack/react-form`, `dotenv` (and its catalog entry), `@verbalis-app/env` and `packages/env`, and `@tauri-apps/plugin-shell`.
+
+Follow-ups found in Phase 1 (not done here):
+- The guardrails **shell-command UI and config** now govern tools that no longer exist: "Shell Command Restrictions", the Shell/min rate limit, `sandbox.shellCommands`, and `shellCommands` allow/deny lists. Removing them changes persisted config shape, so it needs a settings migration.
+- The loop events `loop_paused` and `loop_resumed` and the `"paused"` loop status are still handled in the store and UI, but nothing can emit them now. Remove them together with the UI branches.
 
 ## Phase 2: Shared helpers (removes duplication)
 - **`lib/openrouter.ts`:**

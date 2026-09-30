@@ -74,8 +74,6 @@ export interface VerbalisAdapterConfig {
   temperature?: number;
   /** Reasoning effort for LLM calls. Undefined = thinking off / provider default. */
   reasoning?: ThinkingLevel;
-  /** Whether this is a local model */
-  isLocal?: boolean;
   /** Guardrails configuration */
   guardrailsConfig: GuardrailsConfig;
   /** Optional per-agent tool allowlist (tool names). Undefined = all tools. */
@@ -115,8 +113,6 @@ export class VerbalisAgentAdapter {
   private loopContext: LoopContext;
   private config: VerbalisAdapterConfig | null = null;
   private getMessagesCallback: (() => Message[]) | null = null;
-  private isPausedFlag = false;
-  private resumeResolver: (() => void) | null = null;
   private didEmitLoopAborted = false;
 
   constructor(
@@ -197,39 +193,10 @@ export class VerbalisAgentAdapter {
     }
   }
 
-  pause(): void {
-    if (this.loopContext.status === "thinking" || this.loopContext.status === "tool_executing") {
-      this.isPausedFlag = true;
-      this.loopContext.status = "paused";
-      this.emit({ type: "loop_paused" });
-    }
-  }
-
-  resume(): void {
-    if (this.loopContext.status === "paused" && this.isPausedFlag) {
-      this.isPausedFlag = false;
-      if (this.resumeResolver) {
-        this.resumeResolver();
-        this.resumeResolver = null;
-      }
-      this.emit({ type: "loop_resumed" });
-    }
-  }
-
-  stop(): void {
+  stop(reason = "Loop stopped by user"): void {
     this.loopContext.status = "aborted";
     this.abortController?.abort();
-    this.rejectAllPendingConfirmations("Loop stopped by user");
-    if (!this.didEmitLoopAborted) {
-      this.emit({ type: "loop_aborted" });
-      this.didEmitLoopAborted = true;
-    }
-  }
-
-  abort(): void {
-    this.loopContext.status = "aborted";
-    this.abortController?.abort();
-    this.rejectAllPendingConfirmations("Loop aborted by user");
+    this.rejectAllPendingConfirmations(reason);
     if (!this.didEmitLoopAborted) {
       this.emit({ type: "loop_aborted" });
       this.didEmitLoopAborted = true;
@@ -415,9 +382,6 @@ export class VerbalisAgentAdapter {
           break;
         }
 
-        // Check for pause
-        await this.checkPause();
-
         // Translate pi-agent-core events to Verbalis events
         await this.handleAgentEvent(
           event,
@@ -514,7 +478,7 @@ export class VerbalisAgentAdapter {
             });
           }
           this.pendingDispatchToolCalls.clear();
-          this.abort();
+          this.stop("Loop aborted by user");
           break;
         }
         this.loopContext.status = "thinking";
@@ -773,7 +737,7 @@ export class VerbalisAgentAdapter {
 
           // Hard guardrail blocks should terminate the active loop immediately
           // to prevent repeated retries against blocked policies.
-          this.abort();
+          this.stop("Loop aborted by user");
 
           const violationSummary = evaluation.violations.map(v => v.message).join("; ");
           return {
@@ -967,14 +931,6 @@ export class VerbalisAgentAdapter {
       toolCalls: [],
       startedAt: new Date(),
     };
-  }
-
-  private async checkPause(): Promise<void> {
-    if (this.isPausedFlag) {
-      await new Promise<void>(resolve => {
-        this.resumeResolver = resolve;
-      });
-    }
   }
 }
 

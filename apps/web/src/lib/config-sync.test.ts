@@ -43,9 +43,6 @@ const mockSetSelectedModels = vi.fn();
 const mockSetImageModel = vi.fn();
 const mockSetAvailableImageModels = vi.fn();
 const mockSetGuardrailsConfig = vi.fn();
-const mockSetGuardrails = vi.fn();
-const mockSetSandboxed = vi.fn();
-const mockSetYolo = vi.fn();
 const mockSetAgentDebugLogging = vi.fn();
 const mockSetState = vi.fn();
 
@@ -77,9 +74,6 @@ const defaultStoreState = {
   setImageModel: mockSetImageModel,
   setAvailableImageModels: mockSetAvailableImageModels,
   setGuardrailsConfig: mockSetGuardrailsConfig,
-  setGuardrails: mockSetGuardrails,
-  setSandboxed: mockSetSandboxed,
-  setYolo: mockSetYolo,
   setAgentDebugLogging: mockSetAgentDebugLogging,
 };
 
@@ -225,9 +219,6 @@ describe("config-sync", () => {
       await initConfigSync();
 
       expect(mockSetGuardrailsConfig).toHaveBeenCalledWith(existingConfig.guardrailsConfig);
-      expect(mockSetGuardrails).toHaveBeenCalledWith(false);
-      expect(mockSetSandboxed).toHaveBeenCalledWith(true);
-      expect(mockSetYolo).toHaveBeenCalledWith(true); // yolo = !enabled
     });
 
     it("loads API keys from keychain", async () => {

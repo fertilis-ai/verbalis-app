@@ -44,8 +44,6 @@ vi.mock("@tauri-apps/api/core", () => ({
 import {
   useToolHistoryStore,
   selectUniqueToolNames,
-  selectUniqueAgentIds,
-  selectRecentRecords,
   selectRecordsWithUndo,
 } from "./tool-history-store";
 import type { ToolHistoryFilters, } from "./tool-history-store";
@@ -482,25 +480,6 @@ describe("tool-history-store", () => {
       it("returns sorted unique tool names", () => {
         const result = selectUniqueToolNames(state);
         expect(result).toEqual(["fetch_url", "read_file", "write_file"]);
-      });
-    });
-
-    describe("selectUniqueAgentIds", () => {
-      it("returns sorted unique non-null agent ids", () => {
-        const result = selectUniqueAgentIds(state);
-        expect(result).toEqual(["a1", "a2"]);
-      });
-    });
-
-    describe("selectRecentRecords", () => {
-      it("returns first N records", () => {
-        const result = selectRecentRecords(state, 2);
-        expect(result).toHaveLength(2);
-      });
-
-      it("defaults to 10", () => {
-        const result = selectRecentRecords(state);
-        expect(result).toHaveLength(4);
       });
     });
 

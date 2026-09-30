@@ -308,37 +308,6 @@ describe("UndoManager", () => {
   });
 
   // ==========================================================================
-  // prepareClipboardWriteUndo
-  // ==========================================================================
-  describe("prepareClipboardWriteUndo", () => {
-    it("should return null when not in Tauri", async () => {
-      const manager = getUndoManager();
-      const result = await manager.prepareClipboardWriteUndo();
-      expect(result).toBeNull();
-    });
-
-    it("should return previous clipboard content (Tauri)", async () => {
-      mockIsTauri.mockReturnValue(true);
-      mockInvoke.mockResolvedValueOnce("previous clipboard");
-
-      const manager = getUndoManager();
-      const result = await manager.prepareClipboardWriteUndo();
-      expect(result).not.toBeNull();
-      expect(result!.previousContent).toBe("previous clipboard");
-    });
-
-    it("should return empty string on clipboard read error (Tauri)", async () => {
-      mockIsTauri.mockReturnValue(true);
-      mockInvoke.mockRejectedValueOnce(new Error("clipboard error"));
-
-      const manager = getUndoManager();
-      const result = await manager.prepareClipboardWriteUndo();
-      expect(result).not.toBeNull();
-      expect(result!.previousContent).toBe("");
-    });
-  });
-
-  // ==========================================================================
   // executeUndo
   // ==========================================================================
   describe("executeUndo", () => {
@@ -444,22 +413,6 @@ describe("UndoManager", () => {
 
       const op = manager.getUndoOperation("tool-1");
       expect(op!.status).toBe("failed");
-    });
-
-    it("should execute clipboard_write undo (Tauri)", async () => {
-      mockIsTauri.mockReturnValue(true);
-      mockInvoke.mockResolvedValue(undefined);
-
-      const manager = getUndoManager();
-      const id = await manager.registerUndo("tool-1", "clipboard_write", {
-        previousContent: "old clipboard",
-      });
-
-      const result = await manager.executeUndo(id);
-      expect(result).toBe(true);
-      expect(mockInvoke).toHaveBeenCalledWith("write_clipboard", {
-        content: "old clipboard",
-      });
     });
 
     it("should not execute if operation is already executed", async () => {

@@ -77,8 +77,8 @@ vi.mock("@/lib/storage", () => ({
   isTauri: vi.fn(() => false),
 }));
 
-vi.mock("@tauri-apps/plugin-shell", () => ({
-  open: vi.fn(),
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl: vi.fn(),
 }));
 
 vi.mock("@/lib/hue-presets", () => ({

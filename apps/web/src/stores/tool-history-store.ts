@@ -336,15 +336,6 @@ export const selectUniqueToolNames = (state: ToolHistoryState): string[] => {
   return Array.from(names).sort();
 };
 
-export const selectUniqueAgentIds = (state: ToolHistoryState): string[] => {
-  const ids = new Set(state.records.map((r) => r.agentId).filter((id): id is string => id !== null));
-  return Array.from(ids).sort();
-};
-
-export const selectRecentRecords = (state: ToolHistoryState, limit = 10): ToolExecutionRecord[] => {
-  return state.records.slice(0, limit);
-};
-
 export const selectRecordsWithUndo = (state: ToolHistoryState): ToolExecutionRecord[] => {
   return state.records.filter((r) => r.undoAvailable);
 };

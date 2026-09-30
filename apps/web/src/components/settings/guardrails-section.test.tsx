@@ -17,7 +17,7 @@ vi.mock("lucide-react", () => ({
   X: (props: any) => <span data-testid="icon-X" {...props} />,
 }));
 
-// Mock transitive deps for categories -> web-tools/system-tools chain
+// Mock transitive deps for categories -> web-tools/image-tools chain
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
   isTauri: vi.fn(() => false),

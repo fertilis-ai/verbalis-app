@@ -22,9 +22,6 @@ interface SettingsState {
   workingDirectory: string;
   settingsDirectory: string;
   userMode: UserMode;
-  yolo: boolean;
-  sandboxed: boolean;
-  guardrails: boolean;
   apiKeys: {
     anthropic: string;
     openai: string;
@@ -88,9 +85,6 @@ interface SettingsState {
   setWorkingDirectory: (dir: string) => void;
   setSettingsDirectory: (dir: string) => void;
   setUserMode: (mode: UserMode) => void;
-  setYolo: (yolo: boolean) => void;
-  setSandboxed: (sandboxed: boolean) => void;
-  setGuardrails: (guardrails: boolean) => void;
   setApiKey: (provider: "anthropic" | "openai" | "google" | "openrouter", key: string) => void;
   setLocalLLM: (updates: Partial<SettingsState["localLLM"]>) => void;
   setDefaultModel: (model: ChatModelId) => void;
@@ -140,9 +134,6 @@ export const useSettingsStore = create<SettingsState>()(
       workingDirectory: "",
       settingsDirectory: "",
       userMode: "normal",
-      yolo: false,
-      sandboxed: true,
-      guardrails: true,
       apiKeys: {
         anthropic: "",
         openai: "",
@@ -187,32 +178,6 @@ export const useSettingsStore = create<SettingsState>()(
       setWorkingDirectory: (workingDirectory) => set({ workingDirectory }),
       setSettingsDirectory: (settingsDirectory) => set({ settingsDirectory }),
       setUserMode: (userMode) => set({ userMode }),
-      setYolo: (yolo) => {
-        set({ yolo });
-        // Sync with guardrails config
-        if (yolo) {
-          set((state) => ({
-            guardrailsConfig: { ...state.guardrailsConfig, enabled: false },
-          }));
-        }
-      },
-      setSandboxed: (sandboxed) => {
-        set({ sandboxed });
-        // Sync with guardrails config
-        set((state) => ({
-          guardrailsConfig: {
-            ...state.guardrailsConfig,
-            sandbox: { ...state.guardrailsConfig.sandbox, enabled: sandboxed },
-          },
-        }));
-      },
-      setGuardrails: (guardrails) => {
-        set({ guardrails });
-        // Sync with guardrails config
-        set((state) => ({
-          guardrailsConfig: { ...state.guardrailsConfig, enabled: guardrails },
-        }));
-      },
       setApiKey: (provider, key) => {
         set((state) => ({
           apiKeys: { ...state.apiKeys, [provider]: key },
@@ -362,26 +327,17 @@ export const useSettingsStore = create<SettingsState>()(
       setGuardrailsConfig: (config) =>
         set((state) => ({
           guardrailsConfig: { ...state.guardrailsConfig, ...config },
-          // Keep legacy fields in sync
-          guardrails: config.enabled ?? state.guardrailsConfig.enabled,
-          sandboxed: config.sandbox?.enabled ?? state.guardrailsConfig.sandbox.enabled,
         })),
 
       resetGuardrailsToDefaults: () =>
         set({
           guardrailsConfig: DEFAULT_GUARDRAILS_CONFIG,
-          guardrails: DEFAULT_GUARDRAILS_CONFIG.enabled,
-          sandboxed: DEFAULT_GUARDRAILS_CONFIG.sandbox.enabled,
-          yolo: false,
         }),
 
       applyGuardrailsPreset: (preset) => {
         const presetConfig = getPresetConfig(preset);
         set({
           guardrailsConfig: presetConfig,
-          guardrails: presetConfig.enabled,
-          sandboxed: presetConfig.sandbox.enabled,
-          yolo: preset === "yolo",
           userMode: preset === "normal" ? "normal" : "advanced",
         });
       },
@@ -395,9 +351,6 @@ export const useSettingsStore = create<SettingsState>()(
 
           set({
             guardrailsConfig: { ...DEFAULT_GUARDRAILS_CONFIG, ...config },
-            guardrails: config.enabled,
-            sandboxed: config.sandbox?.enabled ?? true,
-            yolo: !config.enabled,
           });
           return true;
         } catch {

@@ -62,8 +62,7 @@ Built by [Fertilis.ai](https://fertilis.ai).
 
 ### Desktop App (Tauri)
 - Native macOS, Windows, and Linux builds
-- 33 Rust commands for OS integration: file I/O, shell execution, clipboard, notifications, HTTP, keychain, logging
-- Bundled pi-sidecar binary for background agent processing
+- 28 Rust commands for OS integration: file I/O, HTTP, keychain, logging
 - Custom DMG installer with branded background (macOS)
 
 ## Tech Stack
@@ -148,16 +147,13 @@ verbalis-app/
 │       │   └── test/               # Test setup and mocks
 │       └── src-tauri/
 │           ├── src/
-│           │   ├── commands.rs     # 33 Tauri commands (Rust)
+│           │   ├── commands.rs     # 28 Tauri commands (Rust)
 │           │   ├── lib.rs          # Plugin initialization
 │           │   └── main.rs         # Entry point
-│           ├── bin/                # Bundled pi-sidecar binary
 │           ├── icons/              # App icons (macOS, Windows, Linux, mobile)
 │           └── tauri.conf.json     # Desktop app configuration
 ├── packages/
-│   ├── config/                     # Shared TypeScript configuration
-│   ├── env/                        # Type-safe environment variables (T3 env-core)
-│   └── pi-sidecar/                 # AI sidecar process builder
+│   └── config/                     # Shared TypeScript configuration
 ├── assets/                         # Logos and screenshots
 ├── turbo.json                      # Turborepo task orchestration
 └── package.json                    # Workspace root
@@ -198,17 +194,14 @@ Eleven Zustand stores manage application state, each with a corresponding test f
 
 ### Tauri Commands (Rust Backend)
 
-The desktop app exposes 33 commands to the frontend:
+The desktop app exposes 28 commands to the frontend:
 
-- **File operations** — read, write, delete, rename, backup/restore, directory listing
-- **Config** — read/save app configuration
-- **Shell** — execute shell commands
-- **Clipboard** — read/write system clipboard
-- **Notifications** — send OS notifications
-- **HTTP** — make HTTP requests
+- **File operations** — read, write, copy, delete, rename, directory listing, reveal in Finder
+- **HTTP** — make HTTP requests (used by the web tools)
 - **Keychain** — store, retrieve, delete API keys securely
 - **Logging** — append, read, clear log files
-- **Sidecar** — start/manage the pi-sidecar process
+
+URLs are opened in the system browser via `tauri-plugin-opener`.
 
 ### Storage
 
@@ -223,8 +216,7 @@ Turborepo orchestrates builds with dependency awareness:
 
 ```
 turbo build
-  ├── @verbalis-app/config    (shared TS config, no output)
-  └── @verbalis-app/env       (env validation, no output)
+  └── @verbalis-app/config    (shared TS config, no output)
     └── web
        ├── Vite → dist/          (frontend bundle)
        └── Tauri → native app    (desktop builds only)
@@ -241,7 +233,6 @@ Vite uses a custom `nodeStubsPlugin` to provide no-op polyfills for Node.js buil
 | `bun run dev` | Start all apps in development mode |
 | `bun run dev:web` | Start the web app only (port 3001) |
 | `bun run build` | Build all apps for production |
-| `bun run build:sidecar` | Build the pi-sidecar binary |
 | `bun run check-types` | TypeScript type checking across all workspaces |
 
 ### From `apps/web/`

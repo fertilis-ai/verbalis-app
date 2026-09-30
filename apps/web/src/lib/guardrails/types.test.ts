@@ -145,8 +145,7 @@ describe("type utilities", () => {
       "file_write",
       "file_delete",
       "directory_create",
-      "clipboard_write",
     ];
-    expect(types).toHaveLength(4);
+    expect(types).toHaveLength(3);
   });
 });

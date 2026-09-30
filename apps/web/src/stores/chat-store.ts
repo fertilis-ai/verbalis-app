@@ -18,7 +18,6 @@ import { stripProtocolMarkers } from "@/lib/protocol-parser";
 import { messagesToPiMessages } from "@/lib/message-conversion";
 import { computeContextBudget, type ContextBudget } from "@/lib/context/token-estimate";
 import { trimMessagesToBudget } from "@/lib/context/trim";
-import { classifyError } from "@/lib/agentic/types";
 import { resolveMemories } from "@/lib/memory/resolve-memories";
 import { resolveSkills, renderSkillsForPrompt } from "@/lib/skills/resolve-skills";
 import { buildToolboxInventory } from "@/lib/toolbox/toolbox-inventory";
@@ -173,13 +172,11 @@ function buildContextFromConversation(params: {
   api: Api;
   provider: string;
   model: string;
-  includeTools?: boolean;
 }): Context {
-  const { conversation, systemPrompt, api, provider, model, includeTools } = params;
+  const { conversation, systemPrompt, api, provider, model } = params;
   return {
     systemPrompt,
     messages: messagesToPiMessages(conversation.messages, api, provider, model),
-    tools: includeTools ? getToolsForContext() : undefined,
   };
 }
 
@@ -610,7 +607,6 @@ export const useChatStore = create<ChatState>((set, get) => {
       const runWithAdapter = async (
         adapterModel: Model<Api>,
         adapterApiKey: string,
-        adapterIsLocal: boolean,
         adapterReasoning?: ThinkingLevel
       ) => {
         const loopStore = useAgenticLoopStore.getState();
@@ -752,7 +748,6 @@ export const useChatStore = create<ChatState>((set, get) => {
           apiKey: adapterApiKey,
           temperature,
           reasoning: adapterReasoning,
-          isLocal: adapterIsLocal,
           guardrailsConfig,
           allowedTools,
           onEvent: () => {}, // Events already handled via onEvent subscription
@@ -825,7 +820,7 @@ export const useChatStore = create<ChatState>((set, get) => {
 
         if (isTauri()) {
           // Route through adapter for full tool execution, guardrails, and logging
-          await runWithAdapter(localModel, "local", true);
+          await runWithAdapter(localModel, "local");
         } else {
           // Web-only fallback: simple streaming, no tools available
           const context = buildContextFromConversation({
@@ -894,7 +889,7 @@ export const useChatStore = create<ChatState>((set, get) => {
 
         // Use VerbalisAgentAdapter for tool handling in desktop environment
         if (isTauri()) {
-          await runWithAdapter(modelObj, apiKey, false, reasoning);
+          await runWithAdapter(modelObj, apiKey, reasoning);
         } else {
           // Web-only mode: simple streaming without tool support
           const stream = streamSimple(modelObj, buildContextFromConversation({
@@ -903,7 +898,6 @@ export const useChatStore = create<ChatState>((set, get) => {
             api: modelObj.api,
             provider: modelObj.provider,
             model: modelObj.id,
-            includeTools: false,
           }), {
             apiKey,
             temperature,

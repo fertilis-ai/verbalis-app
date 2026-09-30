@@ -131,14 +131,7 @@ async function loadConfigFromFile(providedContent?: string): Promise<void> {
         useSettingsStore.setState({ modelEffort: parsed.modelEffort });
       if (parsed.imageModel !== undefined) store.setImageModel(parsed.imageModel);
       if (parsed.availableImageModels !== undefined) store.setAvailableImageModels(parsed.availableImageModels);
-      if (parsed.guardrailsConfig !== undefined) {
-        store.setGuardrailsConfig(parsed.guardrailsConfig);
-        // Re-sync legacy derived fields
-        const gc = parsed.guardrailsConfig;
-        if (gc.enabled !== undefined) store.setGuardrails(gc.enabled);
-        if (gc.sandbox?.enabled !== undefined) store.setSandboxed(gc.sandbox.enabled);
-        store.setYolo(gc.enabled === false);
-      }
+      if (parsed.guardrailsConfig !== undefined) store.setGuardrailsConfig(parsed.guardrailsConfig);
       if (parsed.agentDebugLogging !== undefined) {
         store.setAgentDebugLogging(parsed.agentDebugLogging);
         setLoggingEnabled(parsed.agentDebugLogging);

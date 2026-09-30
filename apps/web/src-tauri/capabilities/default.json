@@ -6,7 +6,7 @@
   "permissions": [
     "core:default",
     "dialog:default",
-    "shell:allow-open",
+    "opener:default",
     {
       "identifier": "http:default",
       "allow": [
