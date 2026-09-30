@@ -16,7 +16,7 @@ Decisions already made: delete the unused system tools (shell, clipboard, notifi
 4. ✅ **Adapter leak.** A new `releaseAdapter(conversationId, adapter)` runs when each `run()` finishes. It removes the adapter and its event subscription, keeps the loop context and UI status visible, and does nothing if the adapter has already been replaced.
 5. ✅ **Guardrails parameter removed** from `VerbalisAgentAdapter` and `createVerbalisAdapter`. The config comes only from `run(config)`. Also removed the unused `totalIterations`.
 
-## Phase 1: Delete dead code and dependencies — ✅ done (manual smoke test pending)
+## Phase 1: Delete dead code and dependencies — ✅ done
 1. ✅ **System tools:**
    - Removed `lib/tools/system-tools.ts` and its test, `SYSTEM_TOOLS` in `categories.ts`, clipboard undo in `undo-manager.ts` (`clipboard_write` type and `ClipboardWriteUndoData`), the tool-card icons, and `clipboard_read`/`clipboard_write` from the default writer agent in `toolbox-defaults.ts`. Seeded files are never overwritten, so `SUPERSEDED_TOOLBOX_DEFAULTS` plus an upgrade pass in `ensureDefaultToolboxItems` rewrite a `writer.md` that is still byte-identical to the old default. Edited copies are left alone, and `TOOLBOX_DEFAULTS_VERSION` is not bumped, because a bump would resurrect deleted defaults.
    - Removed the Rust `execute_shell`, `read_clipboard`, `write_clipboard` and `send_notification`, and the `arboard` and `notify-rust` crates.
@@ -50,11 +50,46 @@ Follow-ups found in Phase 1 (not done here):
    - Tests that mock `@/lib/http` now spread `importOriginal()`, so `readErrorBody` is real under test instead of `undefined`.
 3. ✅ **Path helpers:** `dirname`/`basename` in `lib/path-resolution.ts`, with exactly the old `substring`/`split("/").pop()` semantics (`dirname` is `""` without a slash). 20 sites replaced; per-caller fallbacks (`|| "unknown"`, the optional `pendingCloseFilePath`) stay at the call site.
 4. ✅ **Provider labels:** `PROVIDER_LABELS`/`getProviderLabel()` in `lib/models.ts` (including `lmstudio`/`ollama`) replace the maps in `chat-input.tsx`, `model-picker.tsx` and the API-key names and local-provider labels in `settings-view.tsx`. chat-store's `defaultBaseUrls` is merged into `PROVIDER_BASE_URL_MAP`. `models.ts` keeps its own OpenRouter URL literal: importing `lib/openrouter.ts` would drag `http` → `logger` → `storage` into a dependency-free module.
-5. ✅ **Downloads:** `lib/download.ts` (`downloadFile(content, filename, type)`) is used by `execution-history.tsx` and `guardrails-section.tsx`.
+5. ✅ **Downloads:** `lib/download.ts` (`downloadFile(content, filename, type)`) is used by `guardrails-section.tsx` (and was used by `execution-history.tsx`, since deleted as dead UI).
 6. ✅ **ZDR setting renamed** to `openRouterZdrOnly` (setter `setOpenRouterZdrOnly`). Persist version 2 → 3 copies `modelDiscoveryNoDataCollection` into the new key and deletes the old one. Without it, Zustand would drop the old key and ZDR routing would silently switch off. The state comment now says the setting also enforces ZDR routing on chat, image, transcription and speech requests.
 
-Follow-up found in Phase 2 (not done here):
-- The default-model select in `settings-view.tsx` still labels options with the raw provider id (`GPT-4o (openai)`). Switching it to `getProviderLabel` is a visible UI change, so it was left alone.
+Packaged-build smoke test (2026-09-29, all passed):
+- Settings migration v2 → v3 on real data: `openRouterZdrOnly` carried over and `modelDiscoveryNoDataCollection` was removed.
+- API-key labels and the "(Get key)" link. ZDR filtering in the model picker (243 of 439 models) and its badges. Refresh for text, image and speech models. Provider labels in the chat picker.
+- Chat with tools; the request carries the ZDR routing preference. Image generation with ZDR. Speech with ZDR on: OpenRouter refuses a non-ZDR model with a 404 ZDR error, as expected.
+- Guardrails export to `~/Downloads` (valid JSON).
+- File rename (on disk, in the tree and in the tab) and the file name in the unsaved-changes modal.
+- Chats: move to folder and folder rename.
+- Default filename in image Save As.
+- Schedules: update, Run now, move into a folder, edit when nested, folder rename, folder delete.
+- Tasks: folder create with auto-select, a run, folder delete.
+- Syntax highlighting in the Workspace and Toolbox editors.
+
+Follow-ups found in Phase 2 (not done here):
+- The default-model select in `settings-view.tsx` still labelled options with the raw provider id (`GPT-4o (openai)`). → **Fixed**, verified in the packaged app (`Qwen: Qwen3.8 27B (OpenRouter)`).
+- **Read-aloud was broken in the packaged app** ("The operation is not supported"). The CSP had no `media-src`, so `blob:` audio was blocked. This dates from the TTS commit (`b177332`), not Phase 2. → **Fixed** (CSP `media-src 'self' blob:`), verified in the packaged app.
+- The image, transcription and speech pickers were not filtered by ZDR; only the text picker was. → **Fixed.** In the packaged app a speech Refresh stored `zdr` flags (8 of 21 false). The image and transcription lists pick up flags on their next Refresh.
+- Transcription returned HTTP 400 ("Provider returned 400") for `say`-generated test audio. The request was unchanged from before Phase 2. → **Fixed** (recordings re-encoded to WAV), verified in the packaged app.
+- `toolbox/execution-history.tsx` (`ExecutionHistory`) was not mounted anywhere: dead UI that Phase 1 missed. → **Fixed** (deleted along with `tool-history-store`).
+- Schedule YAML stored `agentId: Assistant`, but the UI showed "default". → **Fixed** (unit-tested; new schedules store `default`, and legacy `Assistant` maps to `default`).
+
+Fixes for these (branch `fix/smoke-test-bugs`):
+- **Read-aloud:** added `media-src 'self' blob:` to the CSP.
+- **Default-model labels:** the select uses `getProviderLabel`.
+- **ZDR pickers:**
+  - `/endpoints/zdr` also lists image, transcription and speech models, so `provider-models.ts` now sets a `zdr` flag on those too.
+  - It is omitted when the ZDR list fails to load.
+  - `filterZdrModels` hides only models known to lack ZDR (`zdr: false`), so lists cached before the flag existed stay usable until Refresh.
+  - The current selection is always kept, even if it isn't ZDR, so its select never renders blank. Such a selection still works, but OpenRouter refuses it while ZDR is on.
+- **Transcription:**
+  - Recordings are decoded with Web Audio and re-sent as 16-bit mono WAV (`recordingToWav`/`encodeWav`). WAV is the format every OpenRouter transcription provider accepts.
+  - When decoding fails, the recording goes as recorded.
+  - The error now names the format that was sent.
+- **Dead UI:** deleted `ExecutionHistory` and `tool-history-store` (only it used the store). The persisted `verbalis-tool-history` localStorage key is now orphaned and harmless.
+- **Schedule agent:**
+  - The fallback to a generic prompt was a real bug. `Assistant` matches no seeded agent (they are `default`, `organizer`, `researcher` and `writer`). `sendMessageToConversation` therefore found no agent, and scheduled runs used a generic "You are a helpful AI assistant." prompt with temperature 0.7 and no tool scoping, while the UI showed the first option.
+  - New schedules now store `default`.
+  - `resolveScheduleAgentId` maps a stored `Assistant` to `default`, in the runner and the Agent select, unless the user has an agent by that name. No YAML is rewritten.
 
 ## Phase 3: Single tool registry and typed Tauri boundary
 - **One tool registry.** Merge `TOOL_DEFINITIONS` (`lib/tools.ts:188–360`) and `ALL_TOOLS` (`lib/tools/categories.ts`) into one registry. Each entry holds its definition, metadata and executor.
@@ -106,7 +141,6 @@ Also merge the three "update conversation, ghost or regular" copies into one.
 - **Split large components:**
   - `tool-call-card.tsx`: Header/Details/Actions; move `useToolboxDiff` into the toolbox layer.
   - `guardrails-section.tsx`
-  - `execution-history.tsx`, with a `useHistoryTable` hook
   - `loop-progress-panel.tsx`
   - `chat-input.tsx`: `ModelQuickSelect` and `EffortSelect`
 - **Store selectors.** Replace whole-store `useXStore()` subscriptions with selectors or `useShallow` in `settings-view`, `model-picker`, `guardrails-section`, `chat-view`, `chat-sidebar` and the editors.
