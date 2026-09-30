@@ -378,6 +378,35 @@ describe("SettingsView", () => {
       expect(screen.getByRole("option", { name: "GPT-4o (OpenAI)" })).toBeInTheDocument();
     });
 
+    it("hides media models known to lack ZDR when ZDR-only is on, keeping the selection", () => {
+      Object.assign(mockSettingsStore, {
+        apiKeys: { ...mockSettingsStore.apiKeys, openrouter: "sk-or" },
+        openRouterZdrOnly: true,
+        imageModel: "",
+        availableImageModels: [],
+        transcriptionModel: "",
+        availableTranscriptionModels: [],
+        speechModel: "acme/selected-retains",
+        speechVoice: "",
+        availableSpeechModels: [
+          { id: "acme/zdr", name: "Acme ZDR", voices: [], zdr: true },
+          { id: "acme/retains", name: "Acme Retains", voices: [], zdr: false },
+          { id: "acme/selected-retains", name: "Acme Selected", voices: [], zdr: false },
+          { id: "acme/unknown", name: "Acme Unknown", voices: [] },
+        ],
+      });
+      try {
+        render(<SettingsView />);
+        expect(screen.getByRole("option", { name: "Acme ZDR" })).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: "Acme Unknown" })).toBeInTheDocument();
+        expect(screen.getByRole("option", { name: "Acme Selected" })).toBeInTheDocument();
+        expect(screen.queryByRole("option", { name: "Acme Retains" })).not.toBeInTheDocument();
+      } finally {
+        mockSettingsStore.openRouterZdrOnly = false;
+        mockSettingsStore.availableSpeechModels = [];
+      }
+    });
+
     it("renders Text Model Discovery before Default Text Model", () => {
       render(<SettingsView />);
       const discovery = screen.getByText("Text Model Discovery");

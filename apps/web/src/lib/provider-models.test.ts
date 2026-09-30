@@ -409,26 +409,37 @@ describe("fetchAllProviderModels", () => {
   });
 });
 
+/** Serve `data` for the model list and `zdrIds` (or a failure, for null) for /endpoints/zdr. */
+function mockListWithZdr(data: unknown[], zdrIds: string[] | null) {
+  mockAppFetch.mockImplementation((url: string) => {
+    if (url.includes("/endpoints/zdr")) {
+      return zdrIds
+        ? Promise.resolve(jsonResponse({ data: zdrIds.map((model_id) => ({ model_id })) }))
+        : Promise.reject(new Error("network down"));
+    }
+    return Promise.resolve(jsonResponse({ data }));
+  });
+}
+
 describe("fetchOpenRouterImageModels", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("fetches and maps image models with editing capability", async () => {
-    mockAppFetch.mockResolvedValue(
-      jsonResponse({
-        data: [
-          {
-            id: "openai/gpt-image-1",
-            name: "GPT Image 1",
-            architecture: { input_modalities: ["text", "image"], output_modalities: ["image"] },
-          },
-          {
-            id: "some/text-to-image",
-            architecture: { input_modalities: ["text"], output_modalities: ["image"] },
-          },
-        ],
-      })
+  it("fetches and maps image models with editing capability and ZDR flags", async () => {
+    mockListWithZdr(
+      [
+        {
+          id: "openai/gpt-image-1",
+          name: "GPT Image 1",
+          architecture: { input_modalities: ["text", "image"], output_modalities: ["image"] },
+        },
+        {
+          id: "some/text-to-image",
+          architecture: { input_modalities: ["text"], output_modalities: ["image"] },
+        },
+      ],
+      ["some/text-to-image"]
     );
 
     const result = await fetchOpenRouterImageModels("sk-or-key");
@@ -439,8 +450,13 @@ describe("fetchOpenRouterImageModels", () => {
       })
     );
     expect(result.models).toEqual([
-      { id: "openai/gpt-image-1", name: "GPT Image 1", supportsImageInput: true },
-      { id: "some/text-to-image", name: "some/text-to-image", supportsImageInput: false },
+      { id: "openai/gpt-image-1", name: "GPT Image 1", supportsImageInput: true, zdr: false },
+      {
+        id: "some/text-to-image",
+        name: "some/text-to-image",
+        supportsImageInput: false,
+        zdr: true,
+      },
     ]);
   });
 
@@ -477,14 +493,13 @@ describe("fetchOpenRouterTranscriptionModels", () => {
     vi.clearAllMocks();
   });
 
-  it("fetches and maps transcription models", async () => {
-    mockAppFetch.mockResolvedValue(
-      jsonResponse({
-        data: [
-          { id: "openai/whisper-large-v3", name: "Whisper Large V3" },
-          { id: "openai/gpt-4o-mini-transcribe" },
-        ],
-      })
+  it("fetches and maps transcription models with ZDR flags", async () => {
+    mockListWithZdr(
+      [
+        { id: "openai/whisper-large-v3", name: "Whisper Large V3" },
+        { id: "openai/gpt-4o-mini-transcribe" },
+      ],
+      ["openai/whisper-large-v3"]
     );
 
     const result = await fetchOpenRouterTranscriptionModels("sk-or-key");
@@ -495,8 +510,8 @@ describe("fetchOpenRouterTranscriptionModels", () => {
       })
     );
     expect(result.models).toEqual([
-      { id: "openai/whisper-large-v3", name: "Whisper Large V3" },
-      { id: "openai/gpt-4o-mini-transcribe", name: "openai/gpt-4o-mini-transcribe" },
+      { id: "openai/whisper-large-v3", name: "Whisper Large V3", zdr: true },
+      { id: "openai/gpt-4o-mini-transcribe", name: "openai/gpt-4o-mini-transcribe", zdr: false },
     ]);
   });
 
@@ -530,14 +545,13 @@ describe("fetchOpenRouterSpeechModels", () => {
     vi.clearAllMocks();
   });
 
-  it("fetches and maps speech models with their voices", async () => {
-    mockAppFetch.mockResolvedValue(
-      jsonResponse({
-        data: [
-          { id: "x-ai/grok-voice-tts-1.0", name: "Grok Voice TTS", supported_voices: ["eve", "ara"] },
-          { id: "acme/voiceless-tts" },
-        ],
-      })
+  it("fetches and maps speech models with their voices and ZDR flags", async () => {
+    mockListWithZdr(
+      [
+        { id: "x-ai/grok-voice-tts-1.0", name: "Grok Voice TTS", supported_voices: ["eve", "ara"] },
+        { id: "acme/voiceless-tts" },
+      ],
+      ["acme/voiceless-tts"]
     );
 
     const result = await fetchOpenRouterSpeechModels("sk-or-key");
@@ -548,9 +562,15 @@ describe("fetchOpenRouterSpeechModels", () => {
       })
     );
     expect(result.models).toEqual([
-      { id: "x-ai/grok-voice-tts-1.0", name: "Grok Voice TTS", voices: ["eve", "ara"] },
-      { id: "acme/voiceless-tts", name: "acme/voiceless-tts", voices: [] },
+      { id: "x-ai/grok-voice-tts-1.0", name: "Grok Voice TTS", voices: ["eve", "ara"], zdr: false },
+      { id: "acme/voiceless-tts", name: "acme/voiceless-tts", voices: [], zdr: true },
     ]);
+  });
+
+  it("leaves the ZDR flag unset when the ZDR list can't be loaded", async () => {
+    mockListWithZdr([{ id: "acme/tts", name: "Acme TTS" }], null);
+    const result = await fetchOpenRouterSpeechModels("key");
+    expect(result.models).toEqual([{ id: "acme/tts", name: "Acme TTS", voices: [] }]);
   });
 
   it("omits the Authorization header when no key is provided", async () => {

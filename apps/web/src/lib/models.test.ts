@@ -3,6 +3,7 @@ import {
   LOCAL_MODEL_ID,
   PROVIDER_API_MAP,
   PROVIDER_BASE_URL_MAP,
+  filterZdrModels,
   getActiveModels,
   getProviderLabel,
   type ProviderModel,
@@ -78,5 +79,29 @@ describe("getProviderLabel", () => {
 
   it("falls back to the provider id", () => {
     expect(getProviderLabel("mistral")).toBe("mistral");
+  });
+});
+
+describe("filterZdrModels", () => {
+  const models = [
+    { id: "zdr", zdr: true },
+    { id: "retains", zdr: false },
+    { id: "unknown" },
+  ];
+
+  it("returns every model when ZDR-only is off", () => {
+    expect(filterZdrModels(models, false, "")).toEqual(models);
+  });
+
+  it("hides only models known to lack a ZDR endpoint", () => {
+    expect(filterZdrModels(models, true, "").map((m) => m.id)).toEqual(["zdr", "unknown"]);
+  });
+
+  it("keeps the current selection even without ZDR", () => {
+    expect(filterZdrModels(models, true, "retains").map((m) => m.id)).toEqual([
+      "zdr",
+      "retains",
+      "unknown",
+    ]);
   });
 });

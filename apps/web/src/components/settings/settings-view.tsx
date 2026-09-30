@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useTheme } from "@/components/theme-provider";
-import { LOCAL_MODEL_ID, getActiveModels, getProviderLabel, type ChatModelId } from "@/lib/models";
+import {
+  LOCAL_MODEL_ID,
+  filterZdrModels,
+  getActiveModels,
+  getProviderLabel,
+  type ChatModelId,
+} from "@/lib/models";
 import { ModelPicker } from "./model-picker";
 import { GuardrailsSection } from "./guardrails-section";
 import { isTauri } from "@/lib/storage";
@@ -355,6 +361,13 @@ function ModelsSection() {
     speechModel, setSpeechModel, speechVoice, setSpeechVoice, availableSpeechModels, speechModelFetchStatus, speechModelFetchError, fetchSpeechModels,
   } = useSettingsStore();
   const speechVoices = availableSpeechModels.find((m) => m.id === speechModel)?.voices ?? [];
+  const imageOptions = filterZdrModels(availableImageModels, openRouterZdrOnly, imageModel);
+  const transcriptionOptions = filterZdrModels(
+    availableTranscriptionModels,
+    openRouterZdrOnly,
+    transcriptionModel
+  );
+  const speechOptions = filterZdrModels(availableSpeechModels, openRouterZdrOnly, speechModel);
   const activeModels = getActiveModels(selectedModels);
   const localProviderLabel = getProviderLabel(localLLM.provider);
   const localModelLabel = localLLM.model.trim() || `${localProviderLabel} (default)`;
@@ -472,7 +485,7 @@ function ModelsSection() {
                 className="w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm text-foreground"
               >
                 <option value="">None (disabled)</option>
-                {availableImageModels.map((model) => (
+                {imageOptions.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}
                   </option>
@@ -517,7 +530,7 @@ function ModelsSection() {
                 className="w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm text-foreground"
               >
                 <option value="">None (disabled)</option>
-                {availableTranscriptionModels.map((model) => (
+                {transcriptionOptions.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}
                   </option>
@@ -562,7 +575,7 @@ function ModelsSection() {
                 className="w-full rounded-md border border-input bg-transparent dark:bg-input/30 h-8 px-2.5 py-1 text-sm text-foreground"
               >
                 <option value="">None (disabled)</option>
-                {availableSpeechModels.map((model) => (
+                {speechOptions.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}
                   </option>

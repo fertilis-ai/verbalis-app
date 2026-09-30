@@ -30,12 +30,22 @@ export interface ImageProviderModel {
   name: string;
   /** True when the model accepts image input (supports editing via reference images). */
   supportsImageInput: boolean;
+  /**
+   * Whether the model has a zero-data-retention OpenRouter endpoint. Absent when
+   * unknown (lists cached before this field existed, or the ZDR list failed to load).
+   */
+  zdr?: boolean;
 }
 
 /** An OpenRouter transcription model (from /api/v1/models?output_modalities=transcription). */
 export interface TranscriptionProviderModel {
   id: string;
   name: string;
+  /**
+   * Whether the model has a zero-data-retention OpenRouter endpoint. Absent when
+   * unknown (lists cached before this field existed, or the ZDR list failed to load).
+   */
+  zdr?: boolean;
 }
 
 /** An OpenRouter speech (text-to-speech) model (from /api/v1/models?output_modalities=speech). */
@@ -44,6 +54,26 @@ export interface SpeechProviderModel {
   name: string;
   /** Model-specific voice identifiers (from supported_voices); may be empty. */
   voices: string[];
+  /**
+   * Whether the model has a zero-data-retention OpenRouter endpoint. Absent when
+   * unknown (lists cached before this field existed, or the ZDR list failed to load).
+   */
+  zdr?: boolean;
+}
+
+/**
+ * The image/transcription/speech model options to show for the ZDR setting.
+ * Only models known to lack a ZDR endpoint (`zdr: false`) are hidden, so a list
+ * with unknown flags stays usable until Refresh; requests are ZDR-routed either
+ * way. The current selection is always kept so its select never renders blank.
+ */
+export function filterZdrModels<T extends { id: string; zdr?: boolean }>(
+  models: T[],
+  zdrOnly: boolean,
+  selectedId: string
+): T[] {
+  if (!zdrOnly) return models;
+  return models.filter((m) => m.zdr !== false || m.id === selectedId);
 }
 
 export type ModelId = string;

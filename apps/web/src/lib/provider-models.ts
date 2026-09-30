@@ -103,16 +103,24 @@ function isTextModel(architecture?: { input_modalities?: string[]; output_modali
   return true;
 }
 
-/** Fetch the set of model ids with at least one zero-data-retention endpoint. */
-async function fetchZdrModelIds(apiKey?: string): Promise<Set<string>> {
+/**
+ * Fetch the set of model ids with at least one zero-data-retention endpoint
+ * (text, image, transcription and speech alike); null when it can't be loaded.
+ */
+async function fetchZdrModelIds(apiKey?: string): Promise<Set<string> | null> {
   try {
     const resp = await openRouterFetch("/endpoints/zdr", { apiKey });
-    if (!resp.ok) return new Set();
+    if (!resp.ok) return null;
     const data = (await resp.json()) as { data?: Array<{ model_id?: string }> };
     return new Set((data.data ?? []).map((e) => e.model_id).filter((id): id is string => !!id));
   } catch {
-    return new Set();
+    return null;
   }
+}
+
+/** The `zdr` flag for an image/transcription/speech model; omitted when unknown. */
+function zdrFlag(zdrIds: Set<string> | null, id: string): { zdr?: boolean } {
+  return zdrIds ? { zdr: zdrIds.has(id) } : {};
 }
 
 async function fetchOpenRouter(apiKey?: string): Promise<FetchModelsResult> {
@@ -136,7 +144,7 @@ async function fetchOpenRouter(apiKey?: string): Promise<FetchModelsResult> {
         id: m.id,
         name: m.name ?? m.id,
         provider: "openrouter",
-        ...(zdrIds.has(m.id) ? { zdr: true } : {}),
+        ...(zdrIds?.has(m.id) ? { zdr: true } : {}),
         ...(m.reasoning ? { reasoning: m.reasoning } : {}),
       }));
     return { provider: "openrouter", models };
@@ -153,7 +161,10 @@ export interface FetchImageModelsResult {
 /** Fetch image-generation models from OpenRouter's dedicated Image API. */
 export async function fetchOpenRouterImageModels(apiKey?: string): Promise<FetchImageModelsResult> {
   try {
-    const resp = await openRouterFetch("/images/models", { apiKey });
+    const [resp, zdrIds] = await Promise.all([
+      openRouterFetch("/images/models", { apiKey }),
+      fetchZdrModelIds(apiKey),
+    ]);
     if (!resp.ok) return { models: [], error: await readErrorBody(resp) };
     const data = (await resp.json()) as {
       data?: Array<{
@@ -168,6 +179,7 @@ export async function fetchOpenRouterImageModels(apiKey?: string): Promise<Fetch
         id: m.id,
         name: m.name ?? m.id,
         supportsImageInput: m.architecture?.input_modalities?.includes("image") ?? false,
+        ...zdrFlag(zdrIds, m.id),
       }));
     return { models };
   } catch (e) {
@@ -185,12 +197,16 @@ export async function fetchOpenRouterTranscriptionModels(
   apiKey?: string
 ): Promise<FetchTranscriptionModelsResult> {
   try {
-    const resp = await openRouterFetch("/models?output_modalities=transcription", { apiKey });
+    const [resp, zdrIds] = await Promise.all([
+      openRouterFetch("/models?output_modalities=transcription", { apiKey }),
+      fetchZdrModelIds(apiKey),
+    ]);
     if (!resp.ok) return { models: [], error: await readErrorBody(resp) };
     const data = (await resp.json()) as { data?: Array<{ id: string; name?: string }> };
     const models: TranscriptionProviderModel[] = (data.data ?? []).map((m) => ({
       id: m.id,
       name: m.name ?? m.id,
+      ...zdrFlag(zdrIds, m.id),
     }));
     return { models };
   } catch (e) {
@@ -208,7 +224,10 @@ export async function fetchOpenRouterSpeechModels(
   apiKey?: string
 ): Promise<FetchSpeechModelsResult> {
   try {
-    const resp = await openRouterFetch("/models?output_modalities=speech", { apiKey });
+    const [resp, zdrIds] = await Promise.all([
+      openRouterFetch("/models?output_modalities=speech", { apiKey }),
+      fetchZdrModelIds(apiKey),
+    ]);
     if (!resp.ok) return { models: [], error: await readErrorBody(resp) };
     const data = (await resp.json()) as {
       data?: Array<{ id: string; name?: string; supported_voices?: string[] }>;
@@ -217,6 +236,7 @@ export async function fetchOpenRouterSpeechModels(
       id: m.id,
       name: m.name ?? m.id,
       voices: m.supported_voices ?? [],
+      ...zdrFlag(zdrIds, m.id),
     }));
     return { models };
   } catch (e) {
