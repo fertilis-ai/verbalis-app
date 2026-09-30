@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { formatFromMimeType, blobToBase64, transcribeAudio } from "./transcription";
+import {
+  formatFromMimeType,
+  blobToBase64,
+  encodeWav,
+  recordingToWav,
+  transcribeAudio,
+} from "./transcription";
 
 const mockAppFetch = vi.fn();
 
@@ -102,6 +108,81 @@ describe("transcribeAudio", () => {
     );
     await expect(
       transcribeAudio(new Blob(["x"]), { model: "m", apiKey: "bad", format: "webm" })
-    ).rejects.toThrow("Transcription failed (HTTP 401: Unauthorized)");
+    ).rejects.toThrow("Transcription failed (HTTP 401: Unauthorized; sent webm audio)");
+  });
+});
+
+/** A stereo AudioBuffer stand-in: left and right channel samples. */
+function pcm(left: number[], right: number[], sampleRate = 8000) {
+  return {
+    numberOfChannels: 2,
+    sampleRate,
+    length: left.length,
+    getChannelData: (i: number) => new Float32Array(i === 0 ? left : right),
+  };
+}
+
+describe("encodeWav", () => {
+  it("writes a 16-bit mono PCM header and averages channels", () => {
+    const view = new DataView(encodeWav(pcm([1, -1, 0.5], [1, -1, -0.5])));
+    const ascii = (offset: number) =>
+      String.fromCharCode(...Array.from({ length: 4 }, (_, i) => view.getUint8(offset + i)));
+    expect(view.byteLength).toBe(44 + 3 * 2);
+    expect([ascii(0), ascii(8), ascii(12), ascii(36)]).toEqual(["RIFF", "WAVE", "fmt ", "data"]);
+    expect(view.getUint32(4, true)).toBe(36 + 6);
+    expect(view.getUint16(20, true)).toBe(1); // PCM
+    expect(view.getUint16(22, true)).toBe(1); // mono
+    expect(view.getUint32(24, true)).toBe(8000);
+    expect(view.getUint32(28, true)).toBe(16000);
+    expect(view.getUint16(34, true)).toBe(16);
+    expect(view.getUint32(40, true)).toBe(6);
+    expect([view.getInt16(44, true), view.getInt16(46, true), view.getInt16(48, true)]).toEqual([
+      0x7fff, -0x8000, 0,
+    ]);
+  });
+});
+
+describe("WAV re-encoding", () => {
+  const decodeAudioData = vi.fn();
+  const close = vi.fn(() => Promise.resolve());
+
+  beforeEach(() => {
+    mockAppFetch.mockReset();
+    decodeAudioData.mockReset();
+    vi.stubGlobal(
+      "AudioContext",
+      class {
+        decodeAudioData = decodeAudioData;
+        close = close;
+      }
+    );
+    return () => vi.unstubAllGlobals();
+  });
+
+  it("returns null when Web Audio is unavailable", async () => {
+    vi.stubGlobal("AudioContext", undefined);
+    expect(await recordingToWav(new Blob(["x"]))).toBeNull();
+  });
+
+  it("sends decodable audio as wav", async () => {
+    decodeAudioData.mockResolvedValue(pcm([0, 0], [0, 0]));
+    mockAppFetch.mockResolvedValue(jsonResponse({ text: "hi" }));
+    await transcribeAudio(new Blob(["x"], { type: "audio/mp4" }), {
+      model: "m",
+      apiKey: "k",
+      format: "m4a",
+    });
+    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body);
+    expect(body.input_audio.format).toBe("wav");
+    expect(atob(body.input_audio.data).slice(0, 4)).toBe("RIFF");
+    expect(close).toHaveBeenCalled();
+  });
+
+  it("falls back to the recorded format when decoding fails", async () => {
+    decodeAudioData.mockRejectedValue(new Error("EncodingError"));
+    mockAppFetch.mockResolvedValue(jsonResponse({ text: "hi" }));
+    await transcribeAudio(new Blob(["audio-bytes"]), { model: "m", apiKey: "k", format: "webm" });
+    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body);
+    expect(body.input_audio).toEqual({ data: btoa("audio-bytes"), format: "webm" });
   });
 });
