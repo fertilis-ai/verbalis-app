@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
@@ -14,48 +14,9 @@ pub struct FileNode {
     pub children: Option<Vec<FileNode>>,
 }
 
-const DEFAULT_AGENT_CONTENT: &str = r#"---
-name: default
-description: Your personal assistant for everyday life and work
-temperature: 0.3
----
-
-You are the user's personal assistant — the default agent of a local-first AI
-assistant that lives on their device, remembers what matters, and becomes more
-useful over time.
-
-Who you are:
-- A capable, trustworthy generalist for everyday life and work: research,
-  writing, planning, organizing files and notes, and small automations.
-- Private by design: the user's data lives on their device and only leaves it
-  through tools the user can see, like web search — never assume otherwise.
-
-Memory:
-- Your identity lives in the SOUL memory; what you know about the user lives
-  in the USER memory. Both are always in your context — act on them: tailor
-  tone, defaults, and suggestions instead of asking for what you already know.
-- When you learn a durable fact — a preference, a person, a project, a
-  routine — save it with the remember tool. Skip one-off details and trivia.
-
-Toolbox:
-- The Toolbox holds prompts, skills, agents, and workflows; its inventory is
-  in your context. Lean on it, and route the user to it: a task that fits a
-  specialized agent (researcher, writer, organizer) is better done there.
-- When the user asks for the same thing repeatedly, offer to save it — a
-  prompt for a reusable request, a skill for standing guidance, a workflow
-  for a recurring multi-step job (optionally on a schedule).
-
-Tools:
-- Verify with tools (web search, reading files) rather than guessing; use the
-  fewest calls that give a reliable answer, and say what you did.
-- Start small and reversible. Ask before anything destructive or hard to undo
-  (deleting, overwriting, sending) — trust is earned action by action.
-
-Style:
-- Warm, direct, and brief. Lead with the answer or result, not the process.
-- Plain language; concrete suggestions over open-ended questions.
-- End with a next step only when there is a real one.
-"#;
+/// The default agent seeded into ~/.verbalis/agents. Shared with the web
+/// build's storage fallback (`src/lib/storage.ts`).
+const DEFAULT_AGENT_CONTENT: &str = include_str!("../../src/lib/toolbox/default-agent.md");
 
 /// Get the user's home directory
 #[tauri::command]
@@ -65,19 +26,22 @@ pub fn get_home_dir() -> Result<String, String> {
         .ok_or_else(|| "Could not find home directory".to_string())
 }
 
+/// The app data directory (~/.verbalis)
+fn app_dir() -> Result<PathBuf, String> {
+    let home = dirs::home_dir().ok_or("Could not find home directory")?;
+    Ok(home.join(".verbalis"))
+}
+
 /// Get the app data directory (~/.verbalis)
 #[tauri::command]
 pub fn get_app_data_dir() -> Result<String, String> {
-    let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let app_dir = home.join(".verbalis");
-    Ok(app_dir.to_string_lossy().to_string())
+    Ok(app_dir()?.to_string_lossy().to_string())
 }
 
 /// Initialize the app data directory structure
 #[tauri::command]
 pub fn init_app_data_dir() -> Result<(), String> {
-    let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    let app_dir = home.join(".verbalis");
+    let app_dir = app_dir()?;
 
     let subdirs = [
         "chats",
@@ -456,13 +420,20 @@ pub async fn rename_path(old_path: String, new_path: String) -> Result<(), Strin
 // ============================================================================
 
 /// Get the logs directory (~/.verbalis/logs)
-fn get_logs_dir() -> Result<std::path::PathBuf, String> {
-    let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    Ok(home.join(".verbalis").join("logs"))
+fn get_logs_dir() -> Result<PathBuf, String> {
+    Ok(app_dir()?.join("logs"))
+}
+
+/// Rejects log filenames that could escape the logs directory.
+fn validate_log_filename(filename: &str) -> Result<(), String> {
+    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
+        return Err("Invalid filename".to_string());
+    }
+    Ok(())
 }
 
 /// Get the log file path (~/.verbalis/logs/agent.txt)
-fn get_log_path() -> Result<std::path::PathBuf, String> {
+fn get_log_path() -> Result<PathBuf, String> {
     Ok(get_logs_dir()?.join("agent.txt"))
 }
 
@@ -549,10 +520,7 @@ pub fn list_log_files() -> Result<Vec<String>, String> {
 /// Read a specific log file from ~/.verbalis/logs/
 #[tauri::command]
 pub fn read_log_file(filename: String) -> Result<String, String> {
-    // Guard against path traversal
-    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
-        return Err("Invalid filename".to_string());
-    }
+    validate_log_filename(&filename)?;
 
     let log_path = get_logs_dir()?.join(&filename);
 
@@ -566,10 +534,7 @@ pub fn read_log_file(filename: String) -> Result<String, String> {
 /// Append a line to a specific log file in ~/.verbalis/logs/
 #[tauri::command]
 pub fn append_log_file(filename: String, line: String) -> Result<(), String> {
-    // Guard against path traversal
-    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
-        return Err("Invalid filename".to_string());
-    }
+    validate_log_filename(&filename)?;
 
     let logs_dir = get_logs_dir()?;
     if !logs_dir.exists() {
@@ -594,10 +559,7 @@ pub fn append_log_file(filename: String, line: String) -> Result<(), String> {
 /// Clear a specific log file in ~/.verbalis/logs/
 #[tauri::command]
 pub fn clear_log_file(filename: String) -> Result<(), String> {
-    // Guard against path traversal
-    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
-        return Err("Invalid filename".to_string());
-    }
+    validate_log_filename(&filename)?;
 
     let log_path = get_logs_dir()?.join(&filename);
 
@@ -611,9 +573,7 @@ pub fn clear_log_file(filename: String) -> Result<(), String> {
 /// Overwrite a log file with the given content (for debug logging of API requests, etc.)
 #[tauri::command]
 pub fn write_log_file(filename: String, content: String) -> Result<(), String> {
-    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
-        return Err("Invalid filename".to_string());
-    }
+    validate_log_filename(&filename)?;
 
     let log_path = get_logs_dir()?.join(&filename);
     fs::write(&log_path, content).map_err(|e| format!("Failed to write log file: {}", e))?;
@@ -680,4 +640,23 @@ pub fn get_all_api_keys() -> Result<HashMap<String, String>, String> {
         }
     }
     Ok(keys)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_log_filename_rejects_traversal() {
+        assert!(validate_log_filename("agent.txt").is_ok());
+        assert!(validate_log_filename("../secrets").is_err());
+        assert!(validate_log_filename("sub/agent.txt").is_err());
+        assert!(validate_log_filename("sub\\agent.txt").is_err());
+        assert!(validate_log_filename("..").is_err());
+    }
+
+    #[test]
+    fn default_agent_has_frontmatter() {
+        assert!(DEFAULT_AGENT_CONTENT.starts_with("---\nname: default\n"));
+    }
 }
