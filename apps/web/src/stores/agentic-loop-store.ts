@@ -6,37 +6,48 @@ import type {
   LoopIteration,
   AgentLoopEvent,
 } from "@/lib/agentic/types";
-import { DEFAULT_LOOP_CONFIG, } from "@/lib/agentic/types";
+import { DEFAULT_LOOP_CONFIG } from "@/lib/agentic/types";
 import { type VerbalisAgentAdapter, createVerbalisAdapter } from "@/lib/agentic/verbalis-agent-adapter";
-import { useSettingsStore } from "./settings-store";
 import type { ToolCallState } from "@/lib/tools";
-import { useChatStore } from "./chat-store";
 
 // ============================================================================
 // State Types
 // ============================================================================
 
-// Callback for tool state changes (used by chat-store to sync conversation state)
-export type ToolStateCallback = (conversationId: string, toolCall: ToolCallState) => void;
+/**
+ * Conversation-facing events, consumed by chat-store to keep messages in sync.
+ * This bus is the only path from the loop to conversation state — chat-store
+ * subscribes once at module load, so this store never imports chat-store.
+ */
+export type LoopBusEvent =
+  | { type: "tool_state"; conversationId: string; toolCall: ToolCallState }
+  /** The loop completed or was aborted; in-flight tool calls should be marked stopped. */
+  | { type: "loop_ended"; conversationId: string };
 
-// Module-level storage for tool state callbacks (outside zustand to avoid re-renders)
-const toolStateCallbacks: Set<ToolStateCallback> = new Set();
+export type LoopBusCallback = (event: LoopBusEvent) => void;
 
-export function subscribeToToolEvents(callback: ToolStateCallback): () => void {
-  toolStateCallbacks.add(callback);
+// Module-level storage for bus callbacks (outside zustand to avoid re-renders)
+const loopBusCallbacks: Set<LoopBusCallback> = new Set();
+
+export function subscribeToLoopEvents(callback: LoopBusCallback): () => void {
+  loopBusCallbacks.add(callback);
   return () => {
-    toolStateCallbacks.delete(callback);
+    loopBusCallbacks.delete(callback);
   };
 }
 
-function notifyToolStateChange(conversationId: string, toolCall: ToolCallState): void {
-  for (const callback of toolStateCallbacks) {
+function publish(event: LoopBusEvent): void {
+  for (const callback of loopBusCallbacks) {
     try {
-      callback(conversationId, toolCall);
+      callback(event);
     } catch (error) {
-      console.error("[agentic-loop-store] Tool state callback error:", error);
+      console.error("[agentic-loop-store] Loop bus callback error:", error);
     }
   }
+}
+
+function notifyToolStateChange(conversationId: string, toolCall: ToolCallState): void {
+  publish({ type: "tool_state", conversationId, toolCall });
 }
 
 interface AgenticLoopState {
@@ -52,7 +63,6 @@ interface AgenticLoopState {
   pendingToolCalls: ToolCallState[];
 
   // Statistics
-  totalIterations: number;
   totalToolCalls: number;
   successfulToolCalls: number;
   failedToolCalls: number;
@@ -64,6 +74,11 @@ interface AgenticLoopState {
   createAdapter: (conversationId: string, agentId: string | null, config?: Partial<AgentLoopConfig>) => VerbalisAgentAdapter;
   getAdapter: (conversationId: string) => VerbalisAgentAdapter | null;
   removeAdapter: (conversationId: string) => void;
+  /**
+   * Drop a finished adapter without touching the loop UI state (status,
+   * iterations stay visible). No-op if `adapter` was already replaced.
+   */
+  releaseAdapter: (conversationId: string, adapter: VerbalisAgentAdapter) => void;
   setCurrentLoop: (conversationId: string | null) => void;
 
   // Actions - Loop Control (delegates to adapter)
@@ -103,7 +118,6 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
   currentIteration: null,
   iterations: [],
   pendingToolCalls: [],
-  totalIterations: 0,
   totalToolCalls: 0,
   successfulToolCalls: 0,
   failedToolCalls: 0,
@@ -123,12 +137,9 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
       unsubscribeAdapter(conversationId);
     }
 
-    // Get guardrails config from settings
-    const guardrailsConfig = useSettingsStore.getState().guardrailsConfig;
-
-    // Create new adapter
+    // Create new adapter (guardrails config is supplied per run via run(config))
     const loopConfig = { ...defaultConfig, ...config };
-    const adapter = createVerbalisAdapter(conversationId, agentId, guardrailsConfig, loopConfig);
+    const adapter = createVerbalisAdapter(conversationId, agentId, loopConfig);
 
     // Subscribe to events
     const unsubscribe = adapter.onEvent((event) => {
@@ -181,6 +192,15 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
         pendingToolCalls: [],
       } : {}),
     });
+  },
+
+  releaseAdapter: (conversationId, adapter) => {
+    const { activeAdapters } = get();
+    if (activeAdapters.get(conversationId) !== adapter) return;
+    unsubscribeAdapter(conversationId);
+    const newAdapters = new Map(activeAdapters);
+    newAdapters.delete(conversationId);
+    set({ activeAdapters: newAdapters });
   },
 
   setCurrentLoop: (conversationId) => {
@@ -286,7 +306,6 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
         if (isCurrentLoop) {
           set((state) => ({
             iterations: [...state.iterations, event.iteration],
-            totalIterations: state.totalIterations + 1,
           }));
         }
         break;
@@ -414,7 +433,7 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
           });
         }
         // Clean up any tool calls still stuck in pending/executing state
-        useChatStore.getState().markToolCallsStopped(conversationId);
+        publish({ type: "loop_ended", conversationId });
         break;
 
       case "loop_error":
@@ -431,7 +450,7 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
           });
         }
         // Mark in-flight tool calls as "stopped" in conversation messages
-        useChatStore.getState().markToolCallsStopped(conversationId);
+        publish({ type: "loop_ended", conversationId });
         break;
     }
   },

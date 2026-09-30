@@ -25,7 +25,7 @@ import { buildToolboxInventory } from "@/lib/toolbox/toolbox-inventory";
 import { renderToolboxFormatReference } from "@/lib/toolbox/toolbox-schemas";
 import { useSettingsStore } from "./settings-store";
 import { useAgentStore } from "./agent-store";
-import { useAgenticLoopStore, subscribeToToolEvents } from "./agentic-loop-store";
+import { useAgenticLoopStore, subscribeToLoopEvents } from "./agentic-loop-store";
 import type { AgentLoopEvent } from "@/lib/agentic/types";
 import type { VerbalisAdapterConfig } from "@/lib/agentic/verbalis-agent-adapter";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
@@ -652,37 +652,6 @@ export const useChatStore = create<ChatState>((set, get) => {
         };
         adapter.setMessageProvider(messageProvider);
 
-        // Helper to sync tool call state to conversation
-        // Searches ALL messages (not just last) to find the tool call by ID
-        const syncToolCallToConversation = (toolCall: ToolCallState) => {
-          updateConversation((c) => {
-            let found = false;
-            const messages = c.messages.map((m) => {
-              if (!m.toolCalls) return m;
-              const tcIndex = m.toolCalls.findIndex((tc) => tc.id === toolCall.id);
-              if (tcIndex === -1) return m;
-              found = true;
-              const updatedToolCalls = [...m.toolCalls];
-              updatedToolCalls[tcIndex] = toolCall;
-              return { ...m, toolCalls: updatedToolCalls };
-            });
-            if (!found) {
-              // Tool call not in any message yet — append to last assistant message
-              const lastIdx = messages.length - 1;
-              if (lastIdx >= 0 && messages[lastIdx].role === "assistant") {
-                const existingIds = new Set((messages[lastIdx].toolCalls ?? []).map(tc => tc.id));
-                if (!existingIds.has(toolCall.id)) {
-                  messages[lastIdx] = {
-                    ...messages[lastIdx],
-                    toolCalls: [...(messages[lastIdx].toolCalls ?? []), toolCall],
-                  };
-                }
-              }
-            }
-            return { ...c, messages, updatedAt: new Date() };
-          });
-        };
-
         // Context-overflow retry bookkeeping (see run block below).
         let retriedContextExceeded = false;
         let pendingContextRetry = false;
@@ -732,13 +701,6 @@ export const useChatStore = create<ChatState>((set, get) => {
                 };
                 return { ...c, messages, updatedAt: new Date() };
               });
-              break;
-            case "tool_pending":
-            case "tool_executing":
-            case "tool_completed":
-            case "tool_failed":
-            case "tool_cancelled":
-              syncToolCallToConversation(event.toolCall);
               break;
             case "loop_error":
               // If the context overflowed and we can still retry with a
@@ -797,13 +759,17 @@ export const useChatStore = create<ChatState>((set, get) => {
         };
 
         // Run the adapter, subscribing the (reusable) event handler each attempt.
+        // Tool-call state reaches the conversation via the loop bus
+        // (subscribeToLoopEvents below), not this handler.
         const runOnce = async () => {
-          const unsub = adapter!.onEvent(onAdapterEvent);
+          const runAdapter = adapter!;
+          const unsub = runAdapter.onEvent(onAdapterEvent);
           loopStore.setCurrentLoop(conversationId);
           try {
-            await adapter!.run(adapterConfig);
+            await runAdapter.run(adapterConfig);
           } finally {
             unsub();
+            loopStore.releaseAdapter(conversationId, runAdapter);
           }
         };
 
@@ -1459,72 +1425,58 @@ export const useChatStore = create<ChatState>((set, get) => {
 // Tool State Sync from Agentic Loop
 // ============================================================================
 
-// Subscribe to tool state changes from the agentic loop store
-// This ensures conversation state stays in sync when tools are executed
-// outside of the streaming context (e.g., when user confirms a tool)
-subscribeToToolEvents((conversationId, toolCall) => {
-  const state = useChatStore.getState();
-
-  // Determine if this is a ghost conversation or regular
-  const isGhost = state.isGhostMode && state.ghostConversation?.id === conversationId;
-  const conversation = isGhost
-    ? state.ghostConversation
-    : state.conversations.find((c) => c.id === conversationId);
-
-  if (!conversation) return;
-
-  // Find the message with this tool call and update it
-  const updateFn = (c: Conversation): Conversation => {
-    let found = false;
-    const messages = c.messages.map((m) => {
-      if (!m.toolCalls) return m;
-
-      const tcIndex = m.toolCalls.findIndex((tc) => tc.id === toolCall.id);
-      if (tcIndex === -1) return m;
-
-      found = true;
-      // Update the tool call state
-      const updatedToolCalls = [...m.toolCalls];
-      updatedToolCalls[tcIndex] = {
-        ...updatedToolCalls[tcIndex],
-        status: normalizeToolCallStatus(toolCall.status),
-        result: toolCall.result ?? updatedToolCalls[tcIndex].result,
-        error: toolCall.error ?? updatedToolCalls[tcIndex].error,
-        startedAt: toolCall.startedAt ?? updatedToolCalls[tcIndex].startedAt,
-        completedAt: toolCall.completedAt ?? updatedToolCalls[tcIndex].completedAt,
-        durationMs: toolCall.durationMs ?? updatedToolCalls[tcIndex].durationMs,
-        undoAvailable: toolCall.undoAvailable ?? updatedToolCalls[tcIndex].undoAvailable,
-        guardrailReason: toolCall.guardrailReason ?? updatedToolCalls[tcIndex].guardrailReason,
-        guardrailViolations: toolCall.guardrailViolations ?? updatedToolCalls[tcIndex].guardrailViolations,
+/**
+ * Merge a tool call's latest state into the conversation. Fields the event
+ * carries win; fields it omits keep their stored value. A call not yet in any
+ * message is appended to the last assistant message.
+ */
+function upsertToolCall(c: Conversation, toolCall: ToolCallState): Conversation {
+  let found = false;
+  const messages = c.messages.map((m) => {
+    if (!m.toolCalls) return m;
+    const tcIndex = m.toolCalls.findIndex((tc) => tc.id === toolCall.id);
+    if (tcIndex === -1) return m;
+    found = true;
+    const updatedToolCalls = [...m.toolCalls];
+    updatedToolCalls[tcIndex] = {
+      ...updatedToolCalls[tcIndex],
+      ...toolCall,
+      status: normalizeToolCallStatus(toolCall.status),
+    };
+    return { ...m, toolCalls: updatedToolCalls };
+  });
+  if (!found) {
+    const lastIdx = messages.length - 1;
+    if (lastIdx >= 0 && messages[lastIdx].role === "assistant") {
+      messages[lastIdx] = {
+        ...messages[lastIdx],
+        toolCalls: [...(messages[lastIdx].toolCalls ?? []), toolCall],
       };
-
-      return { ...m, toolCalls: updatedToolCalls };
-    });
-    if (!found) {
-      // Tool call not in any message yet — append to last assistant message
-      const lastIdx = messages.length - 1;
-      if (lastIdx >= 0 && messages[lastIdx].role === "assistant") {
-        const existingIds = new Set((messages[lastIdx].toolCalls ?? []).map(tc => tc.id));
-        if (!existingIds.has(toolCall.id)) {
-          messages[lastIdx] = {
-            ...messages[lastIdx],
-            toolCalls: [...(messages[lastIdx].toolCalls ?? []), toolCall],
-          };
-        }
-      }
     }
-    return { ...c, messages, updatedAt: new Date() };
-  };
+  }
+  return { ...c, messages, updatedAt: new Date() };
+}
+
+// The loop bus is the single path from the agentic loop to conversation state,
+// covering both streaming and out-of-band updates (e.g. a user confirming a tool).
+subscribeToLoopEvents((event) => {
+  if (event.type === "loop_ended") {
+    useChatStore.getState().markToolCallsStopped(event.conversationId);
+    return;
+  }
+
+  const { conversationId, toolCall } = event;
+  const state = useChatStore.getState();
+  const isGhost = state.isGhostMode && state.ghostConversation?.id === conversationId;
 
   if (isGhost) {
-    useChatStore.setState((state) => {
-      if (!state.ghostConversation) return state;
-      return { ghostConversation: updateFn(state.ghostConversation) };
-    });
-  } else {
-    useChatStore.setState((state) => ({
-      conversations: state.conversations.map((c) =>
-        c.id === conversationId ? updateFn(c) : c
+    useChatStore.setState((s) =>
+      s.ghostConversation ? { ghostConversation: upsertToolCall(s.ghostConversation, toolCall) } : s
+    );
+  } else if (state.conversations.some((c) => c.id === conversationId)) {
+    useChatStore.setState((s) => ({
+      conversations: s.conversations.map((c) =>
+        c.id === conversationId ? upsertToolCall(c, toolCall) : c
       ),
     }));
   }

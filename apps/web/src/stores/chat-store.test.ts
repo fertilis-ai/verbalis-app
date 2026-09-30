@@ -31,7 +31,10 @@ const {
   mockGetAdapter,
   mockCreateAdapter,
   mockUuidState,
+  loopBus,
 } = vi.hoisted(() => ({
+  // Captures chat-store's module-level loop-bus subscriber so tests can publish.
+  loopBus: { callback: null as null | ((event: unknown) => void) },
   mockLoadChatTree: vi.fn().mockResolvedValue([]),
   mockSaveChatToFolder: vi.fn().mockResolvedValue(undefined),
   mockDeleteChatByPath: vi.fn().mockResolvedValue(undefined),
@@ -185,9 +188,13 @@ vi.mock("./agentic-loop-store", () => ({
       confirmTool: mockConfirmTool,
       rejectTool: mockRejectTool,
       stopLoop: vi.fn(),
+      releaseAdapter: vi.fn(),
     })),
   }),
-  subscribeToToolEvents: vi.fn(),
+  subscribeToLoopEvents: (callback: (event: unknown) => void) => {
+    loopBus.callback = callback;
+    return () => {};
+  },
 }));
 
 // Now import the store
@@ -1387,6 +1394,83 @@ describe("chat-store", () => {
         "/mock-data/chats/parent/nested",
         expect.objectContaining({ isPinned: true }),
       );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Loop bus (the single path from the agentic loop to conversation state)
+  // -----------------------------------------------------------------------
+  describe("loop bus", () => {
+    const publish = (event: unknown) => loopBus.callback?.(event);
+
+    it("merges tool state into the matching tool call, keeping omitted fields", () => {
+      const msg = makeMessage({
+        id: "m1",
+        role: "assistant",
+        toolCalls: [
+          { id: "tc1", name: "read_file", arguments: { path: "a" }, status: "pending", riskLevel: "low" },
+        ],
+      });
+      useChatStore.setState({ conversations: [makeConversation({ id: "c1", messages: [msg] })] });
+
+      publish({
+        type: "tool_state",
+        conversationId: "c1",
+        toolCall: { id: "tc1", name: "read_file", arguments: { path: "a" }, status: "success", result: "ok" },
+      });
+
+      const tc = useChatStore.getState().conversations[0].messages[0].toolCalls![0];
+      expect(tc).toMatchObject({ status: "success", result: "ok", riskLevel: "low" });
+    });
+
+    it("appends an unseen tool call to the last assistant message", () => {
+      const msg = makeMessage({ id: "m1", role: "assistant", toolCalls: [] });
+      useChatStore.setState({ conversations: [makeConversation({ id: "c1", messages: [msg] })] });
+
+      publish({
+        type: "tool_state",
+        conversationId: "c1",
+        toolCall: { id: "tc9", name: "write_file", arguments: {}, status: "pending_confirmation" },
+      });
+
+      const calls = useChatStore.getState().conversations[0].messages[0].toolCalls!;
+      expect(calls.map((tc) => tc.id)).toEqual(["tc9"]);
+    });
+
+    it("updates the ghost conversation when it is the target", () => {
+      const msg = makeMessage({
+        id: "m1",
+        role: "assistant",
+        toolCalls: [{ id: "tc1", name: "t", arguments: {}, status: "executing" }],
+      });
+      useChatStore.setState({
+        isGhostMode: true,
+        ghostConversation: makeConversation({ id: "ghost-1", messages: [msg] }),
+      });
+
+      publish({
+        type: "tool_state",
+        conversationId: "ghost-1",
+        toolCall: { id: "tc1", name: "t", arguments: {}, status: "error", error: "boom" },
+      });
+
+      expect(useChatStore.getState().ghostConversation!.messages[0].toolCalls![0]).toMatchObject({
+        status: "error",
+        error: "boom",
+      });
+    });
+
+    it("marks in-flight tool calls stopped on loop_ended", () => {
+      const msg = makeMessage({
+        id: "m1",
+        role: "assistant",
+        toolCalls: [{ id: "tc1", name: "t", arguments: {}, status: "executing" }],
+      });
+      useChatStore.setState({ conversations: [makeConversation({ id: "c1", messages: [msg] })] });
+
+      publish({ type: "loop_ended", conversationId: "c1" });
+
+      expect(useChatStore.getState().conversations[0].messages[0].toolCalls![0].status).toBe("stopped");
     });
   });
 

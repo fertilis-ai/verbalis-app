@@ -131,7 +131,7 @@ describe("verbalis-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -215,7 +215,7 @@ describe("verbalis-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -298,7 +298,7 @@ describe("verbalis-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -363,7 +363,7 @@ describe("verbalis-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -404,7 +404,7 @@ describe("verbalis-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, {});
     adapter.setMessageProvider(() => []);
 
     let abortedCount = 0;
@@ -465,7 +465,7 @@ describe("verbalis-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -558,7 +558,7 @@ describe("verbalis-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -623,7 +623,7 @@ describe("verbalis-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];
@@ -720,7 +720,7 @@ describe("verbalis-agent-adapter", () => {
       return iterable;
     });
 
-    const adapter = createVerbalisAdapter("conv-1", null, DEFAULT_GUARDRAILS_CONFIG, {});
+    const adapter = createVerbalisAdapter("conv-1", null, {});
     adapter.setMessageProvider(() => []);
 
     const events: AgentLoopEvent[] = [];

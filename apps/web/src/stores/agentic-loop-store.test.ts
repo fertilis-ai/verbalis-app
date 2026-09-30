@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mocks — break the circular dependency by mocking chat-store first
-// (agentic-loop-store imports chat-store which calls subscribeToToolEvents)
+// Mocks
 // ---------------------------------------------------------------------------
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -74,17 +73,6 @@ vi.mock("./settings-store", () => ({
   }),
 }));
 
-// Mock chat-store to break the circular dependency
-// (chat-store imports agentic-loop-store and calls subscribeToToolEvents at module level)
-vi.mock("./chat-store", () => ({
-  useChatStore: Object.assign(vi.fn(() => ({})), {
-    getState: vi.fn(() => ({
-      conversations: [],
-      markToolCallsStopped: vi.fn(),
-    })),
-    setState: vi.fn(),
-  }),
-}));
 
 // Mock the adapter creation
 const mockAdapterStop = vi.fn();
@@ -125,7 +113,7 @@ vi.mock("@/lib/agentic/verbalis-agent-adapter", () => ({
 }));
 
 // Import store and dependencies after mocks
-import { useAgenticLoopStore, subscribeToToolEvents } from "./agentic-loop-store";
+import { useAgenticLoopStore, subscribeToLoopEvents } from "./agentic-loop-store";
 import { createInitialLoopContext, DEFAULT_LOOP_CONFIG } from "@/lib/agentic/types";
 import type { ToolCallState } from "@/lib/tools";
 
@@ -158,7 +146,6 @@ describe("agentic-loop-store", () => {
       currentIteration: null,
       iterations: [],
       pendingToolCalls: [],
-      totalIterations: 0,
       totalToolCalls: 0,
       successfulToolCalls: 0,
       failedToolCalls: 0,
@@ -180,7 +167,6 @@ describe("agentic-loop-store", () => {
 
     it("starts with zero statistics", () => {
       const s = useAgenticLoopStore.getState();
-      expect(s.totalIterations).toBe(0);
       expect(s.totalToolCalls).toBe(0);
       expect(s.successfulToolCalls).toBe(0);
       expect(s.failedToolCalls).toBe(0);
@@ -206,7 +192,6 @@ describe("agentic-loop-store", () => {
       expect(mockCreateVerbalisAdapter).toHaveBeenCalledWith(
         "conv-1",
         "agent-1",
-        expect.any(Object),
         expect.any(Object),
       );
 
@@ -281,6 +266,36 @@ describe("agentic-loop-store", () => {
 
       expect(useAgenticLoopStore.getState().currentLoopId).toBe("conv-1");
       expect(useAgenticLoopStore.getState().currentStatus).toBe("thinking");
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // releaseAdapter
+  // -----------------------------------------------------------------------
+  describe("releaseAdapter", () => {
+    it("drops the adapter but keeps context and current loop UI state", () => {
+      const adapter = useAgenticLoopStore.getState().createAdapter("conv-1", null);
+      useAgenticLoopStore.setState({ currentLoopId: "conv-1", currentStatus: "completed" });
+      vi.clearAllMocks();
+
+      useAgenticLoopStore.getState().releaseAdapter("conv-1", adapter);
+
+      const s = useAgenticLoopStore.getState();
+      expect(s.activeAdapters.has("conv-1")).toBe(false);
+      expect(s.activeContexts.has("conv-1")).toBe(true);
+      expect(s.currentLoopId).toBe("conv-1");
+      expect(s.currentStatus).toBe("completed");
+      expect(mockAdapterStop).not.toHaveBeenCalled();
+    });
+
+    it("is a no-op when the adapter was already replaced", () => {
+      const first = useAgenticLoopStore.getState().createAdapter("conv-1", null);
+      const replacement = { marker: "replacement" } as unknown as typeof first;
+      useAgenticLoopStore.setState({ activeAdapters: new Map([["conv-1", replacement]]) });
+
+      useAgenticLoopStore.getState().releaseAdapter("conv-1", first);
+
+      expect(useAgenticLoopStore.getState().activeAdapters.get("conv-1")).toBe(replacement);
     });
   });
 
@@ -543,7 +558,7 @@ describe("agentic-loop-store", () => {
       expect(s.pendingToolCalls).toEqual([]);
     });
 
-    it("iteration_completed increments totalIterations", () => {
+    it("iteration_completed appends the iteration", () => {
       const iteration = {
         id: "iter-1",
         stepNumber: 1,
@@ -558,7 +573,6 @@ describe("agentic-loop-store", () => {
         iteration,
       });
 
-      expect(useAgenticLoopStore.getState().totalIterations).toBe(1);
       expect(useAgenticLoopStore.getState().iterations).toHaveLength(1);
     });
 
@@ -617,12 +631,12 @@ describe("agentic-loop-store", () => {
   });
 
   // -----------------------------------------------------------------------
-  // subscribeToToolEvents
+  // subscribeToLoopEvents
   // -----------------------------------------------------------------------
-  describe("subscribeToToolEvents", () => {
+  describe("subscribeToLoopEvents", () => {
     it("returns an unsubscribe function", () => {
       const callback = vi.fn();
-      const unsub = subscribeToToolEvents(callback);
+      const unsub = subscribeToLoopEvents(callback);
       expect(typeof unsub).toBe("function");
       unsub();
     });
@@ -630,7 +644,7 @@ describe("agentic-loop-store", () => {
     it("emits pending and cancelled lifecycle updates to subscribers", () => {
       useAgenticLoopStore.setState({ currentLoopId: "conv-1", currentStatus: "thinking" });
       const callback = vi.fn();
-      const unsub = subscribeToToolEvents(callback);
+      const unsub = subscribeToLoopEvents(callback);
 
       const pendingTool = makeToolCall({ id: "tc-1", status: "pending_confirmation" });
       const cancelledTool = makeToolCall({ id: "tc-1", status: "cancelled", error: "Rejected by user" });
@@ -650,9 +664,23 @@ describe("agentic-loop-store", () => {
         reason: "Rejected by user",
       });
 
-      expect(callback).toHaveBeenCalledWith("conv-1", pendingTool);
-      expect(callback).toHaveBeenCalledWith("conv-1", cancelledTool);
+      expect(callback).toHaveBeenCalledWith({ type: "tool_state", conversationId: "conv-1", toolCall: pendingTool });
+      expect(callback).toHaveBeenCalledWith({ type: "tool_state", conversationId: "conv-1", toolCall: cancelledTool });
       expect(useAgenticLoopStore.getState().pendingToolCalls).toHaveLength(0);
+      unsub();
+    });
+
+    it.each(["loop_completed", "loop_aborted"] as const)("publishes loop_ended on %s", (type) => {
+      const callback = vi.fn();
+      const unsub = subscribeToLoopEvents(callback);
+      useAgenticLoopStore.getState().handleLoopEvent(
+        "conv-1",
+        type === "loop_completed"
+          ? { type, context: createInitialLoopContext("conv-1", null), reason: "natural_completion" }
+          : { type }
+      );
+
+      expect(callback).toHaveBeenCalledWith({ type: "loop_ended", conversationId: "conv-1" });
       unsub();
     });
   });

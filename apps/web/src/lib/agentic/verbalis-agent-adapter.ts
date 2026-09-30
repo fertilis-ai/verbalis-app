@@ -122,7 +122,6 @@ export class VerbalisAgentAdapter {
   constructor(
     private conversationId: string,
     private agentId: string | null,
-    guardrailsConfig: GuardrailsConfig,
     loopConfig: Partial<VerbalisLoopConfig> = {}
   ) {
     this.loopContext = createInitialLoopContext(conversationId, agentId, loopConfig);
@@ -986,8 +985,7 @@ export class VerbalisAgentAdapter {
 export function createVerbalisAdapter(
   conversationId: string,
   agentId: string | null,
-  guardrailsConfig: GuardrailsConfig,
   config?: Partial<VerbalisLoopConfig>
 ): VerbalisAgentAdapter {
-  return new VerbalisAgentAdapter(conversationId, agentId, guardrailsConfig, config);
+  return new VerbalisAgentAdapter(conversationId, agentId, config);
 }
