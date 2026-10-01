@@ -1,19 +1,11 @@
 import { create } from "zustand";
 import { v4 as uuid } from "uuid";
-import {
-  streamSimple,
-  type Context,
-  type Api,
-  type Model,
-  type ThinkingLevel,
-} from "@earendil-works/pi-ai";
+import type { Api, Model, ThinkingLevel } from "@earendil-works/pi-ai";
 import {
   type ToolCallState,
   type ToolCallStatus,
   getToolsForContext,
 } from "@/lib/tools";
-import { stripProtocolMarkers } from "@/lib/protocol-parser";
-import { messagesToPiMessages } from "@/lib/message-conversion";
 import { computeContextBudget, type ContextBudget } from "@/lib/context/token-estimate";
 import { trimMessagesToBudget } from "@/lib/context/trim";
 import { resolveMemories } from "@/lib/memory/resolve-memories";
@@ -49,6 +41,7 @@ import {
 import { logAgent } from "@/lib/logger";
 import { resolveModelObject, unresolvedModelMessage } from "@/lib/llm/resolve-model";
 import { buildLocalModel, resolveLocalModel } from "@/lib/llm/local-model";
+import { streamPlain } from "@/lib/llm/stream-plain";
 import { dirname, basename } from "@/lib/path-resolution";
 import {
   chatFolderArg,
@@ -59,20 +52,6 @@ import {
 import { mergeToolCalls, rejectToolCall, stopInFlightToolCalls, upsertToolCall } from "@/lib/tool-call-patch";
 import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
 import { toggleInSet } from "@/lib/set-utils";
-
-function buildContextFromConversation(params: {
-  conversation: Conversation;
-  systemPrompt?: string;
-  api: Api;
-  provider: string;
-  model: string;
-}): Context {
-  const { conversation, systemPrompt, api, provider, model } = params;
-  return {
-    systemPrompt,
-    messages: messagesToPiMessages(conversation.messages, api, provider, model),
-  };
-}
 
 export interface Message {
   id: string;
@@ -589,6 +568,13 @@ export const useChatStore = create<ChatState>((set, get) => {
         }
       };
 
+      const showStreamedContent = (content: string) =>
+        updateConversation((c) => ({
+          ...c,
+          messages: updateLastAssistantMessage(c.messages, { content }),
+          updatedAt: new Date(),
+        }));
+
       if (isLocal) {
         const localSettings = settings.localLLM;
         if (!localSettings.enabled) {
@@ -629,33 +615,14 @@ export const useChatStore = create<ChatState>((set, get) => {
           await runWithAdapter(localModel, "local");
         } else {
           // Web-only fallback: simple streaming, no tools available
-          const context = buildContextFromConversation({
-            conversation,
+          await streamPlain({
+            model: localModel,
             systemPrompt,
-            api: localModel.api,
-            provider: localModel.provider,
-            model: localModel.id,
+            messages: conversation.messages,
+            options: { apiKey: "local", temperature },
+            fallbackError: "Local LLM error",
+            onContent: showStreamedContent,
           });
-
-          const stream = streamSimple(localModel, context, {
-            apiKey: "local",
-            temperature,
-          });
-
-          let fullContent = "";
-          for await (const event of stream) {
-            if (event.type === "text_delta") {
-              fullContent += event.delta;
-              const displayContent = stripProtocolMarkers(fullContent);
-              updateConversation((c) => ({
-                ...c,
-                messages: updateLastAssistantMessage(c.messages, { content: displayContent }),
-                updatedAt: new Date(),
-              }));
-            } else if (event.type === "error") {
-              throw new Error(event.error.errorMessage || "Local LLM error");
-            }
-          }
         }
       } else {
         const resolved = resolveModelObject(
@@ -691,33 +658,14 @@ export const useChatStore = create<ChatState>((set, get) => {
           await runWithAdapter(modelObj, apiKey, reasoning);
         } else {
           // Web-only mode: simple streaming without tool support
-          const stream = streamSimple(modelObj, buildContextFromConversation({
-            conversation,
+          await streamPlain({
+            model: modelObj,
             systemPrompt,
-            api: modelObj.api,
-            provider: modelObj.provider,
-            model: modelObj.id,
-          }), {
-            apiKey,
-            temperature,
-            reasoning,
+            messages: conversation.messages,
+            options: { apiKey, temperature, reasoning },
+            fallbackError: "Failed to send message",
+            onContent: showStreamedContent,
           });
-
-          let fullContent = "";
-          for await (const event of stream) {
-            if (event.type === "text_delta") {
-              fullContent += event.delta;
-              updateConversation((c) => ({
-                ...c,
-                messages: updateLastAssistantMessage(c.messages, {
-                  content: stripProtocolMarkers(fullContent),
-                }),
-                updatedAt: new Date(),
-              }));
-            } else if (event.type === "error") {
-              throw new Error(event.error.errorMessage || "Failed to send message");
-            }
-          }
         }
       }
 
