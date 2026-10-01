@@ -2,7 +2,6 @@ import { create } from "zustand";
 import { v4 as uuid } from "uuid";
 import {
   streamSimple,
-  getModel,
   type Context,
   type Api,
   type Model,
@@ -27,14 +26,8 @@ import { useAgenticLoopStore, subscribeToLoopEvents } from "./agentic-loop-store
 import type { AgentLoopEvent } from "@/lib/agentic/types";
 import type { VerbalisAdapterConfig } from "@/lib/agentic/verbalis-agent-adapter";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
-import { appFetch } from "@/lib/http";
-import { getActiveModels, PROVIDER_API_MAP, PROVIDER_BASE_URL_MAP, type ModelId, type ChatModelId } from "@/lib/models";
-import {
-  getEffortCapability,
-  resolveEffortFor,
-  toReasoningOption,
-  type EffortCapability,
-} from "@/lib/reasoning";
+import { getActiveModels, type ModelId, type ChatModelId } from "@/lib/models";
+import { resolveEffortFor, toReasoningOption } from "@/lib/reasoning";
 import {
   loadChatTree,
   loadChatByPath,
@@ -54,7 +47,8 @@ import {
   type ChatFolderMeta,
 } from "@/lib/storage";
 import { logAgent } from "@/lib/logger";
-import { openRouterCompat, openRouterHeaders } from "@/lib/openrouter";
+import { resolveModelObject, unresolvedModelMessage } from "@/lib/llm/resolve-model";
+import { buildLocalModel, resolveLocalModel } from "@/lib/llm/local-model";
 import { dirname, basename } from "@/lib/path-resolution";
 import {
   chatFolderArg,
@@ -65,93 +59,6 @@ import {
 import { mergeToolCalls, rejectToolCall, stopInFlightToolCalls, upsertToolCall } from "@/lib/tool-call-patch";
 import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
 import { toggleInSet } from "@/lib/set-utils";
-import { normalizeBaseUrl, buildOpenAiBaseUrl, buildOpenAiUrl } from "@/lib/url-utils";
-
-/** Resolve a model ID to its pi-ai Model object, provider, and API key. */
-function resolveModelObject(
-  modelId: string,
-  apiKeys: Record<string, string>,
-  selectedModels?: import("@/lib/models").ProviderModel[],
-  zdr = false
-): {
-  modelObj: Model<Api>;
-  provider: string;
-  apiKey: string;
-  capability: EffortCapability | null;
-} | null {
-  const active = getActiveModels(selectedModels);
-  const entry = active.find((m) => m.id === modelId);
-  if (!entry) return null;
-
-  const apiKey = apiKeys[entry.provider as keyof typeof apiKeys];
-  if (!apiKey) return null;
-
-  // Reasoning comes from OpenRouter's per-model metadata and nothing else, and
-  // is always stamped onto the model — in both directions.
-  //
-  // Stamping the positive case is what makes the request carry the effort at
-  // all: pi-ai's OpenRouter branch is gated on `model.reasoning`, so a model
-  // built with `reasoning: false` drops the option however the picker looked.
-  //
-  // Overwriting the negative case matters just as much. pi-ai's registry marks
-  // 167 OpenRouter ids `reasoning: true` with a map of its own; for a model that
-  // exposes no discrete levels (93 live ids, 21 of them `mandatory`) that branch
-  // takes its `else` and sends `reasoning: { effort: "none" }`, silently
-  // disabling reasoning on a model the user got no picker for. `reasoning:
-  // false` sends no reasoning parameter instead, leaving the provider default.
-  // Thinking output is unaffected — pi-ai parses it without consulting this flag.
-  const capability = getEffortCapability(entry);
-  const reasoningFields = capability
-    ? { reasoning: true as const, thinkingLevelMap: capability.thinkingLevelMap }
-    : { reasoning: false as const, thinkingLevelMap: undefined };
-
-  // Try pi-ai's getModel() first (gives full config with cost/context data)
-  const registryModel = getModel(entry.provider as "anthropic", modelId as "claude-sonnet-4-20250514");
-  if (registryModel) {
-    // OpenRouter needs explicit auth header (Tauri fetch may strip SDK-managed auth on redirect)
-    if (entry.provider === "openrouter") {
-      return {
-        modelObj: {
-          ...registryModel,
-          ...reasoningFields,
-          headers: { ...registryModel.headers, ...openRouterHeaders(apiKey) },
-          compat: openRouterCompat(zdr),
-        },
-        provider: entry.provider,
-        apiKey,
-        capability,
-      };
-    }
-    return { modelObj: registryModel, provider: entry.provider, apiKey, capability };
-  }
-
-  const api = PROVIDER_API_MAP[entry.provider];
-  if (!api) return null;
-
-  const baseUrl = PROVIDER_BASE_URL_MAP[entry.provider] ?? "";
-  const modelObj: Model<Api> = {
-    id: modelId,
-    name: entry.name,
-    api: api as Api,
-    provider: entry.provider,
-    baseUrl,
-    ...reasoningFields,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 128000,
-    maxTokens: 8192,
-  };
-
-  // Add explicit auth header for OpenRouter (Tauri fetch may strip SDK-managed auth on redirect)
-  if (entry.provider === "openrouter") {
-    modelObj.headers = openRouterHeaders(apiKey);
-    modelObj.compat = openRouterCompat(zdr);
-  }
-
-  return { modelObj, provider: entry.provider, apiKey, capability };
-}
-
-import type { LocalLlmProvider } from "./settings-store";
 
 function buildContextFromConversation(params: {
   conversation: Conversation;
@@ -164,45 +71,6 @@ function buildContextFromConversation(params: {
   return {
     systemPrompt,
     messages: messagesToPiMessages(conversation.messages, api, provider, model),
-  };
-}
-
-async function resolveLocalModel(provider: LocalLlmProvider, baseUrl: string, fallback?: string) {
-  if (fallback?.trim()) return fallback.trim();
-  try {
-    const url = buildOpenAiUrl(baseUrl, "/models");
-    const response = await appFetch(url);
-    if (response.ok) {
-      const data = (await response.json()) as { data?: Array<{ id?: string }> };
-      const modelId = data?.data?.[0]?.id ?? null;
-      if (modelId) return modelId;
-    }
-    if (provider === "ollama") {
-      const ollamaUrl = `${normalizeBaseUrl(baseUrl)}/api/tags`;
-      const ollamaResponse = await appFetch(ollamaUrl);
-      if (!ollamaResponse.ok) return null;
-      const data = (await ollamaResponse.json()) as { models?: Array<{ name?: string }> };
-      return data?.models?.[0]?.name ?? null;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function buildLocalModel(params: { provider: LocalLlmProvider; baseUrl: string; model: string }): Model<"openai-completions"> {
-  const baseUrl = buildOpenAiBaseUrl(params.baseUrl);
-  return {
-    id: params.model,
-    name: params.model,
-    api: "openai-completions",
-    provider: params.provider,
-    baseUrl,
-    reasoning: false,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 128000,
-    maxTokens: 32000,
   };
 }
 
@@ -797,17 +665,10 @@ export const useChatStore = create<ChatState>((set, get) => {
           settings.openRouterZdrOnly
         );
         if (!resolved) {
-          const active = getActiveModels(settings.selectedModels);
-          const entry = active.find((m) => m.id === model);
-          const providerName = entry?.provider ?? "the appropriate";
           updateConversation((c) => ({
             ...c,
             messages: updateLastAssistantMessage(c.messages, {
-              content: entry
-                ? `Please configure a ${providerName} API key in Settings to use the chat.`
-                : model
-                  ? `Unknown model: ${model}. Please select a valid model in Settings.`
-                  : "No model selected. Choose one under Settings → Models.",
+              content: unresolvedModelMessage(model, settings.selectedModels),
             }),
             updatedAt: new Date(),
           }));
