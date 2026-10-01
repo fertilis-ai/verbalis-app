@@ -12,7 +12,6 @@ import {
   type ToolCallState,
   type ToolCallStatus,
   getToolsForContext,
-  normalizeToolCallStatus,
 } from "@/lib/tools";
 import { stripProtocolMarkers } from "@/lib/protocol-parser";
 import { messagesToPiMessages } from "@/lib/message-conversion";
@@ -53,11 +52,17 @@ import {
   renamePath,
   type ChatTreeNode,
   type ChatFolderMeta,
-  type ChatData,
 } from "@/lib/storage";
 import { logAgent } from "@/lib/logger";
 import { openRouterCompat, openRouterHeaders } from "@/lib/openrouter";
 import { dirname, basename } from "@/lib/path-resolution";
+import {
+  chatFolderArg,
+  conversationToChatData,
+  deserializeMessages,
+  saveConversation,
+} from "@/lib/chat-persistence";
+import { mergeToolCalls, rejectToolCall, stopInFlightToolCalls, upsertToolCall } from "@/lib/tool-call-patch";
 import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
 import { toggleInSet } from "@/lib/set-utils";
 import { normalizeBaseUrl, buildOpenAiBaseUrl, buildOpenAiUrl } from "@/lib/url-utils";
@@ -308,12 +313,6 @@ function deriveConversationTitle(content: string, maxLength = 50): string | null
   return trimmed.slice(0, maxLength);
 }
 
-/** Merge incoming tool calls with existing ones, skipping duplicates by ID. */
-function mergeToolCalls(existing: ToolCallState[], incoming: ToolCallState[]): ToolCallState[] {
-  const existingIds = new Set(existing.map((tc) => tc.id));
-  return [...existing, ...incoming.filter((tc) => !existingIds.has(tc.id))];
-}
-
 /** Update the last assistant message in a messages array with the given partial updates. */
 function updateLastAssistantMessage(messages: Message[], updates: Partial<Message>): Message[] {
   const result = [...messages];
@@ -322,40 +321,6 @@ function updateLastAssistantMessage(messages: Message[], updates: Partial<Messag
     result[lastIdx] = { ...result[lastIdx], ...updates };
   }
   return result;
-}
-
-/** Serialize a Conversation's messages to ChatData message format for disk persistence. */
-function serializeMessages(messages: Message[]): ChatData["messages"] {
-  return messages.map((m) => ({
-    id: m.id,
-    role: m.role,
-    content: m.content,
-    createdAt: m.createdAt.toISOString(),
-    ...(m.toolCalls?.length ? {
-      toolCalls: m.toolCalls.map((tc) => ({
-        id: tc.id,
-        name: tc.name,
-        arguments: tc.arguments,
-        status: tc.status,
-        result: tc.result,
-        error: tc.error,
-        durationMs: tc.durationMs,
-      })),
-    } : {}),
-  }));
-}
-
-/** Build a ChatData object from a Conversation for disk persistence. */
-function conversationToChatData(conv: Conversation, model: string, agentId: string | null): ChatData {
-  return {
-    id: conv.id,
-    title: conv.title,
-    model,
-    agentId,
-    messages: serializeMessages(conv.messages),
-    createdAt: conv.createdAt.toISOString(),
-    updatedAt: conv.updatedAt.toISOString(),
-  };
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
@@ -409,16 +374,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     // Skip disk save for background conversations (e.g. scheduler runs)
     if (isTauri() && !options.background) {
       try {
-        const chatData: ChatData = {
-          id: newConversation.id,
-          title: newConversation.title,
-          model: get().model,
-          agentId: get().agentId,
-          messages: [],
-          createdAt: newConversation.createdAt.toISOString(),
-          updatedAt: newConversation.updatedAt.toISOString(),
-        };
-        await saveChatToFolder(chatData, folderPath);
+        await saveChatToFolder(conversationToChatData(newConversation, get().model, get().agentId), folderPath);
         await get().loadChatsFromDisk();
       } catch (error) {
         console.error("[chat-store] Failed to save chat to disk:", error);
@@ -906,11 +862,8 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       if (!isGhost) {
         const finalConversation = get().conversations.find((c) => c.id === conversationId);
-        if (finalConversation?.path && !finalConversation.background) {
-          const chatData = conversationToChatData(finalConversation, model, agentId);
-          const folderPath = dirname(finalConversation.path);
-          const dir = await getAppDataDir();
-          await saveChatToFolder(chatData, folderPath === `${dir}/chats` ? undefined : folderPath);
+        if (finalConversation && !finalConversation.background) {
+          await saveConversation(finalConversation, model, agentId);
         }
       }
     } catch (error) {
@@ -996,7 +949,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       try {
         const dir = dirname(conversation.path);
         newPath = `${dir}/${loaded.id}.json`;
-        await saveChatToFolder(loaded, dir === `${await getAppDataDir()}/chats` ? undefined : dir);
+        await saveChatToFolder(loaded, await chatFolderArg(dir));
         await deletePath(conversation.path);
       } catch (e) {
         console.error("[chat-store] Failed to auto-migrate YAML chat:", e);
@@ -1011,28 +964,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           ...c,
           title: loaded.title || c.title,
           path: newPath,
-          messages: loaded.messages.map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: stripProtocolMarkers(m.content),
-            createdAt: new Date(m.createdAt),
-            ...(m.toolCalls?.length ? {
-              toolCalls: m.toolCalls.map((tc) => {
-                const normalizedStatus = normalizeToolCallStatus(tc.status);
-                const wasInFlight =
-                  normalizedStatus === "pending" ||
-                  normalizedStatus === "pending_confirmation" ||
-                  normalizedStatus === "executing";
-                return {
-                  ...tc,
-                  status: wasInFlight ? "error" as ToolCallStatus : normalizedStatus,
-                  error: wasInFlight
-                    ? (tc.error || "Interrupted — app closed during execution")
-                    : tc.error,
-                };
-              }),
-            } : {}),
-          })),
+          messages: deserializeMessages(loaded.messages),
           createdAt: new Date(loaded.createdAt),
           updatedAt: new Date(loaded.updatedAt),
         };
@@ -1243,10 +1175,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       try {
         const updated = get().conversations.find((c) => c.id === chatId);
         if (updated?.path) {
-          const chatData = conversationToChatData(updated, get().model, get().agentId);
-          const folderPath = dirname(updated.path);
-          const dir = await getAppDataDir();
-          await saveChatToFolder(chatData, folderPath === `${dir}/chats` ? undefined : folderPath);
+          await saveConversation(updated, get().model, get().agentId);
           await get().loadChatsFromDisk();
         }
       } catch (error) {
@@ -1353,46 +1282,11 @@ export const useChatStore = create<ChatState>((set, get) => {
     useAgenticLoopStore.getState().rejectTool(conversationId, toolCallId, "Rejected by user");
 
     // Immediately reflect rejection in chat history to avoid stale pending UI.
-    applyUpdate(conversationId, (c) => {
-      let changed = false;
-      const messages = c.messages.map((m) => {
-        if (!m.toolCalls) return m;
-        const updatedToolCalls = m.toolCalls.map((tc) => {
-          if (tc.id !== toolCallId) return tc;
-          changed = true;
-          return {
-            ...tc,
-            status: "cancelled" as const,
-            error: "Rejected by user",
-            completedAt: tc.completedAt ?? new Date(),
-          };
-        });
-        return changed ? { ...m, toolCalls: updatedToolCalls } : m;
-      });
-      return changed ? { ...c, messages, updatedAt: new Date() } : c;
-    });
+    applyUpdate(conversationId, (c) => rejectToolCall(c, toolCallId, "Rejected by user"));
   },
 
   markToolCallsStopped: (conversationId: string) => {
-    applyUpdate(conversationId, (c) => {
-      let changed = false;
-      const messages = c.messages.map((m) => {
-        if (!m.toolCalls) return m;
-        const updatedToolCalls = m.toolCalls.map((tc) => {
-          if (
-            tc.status === "pending" ||
-            tc.status === "pending_confirmation" ||
-            tc.status === "executing"
-          ) {
-            changed = true;
-            return { ...tc, status: "stopped" as const };
-          }
-          return tc;
-        });
-        return changed ? { ...m, toolCalls: updatedToolCalls } : m;
-      });
-      return changed ? { ...c, messages, updatedAt: new Date() } : c;
-    });
+    applyUpdate(conversationId, stopInFlightToolCalls);
   },
   };
 });
@@ -1400,38 +1294,6 @@ export const useChatStore = create<ChatState>((set, get) => {
 // ============================================================================
 // Tool State Sync from Agentic Loop
 // ============================================================================
-
-/**
- * Merge a tool call's latest state into the conversation. Fields the event
- * carries win; fields it omits keep their stored value. A call not yet in any
- * message is appended to the last assistant message.
- */
-function upsertToolCall(c: Conversation, toolCall: ToolCallState): Conversation {
-  let found = false;
-  const messages = c.messages.map((m) => {
-    if (!m.toolCalls) return m;
-    const tcIndex = m.toolCalls.findIndex((tc) => tc.id === toolCall.id);
-    if (tcIndex === -1) return m;
-    found = true;
-    const updatedToolCalls = [...m.toolCalls];
-    updatedToolCalls[tcIndex] = {
-      ...updatedToolCalls[tcIndex],
-      ...toolCall,
-      status: normalizeToolCallStatus(toolCall.status),
-    };
-    return { ...m, toolCalls: updatedToolCalls };
-  });
-  if (!found) {
-    const lastIdx = messages.length - 1;
-    if (lastIdx >= 0 && messages[lastIdx].role === "assistant") {
-      messages[lastIdx] = {
-        ...messages[lastIdx],
-        toolCalls: [...(messages[lastIdx].toolCalls ?? []), toolCall],
-      };
-    }
-  }
-  return { ...c, messages, updatedAt: new Date() };
-}
 
 // The loop bus is the single path from the agentic loop to conversation state,
 // covering both streaming and out-of-band updates (e.g. a user confirming a tool).
