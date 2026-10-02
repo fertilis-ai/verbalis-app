@@ -37,18 +37,49 @@ export function ChatView() {
   useElapsedTime(isLoopActive);
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const messageListRef = React.useRef<HTMLDivElement>(null);
+  // Whether to follow new content; cleared when the user scrolls up to read.
+  const stickToBottomRef = React.useRef(true);
+  const lastScrollTopRef = React.useRef(0);
 
   const scrollToBottom = () => {
+    stickToBottomRef.current = true;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+      stickToBottomRef.current = true;
+    } else if (el.scrollTop < lastScrollTopRef.current) {
+      stickToBottomRef.current = false;
+    }
+    lastScrollTopRef.current = el.scrollTop;
   };
 
   // Use message count and pending count to avoid array reference issues
   const messageCount = currentConversation?.messages?.length ?? 0;
   const pendingCount = pendingToolCalls.length;
+  const hasMessages = messageCount > 0;
 
   React.useEffect(() => {
     scrollToBottom();
   }, [messageCount, pendingCount]);
+
+  // Message count alone misses content that grows in place (streamed text,
+  // tool results, the final answer), so follow the list's height too.
+  React.useEffect(() => {
+    const el = scrollContainerRef.current;
+    const list = messageListRef.current;
+    if (!hasMessages || !el || !list || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      if (stickToBottomRef.current) el.scrollTop = el.scrollHeight;
+    });
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [hasMessages]);
 
   const handleSend = async (message: string) => {
     await sendMessage(message);
@@ -99,7 +130,7 @@ export function ChatView() {
       <ChatHeader />
 
       {/* Messages */}
-      <div className="flex-1 overflow-auto p-4">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-auto p-4">
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -121,7 +152,7 @@ export function ChatView() {
             </div>
           </div>
         ) : (
-          <div className="mx-auto max-w-3xl space-y-4">
+          <div ref={messageListRef} className="mx-auto max-w-3xl space-y-4">
             {messages.map((msg) => (
               <div
                 key={msg.id}

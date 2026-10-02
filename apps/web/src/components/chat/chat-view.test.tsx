@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 
 // jsdom does not implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
@@ -402,6 +402,60 @@ describe("ChatView", () => {
       render(<ChatView />);
       expect(screen.queryByText("Incognito Session")).not.toBeInTheDocument();
       expect(screen.queryByText("Messages won't be saved to disk")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("auto-scroll", () => {
+    let resizeCallback: (() => void) | null = null;
+
+    beforeEach(() => {
+      resizeCallback = null;
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(cb: () => void) {
+            resizeCallback = cb;
+          }
+          observe() {}
+          disconnect() {}
+        }
+      );
+      mockChatStoreState.currentConversation = {
+        id: "conv-1",
+        title: "Test",
+        messages: [{ id: "msg-1", role: "assistant", content: "Streaming answer", createdAt: new Date() }],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    /** Render, then give the scroll container a fixed geometry (jsdom has no layout). */
+    function renderScrollable() {
+      render(<ChatView />);
+      const container = screen.getByTestId("markdown").closest(".overflow-auto") as HTMLElement;
+      Object.defineProperty(container, "clientHeight", { configurable: true, value: 500 });
+      Object.defineProperty(container, "scrollHeight", { configurable: true, value: 2000 });
+      return container;
+    }
+
+    it("follows content that grows in place while at the bottom", () => {
+      const container = renderScrollable();
+      act(() => resizeCallback?.());
+      expect(container.scrollTop).toBe(2000);
+    });
+
+    it("stops following once the user scrolls up", () => {
+      const container = renderScrollable();
+      container.scrollTop = 1500;
+      fireEvent.scroll(container);
+      container.scrollTop = 600;
+      fireEvent.scroll(container);
+      act(() => resizeCallback?.());
+      expect(container.scrollTop).toBe(600);
     });
   });
 });
