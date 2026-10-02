@@ -109,6 +109,7 @@ export function CodeOverlayEditor({
         <div
           ref={highlightRef}
           className="absolute inset-0 overflow-hidden pointer-events-none p-4 [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:p-0 [&_span]:!bg-transparent [&_code]:leading-5 [&_code]:whitespace-pre"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: Shiki output, or escapeHtml(content) on failure
           dangerouslySetInnerHTML={{ __html: highlightedHtml }}
         />
 
