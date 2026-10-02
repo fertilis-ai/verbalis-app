@@ -91,7 +91,7 @@ Fixes for these (branch `fix/smoke-test-bugs`):
   - New schedules now store `default`.
   - `resolveScheduleAgentId` maps a stored `Assistant` to `default`, in the runner and the Agent select, unless the user has an agent by that name. No YAML is rewritten.
 
-## Phase 3: Single tool registry and typed Tauri boundary — ✅ done (branch `refactor/phase-3`, packaged smoke test pending)
+## Phase 3: Single tool registry and typed Tauri boundary — ✅ done (branch `refactor/phase-3`, packaged smoke test passed 2026-10-01)
 1. ✅ **Typed commands.** `lib/tauri/commands.ts` has one typed function per Rust command. It is a leaf module (it imports only `invoke`), because logger, storage and http depend on it. Every raw `invoke("…")` outside it is gone, including in `tools.ts` and `undo-manager.ts`.
    - **Latent bug found:** `storage.readDirectory` sent `max_depth`, but Tauri expects camelCase argument keys, so Rust ignored it and every tree load used its default depth of 3 (the Workspace tree asked for 10). The depth now reaches Rust. The Workspace tree asks for 3 explicitly (`FILE_TREE_DEPTH`), keeping the depth it has always had. The other callers ask for 1 and use only top-level entries. All other invoke key casings were checked against the Rust signatures.
 2. ✅ **One tool registry.** Each tool is a `ToolSpec` (`tools/categories.ts`): schema, category, risk level, undo support, path parameters and executor.
@@ -122,11 +122,23 @@ Packaged smoke test (`cd apps/web && bunx tauri build --bundles dmg`); these cov
 - Workspace file tree: directories nested more than 3 levels still show empty past depth 3, as before.
 - A self-authored agent with an unknown tool in `tools:` shows the "Valid tools" list.
 
+Result (2026-10-01, packaged build of `refactor/phase-4`, which contains Phase 3): every item passed except `rename_path` undo, which never existed (see follow-ups).
+- Tool calls run under the CSP with TypeBox validation.
+- Undo of a `write_file` and a `delete_path` given absolute paths restores the file.
+- The log viewer lists, reads and clears logs.
+- The keychain key reloads after a restart.
+- Save As opens the save dialog, and Show in Folder opens Finder with the image selected.
+- The Workspace tree is empty past depth 3, as before.
+- The unknown-tool agent shows the "Valid tools" list.
+
 Follow-ups found in Phase 3 (not done here):
+- **Undo with relative paths (pre-existing).** The adapter passes the raw `params.path` to `prepareFileWriteUndo`/`prepareFileDeleteUndo` before it is resolved against the working directory. So a relative `delete_path` gets no Undo button, and Undo of a relative `write_file` does nothing. Resolve the path first.
+- **`rename_path` has `supportsUndo: true` but no undo handler** (pre-existing). Either add one or set it to `false`.
+- The Undo button stays visible after an undo has run (pre-existing).
 - **Undo trash is never cleaned.** `undo-manager.ts` `cleanupTrash` lists `~/.verbalis/trash` with `list_files`. That command returns file *stems* and skips directories, so `deletePath(trash/<stem>)` misses any trashed file with an extension, and trashed directories are never considered. Needs a listing that returns full names, including directories.
 - `FILE_TREE_DEPTH` could be raised now that the depth reaches Rust, if deep folders should show in the Workspace tree.
 
-## Phase 4: Split `chat-store.ts` (1550 lines) — ✅ done (branch `refactor/phase-4`, stacked on `refactor/phase-3`; dev smoke test pending)
+## Phase 4: Split `chat-store.ts` (1550 lines) — ✅ done (branch `refactor/phase-4`, stacked on `refactor/phase-3`; packaged smoke test passed 2026-10-01)
 `chat-store.ts` is down from 1550 to 918 lines and now coordinates the modules below. New lib modules use `import type` only from `@/stores/chat-store`, and Phase 5 moves those types out.
 
 1. ✅ **`lib/tool-call-patch.ts`:** `isToolCallInFlight`, `mergeToolCalls`, `upsertToolCall` (moved verbatim), `stopInFlightToolCalls`, `rejectToolCall` and `restoreToolCall` (an in-flight call loaded from disk becomes `error`). The stop and reject patches return the same conversation when no call changed.
@@ -154,6 +166,17 @@ Dev smoke test (`bun run dev`, Tauri): `chat-store.test.ts` doesn't cover the ad
 - Rename a chat in a subfolder, restart, and check that it reloads from the same folder.
 - A local model (LM Studio/Ollama) turn through the adapter.
 - In the browser build (`bun run dev:web`), a cloud and a local turn both stream; this is the `streamPlain` path.
+
+Result (2026-10-01, run in the packaged build instead of `bun run dev`): no regression from the split.
+- Passed: approve and reject, Decline All, several tool iterations, Stop mid-stream, the ghost chat with a tool call (nothing written to disk), and rename in a subfolder that survives a restart in the same folder without a copy in the root.
+- **Not run:** the local model turn (no LM Studio or Ollama running) and the `dev:web` `streamPlain` path.
+
+The smoke test found three bugs that also exist on `main`. Each one is fixed with a regression test that fails without the fix:
+- `643a926` **Stop during a pending confirmation left the Stop button stuck and the input disabled.** `stop()` emits `loop_aborted`, and then each rejected confirmation emits `tool_cancelled`, which set the status back to `thinking`. `tool_cancelled` now leaves an ended loop alone.
+- `3de32c2` **The chat didn't scroll to the end of some answers.** Auto-scroll ran only when the message count changed, so it missed content growing in place (streamed text, tool results). A `ResizeObserver` on the message list now keeps the view at the bottom, unless the user has scrolled up.
+- `6776b7b` **Leaving ghost mode showed an empty chat.** It pointed at `conversations[0]` without loading its messages, which load lazily. It now reopens the chat that was open before, through `selectConversation`.
+
+After the fixes: `tsc`, the full Vitest suite (94 files, 2112 tests) and Biome (54 warnings, unchanged) all pass.
 
 ## Phase 5: Shared tree/folder model and runners
 - **Folder-tree factory.** Chat, scheduler and task stores repeat folder CRUD, pin/expand and load-from-disk logic (`chat-store.ts:1189–1344`, `scheduler-store.ts:120–160`, `task-store.ts:101–137`). Move it into a `createFolderTreeSlice` factory, and fix the top-level-only `findNodeInTree` copy in `task-store.ts:75–83`.
