@@ -180,7 +180,7 @@ The smoke test found three bugs that also exist on `main`. Each one is fixed wit
 
 After the fixes: `tsc`, the full Vitest suite (94 files, 2112 tests) and Biome (54 warnings, unchanged) all pass.
 
-## Phase 5: Shared tree/folder model and runners — ✅ done (branch `refactor/phase-5`, stacked on `refactor/phase-4`)
+## Phase 5: Shared tree/folder model and runners — ✅ code done, ⏳ dev smoke test not yet run (branch `refactor/phase-5`, stacked on `refactor/phase-4`)
 1. ✅ **Domain types out of the stores.**
    - `lib/types/chat.ts` holds `Message`, `Conversation`, `ContextFile`, `ToolCallState` and `ToolCallStatus`.
    - `lib/types/agent.ts` holds `Agent`, and `lib/types/settings.ts` holds `Theme`, `UserMode` and `LocalLlmProvider`.
@@ -216,6 +216,11 @@ Dev smoke test (`bun run dev`, Tauri):
 - Scheduler: the same, including a nested folder; then Run now on a schedule.
 - Tasks: create a backlog (it is selected), rename, pin, delete the selected one (the selection clears), and run a task.
 - With logging on, `~/.verbalis/logs/tasks.txt` and `scheduler.txt` get start and completion lines. With logging off, neither file grows.
+- Inline rename in the scheduler and task sidebars still commits on Enter and closes the edit field.
+- A task run that fails (e.g. no model configured) still writes an `Error in task "…"` line and leaves the task incomplete.
+- Optional: quit with a schedule due, restart, and check it runs once the app has initialized (the logging setting is restored before the runner starts).
+
+Result: **not yet run.** The 2026-10-01 attempt couldn't drive the app (computer-use daemon unavailable), so this checklist still needs a manual pass before merging.
 
 Follow-ups found in Phase 5 (not done here):
 - **Runtime store imports in `lib` remain:** the runners and `run-workflow` (`useChatStore`), `tools`, `image-tools`, `config-sync` and the speech/voice hooks (`useSettingsStore`), `toolbox-tools`, `memory-tools` and `toolbox-schemas` (`useToolboxStore`, `useAgentStore`). Moving types can't remove these; inverting them means passing state or callbacks in.
