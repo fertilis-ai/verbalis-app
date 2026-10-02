@@ -8,8 +8,8 @@ describe("parseProtocolMarkers", () => {
       const result = parseProtocolMarkers(input);
 
       expect(result.toolCalls).toHaveLength(1);
-      expect(result.toolCalls[0].name).toBe("repo_browser.apply_patch");
-      expect(result.toolCalls[0].arguments).toHaveProperty("patch");
+      expect(result.toolCalls[0]!.name).toBe("repo_browser.apply_patch");
+      expect(result.toolCalls[0]!.arguments).toHaveProperty("patch");
       expect(result.cleanText).toBe("");
     });
 
@@ -18,8 +18,8 @@ describe("parseProtocolMarkers", () => {
       const result = parseProtocolMarkers(input);
 
       expect(result.toolCalls).toHaveLength(1);
-      expect(result.toolCalls[0].name).toBe("repo_browser.open_file");
-      expect(result.toolCalls[0].arguments).toEqual({ path: "~/test.md" });
+      expect(result.toolCalls[0]!.name).toBe("repo_browser.open_file");
+      expect(result.toolCalls[0]!.arguments).toEqual({ path: "~/test.md" });
       expect(result.cleanText).toBe("");
     });
 
@@ -28,7 +28,7 @@ describe("parseProtocolMarkers", () => {
       const result = parseProtocolMarkers(input);
 
       expect(result.toolCalls).toHaveLength(1);
-      expect(result.toolCalls[0].name).toBe("read_file");
+      expect(result.toolCalls[0]!.name).toBe("read_file");
       expect(result.cleanText).toContain("I'll help you with that.");
       expect(result.cleanText).toContain("Done!");
       expect(result.cleanText).not.toContain("<|channel|>");
@@ -39,8 +39,8 @@ describe("parseProtocolMarkers", () => {
       const result = parseProtocolMarkers(input);
 
       expect(result.toolCalls).toHaveLength(2);
-      expect(result.toolCalls[0].name).toBe("read_file");
-      expect(result.toolCalls[1].name).toBe("write_file");
+      expect(result.toolCalls[0]!.name).toBe("read_file");
+      expect(result.toolCalls[1]!.name).toBe("write_file");
     });
   });
 

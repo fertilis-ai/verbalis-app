@@ -35,7 +35,7 @@ describe("resolveMemories", () => {
     );
     const result = await resolveMemories();
     expect(result.map((m) => m.heading)).toEqual(["Soul", "User"]);
-    expect(result[0].body).toBe("soul body");
+    expect(result[0]!.body).toBe("soul body");
   });
 
   it("injects non-well-known memories only when alwaysInclude is true", async () => {
@@ -52,7 +52,7 @@ describe("resolveMemories", () => {
     );
     const result = await resolveMemories();
     expect(result.map((m) => m.name)).toEqual(["notes"]);
-    expect(result[0].body).toBe("keep me");
+    expect(result[0]!.body).toBe("keep me");
   });
 
   it("falls back to legacy settingsDir for SOUL/USER when absent", async () => {
@@ -62,8 +62,8 @@ describe("resolveMemories", () => {
     );
     const result = await resolveMemories({ settingsDir: "/legacy" });
     expect(result).toHaveLength(1);
-    expect(result[0].heading).toBe("Soul");
-    expect(result[0].body).toBe("legacy soul");
+    expect(result[0]!.heading).toBe("Soul");
+    expect(result[0]!.body).toBe("legacy soul");
   });
 
   it("prefers canonical SOUL over legacy", async () => {
@@ -75,7 +75,7 @@ describe("resolveMemories", () => {
     );
     const result = await resolveMemories({ settingsDir: "/legacy" });
     expect(result).toHaveLength(1);
-    expect(result[0].body).toBe("canonical soul");
+    expect(result[0]!.body).toBe("canonical soul");
   });
 
   it("loads alwaysInclude memories from the settings directory", async () => {
@@ -92,7 +92,7 @@ describe("resolveMemories", () => {
     const result = await resolveMemories({ settingsDir: "/settings" });
     expect(mockListFiles).toHaveBeenCalledWith("/settings/memories", "md");
     expect(result.map((m) => m.name)).toEqual(["projects"]);
-    expect(result[0].body).toBe("project facts");
+    expect(result[0]!.body).toBe("project facts");
   });
 
   it("app-data memory wins over a same-named settings-dir memory even when excluded", async () => {
@@ -132,7 +132,7 @@ describe("resolveMemories", () => {
     );
     const result = await resolveMemories({ settingsDir: "/settings" });
     expect(result).toHaveLength(1);
-    expect(result[0].heading).toBe("User");
+    expect(result[0]!.heading).toBe("User");
   });
 
   it("skips empty memories", async () => {
@@ -151,7 +151,7 @@ describe("resolveMemories", () => {
     });
     const result = await resolveMemories({ maxChars: 1000 });
     // SOUL always included; first opt-in pushes over budget so only one of a/b fits
-    expect(result[0].name).toBe("SOUL");
+    expect(result[0]!.name).toBe("SOUL");
     expect(result.length).toBeLessThanOrEqual(2);
   });
 });

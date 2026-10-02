@@ -115,9 +115,9 @@ describe("storage", () => {
       await initAppDataDir();
       const vfs = getVFS();
       expect(vfs["/verbalis-data/agents/default.md"]).toBeDefined();
-      expect(vfs["/verbalis-data/agents/default.md"].isDir).toBe(false);
-      expect(vfs["/verbalis-data/agents/default.md"].content).toContain("name: default");
-      expect(vfs["/verbalis-data/agents/default.md"].content).toContain("personal assistant");
+      expect(vfs["/verbalis-data/agents/default.md"]!.isDir).toBe(false);
+      expect(vfs["/verbalis-data/agents/default.md"]!.content).toContain("name: default");
+      expect(vfs["/verbalis-data/agents/default.md"]!.content).toContain("personal assistant");
     });
 
     it("does not overwrite existing default agent file", async () => {
@@ -132,7 +132,7 @@ describe("storage", () => {
       const { initAppDataDir } = await importStorage();
       await initAppDataDir();
       const vfs = getVFS();
-      expect(vfs["/verbalis-data/agents/default.md"].content).toBe(customContent);
+      expect(vfs["/verbalis-data/agents/default.md"]!.content).toBe(customContent);
     });
 
     it("invokes init_app_data_dir when in Tauri", async () => {
@@ -179,7 +179,7 @@ describe("storage", () => {
       expect(vfs["/deep"]).toEqual({ isDir: true });
       expect(vfs["/deep/nested"]).toEqual({ isDir: true });
       expect(vfs["/deep/nested/dir"]).toEqual({ isDir: true });
-      expect(vfs["/deep/nested/dir/file.txt"].content).toBe("content");
+      expect(vfs["/deep/nested/dir/file.txt"]!.content).toBe("content");
     });
   });
 
@@ -310,7 +310,7 @@ describe("storage", () => {
       await writeFile("/root/file.txt", "data");
       const entries = await readDirectory("/root/");
       expect(entries).toHaveLength(1);
-      expect(entries[0].name).toBe("file.txt");
+      expect(entries[0]!.name).toBe("file.txt");
     });
 
     it("returns empty array for empty directory", async () => {
@@ -569,7 +569,7 @@ describe("storage", () => {
       const tree = await loadChatTree();
       expect(tree).toHaveLength(2);
       expect(tree.map((n) => n.id)).toEqual(expect.arrayContaining(["c1", "c2"]));
-      expect(tree[0].type).toBe("chat");
+      expect(tree[0]!.type).toBe("chat");
     });
 
     it("loads chats nested in folders with metadata", async () => {
@@ -599,7 +599,7 @@ describe("storage", () => {
       expect(folder).toBeDefined();
       expect(folder!.isPinned).toBe(true);
       expect(folder!.children).toHaveLength(1);
-      expect(folder!.children![0].id).toBe("c1");
+      expect(folder!.children![0]!.id).toBe("c1");
     });
 
     it("sorts pinned items first, then folders before chats", async () => {
@@ -630,13 +630,13 @@ describe("storage", () => {
 
       const tree = await loadChatTree();
       // Pinned folder should come first
-      expect(tree[0].name).toBe("beta-folder");
-      expect(tree[0].isPinned).toBe(true);
+      expect(tree[0]!.name).toBe("beta-folder");
+      expect(tree[0]!.isPinned).toBe(true);
       // Then unpinned folder
-      expect(tree[1].name).toBe("alpha-folder");
-      expect(tree[1].type).toBe("folder");
+      expect(tree[1]!.name).toBe("alpha-folder");
+      expect(tree[1]!.type).toBe("folder");
       // Then chat
-      expect(tree[2].type).toBe("chat");
+      expect(tree[2]!.type).toBe("chat");
     });
 
     it("skips _meta.yaml and _meta.json files as chat entries", async () => {
@@ -680,8 +680,8 @@ describe("storage", () => {
 
       const tree = await loadChatTree();
       expect(tree).toHaveLength(1);
-      expect(tree[0].id).toBe("yaml-chat");
-      expect(tree[0].type).toBe("chat");
+      expect(tree[0]!.id).toBe("yaml-chat");
+      expect(tree[0]!.type).toBe("chat");
     });
 
     it("skips malformed YAML chat files gracefully", async () => {
@@ -925,9 +925,9 @@ describe("storage", () => {
 
       const tree = await loadTaskTree();
       expect(tree).toHaveLength(1);
-      expect(tree[0].name).toBe("Test Folder");
-      expect(tree[0].isPinned).toBe(true);
-      expect(tree[0].tasks).toHaveLength(1);
+      expect(tree[0]!.name).toBe("Test Folder");
+      expect(tree[0]!.isPinned).toBe(true);
+      expect(tree[0]!.tasks).toHaveLength(1);
     });
 
     it("loadTaskTree sorts pinned folders first", async () => {
@@ -962,8 +962,8 @@ describe("storage", () => {
       );
 
       const tree = await loadTaskTree();
-      expect(tree[0].name).toBe("Beta"); // pinned first
-      expect(tree[1].name).toBe("Alpha");
+      expect(tree[0]!.name).toBe("Beta"); // pinned first
+      expect(tree[1]!.name).toBe("Alpha");
     });
 
     it("loadTaskTree skips directories without folder.yaml", async () => {
@@ -1164,11 +1164,11 @@ describe("storage", () => {
 
       const tree = await loadSchedulerTree();
       expect(tree).toHaveLength(1);
-      expect(tree[0].type).toBe("schedule");
-      expect(tree[0].id).toBe("s1");
-      expect(tree[0].name).toBe("Schedule 1");
-      expect(tree[0].cron).toBe("0 * * * *");
-      expect(tree[0].enabled).toBe(true);
+      expect(tree[0]!.type).toBe("schedule");
+      expect(tree[0]!.id).toBe("s1");
+      expect(tree[0]!.name).toBe("Schedule 1");
+      expect(tree[0]!.cron).toBe("0 * * * *");
+      expect(tree[0]!.enabled).toBe(true);
     });
 
     it("loads nested schedules in folders", async () => {
@@ -1199,7 +1199,7 @@ describe("storage", () => {
       expect(folderNode).toBeDefined();
       expect(folderNode!.name).toBe("work");
       expect(folderNode!.children).toHaveLength(1);
-      expect(folderNode!.children![0].id).toBe("s1");
+      expect(folderNode!.children![0]!.id).toBe("s1");
     });
 
     it("skips malformed schedule YAML files", async () => {
@@ -1537,15 +1537,15 @@ describe("storage", () => {
 
       const first = DEFAULT_TOOLBOX_ITEMS[0];
       await saveToolboxItem({
-        name: first.name,
-        category: first.category,
+        name: first!.name,
+        category: first!.category,
         content: "user-customized content",
         updatedAt: "2025-01-01T00:00:00Z",
       });
 
       await ensureDefaultToolboxItems();
 
-      const loaded = await loadToolboxItem(first.category, first.name);
+      const loaded = await loadToolboxItem(first!.category, first!.name);
       expect(loaded!.content).toBe("user-customized content");
     });
 
@@ -1557,11 +1557,11 @@ describe("storage", () => {
 
       await ensureDefaultToolboxItems();
       const first = DEFAULT_TOOLBOX_ITEMS[0];
-      await deleteToolboxItem(first.category, first.name);
+      await deleteToolboxItem(first!.category, first!.name);
 
       await ensureDefaultToolboxItems();
 
-      expect(await loadToolboxItem(first.category, first.name)).toBeNull();
+      expect(await loadToolboxItem(first!.category, first!.name)).toBeNull();
     });
 
     it("re-seeds missing items when the marker version is older", async () => {
@@ -1572,13 +1572,13 @@ describe("storage", () => {
 
       await ensureDefaultToolboxItems();
       const first = DEFAULT_TOOLBOX_ITEMS[0];
-      await deleteToolboxItem(first.category, first.name);
+      await deleteToolboxItem(first!.category, first!.name);
       // Simulate an app upgrade that bumped the defaults version.
       await writeFile("/verbalis-data/toolbox-defaults-version", "0");
 
       await ensureDefaultToolboxItems();
 
-      expect(await loadToolboxItem(first.category, first.name)).not.toBeNull();
+      expect(await loadToolboxItem(first!.category, first!.name)).not.toBeNull();
     });
 
     it("upgrades an untouched superseded default and leaves edited copies alone", async () => {
@@ -1592,26 +1592,26 @@ describe("storage", () => {
 
       const [superseded] = SUPERSEDED_TOOLBOX_DEFAULTS;
       const current = DEFAULT_TOOLBOX_ITEMS.find(
-        (i) => i.category === superseded.category && i.name === superseded.name
+        (i) => i.category === superseded!.category && i.name === superseded!.name
       )!;
       const save = (content: string) =>
         saveToolboxItem({
-          name: superseded.name,
-          category: superseded.category,
+          name: superseded!.name,
+          category: superseded!.category,
           content,
           updatedAt: "2025-01-01T00:00:00Z",
         });
 
-      await save(superseded.previous[0]);
+      await save(superseded!.previous[0]!);
       await ensureDefaultToolboxItems();
-      expect((await loadToolboxItem(superseded.category, superseded.name))!.content).toBe(
+      expect((await loadToolboxItem(superseded!.category, superseded!.name))!.content).toBe(
         current.content
       );
 
-      const edited = `${superseded.previous[0]}\nMy own note.\n`;
+      const edited = `${superseded!.previous[0]}\nMy own note.\n`;
       await save(edited);
       await ensureDefaultToolboxItems();
-      expect((await loadToolboxItem(superseded.category, superseded.name))!.content).toBe(edited);
+      expect((await loadToolboxItem(superseded!.category, superseded!.name))!.content).toBe(edited);
     });
 
     it("every superseded entry names an existing default and differs from it", async () => {
@@ -1736,7 +1736,7 @@ describe("storage", () => {
         expect(await loadTaskFolder("/verbalis-data/tasks/f1")).toEqual({ id: "f1", name: "Backlog" });
         const tree = await loadTaskTree();
         expect(tree).toHaveLength(1);
-        expect(tree[0].tasks).toEqual([]);
+        expect(tree[0]!.tasks).toEqual([]);
         expect(warn).not.toHaveBeenCalled();
       });
 
@@ -1783,7 +1783,7 @@ describe("storage", () => {
         const tree = await loadChatTree();
         expect(tree).toHaveLength(1);
         expect(tree[0]).toMatchObject({ type: "folder", isPinned: false });
-        expect(tree[0].children?.map((n) => n.id)).toEqual(["c"]);
+        expect(tree[0]!.children?.map((n) => n.id)).toEqual(["c"]);
       });
 
       it("loadFolderMeta returns null for a non-boolean isPinned", async () => {

@@ -102,7 +102,7 @@ describe("executeGenerateImage", () => {
         headers: expect.objectContaining({ Authorization: "Bearer sk-or-key" }),
       })
     );
-    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockAppFetch.mock.calls[0]![1].body as string);
     expect(body).toEqual({
       model: "openai/gpt-image-1",
       prompt: "A red panda! In space.",
@@ -127,7 +127,7 @@ describe("executeGenerateImage", () => {
 
     await executeGenerateImage({ prompt: "a cat" });
 
-    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockAppFetch.mock.calls[0]![1].body as string);
     expect(body.provider).toEqual({ zdr: true });
   });
 
@@ -138,7 +138,7 @@ describe("executeGenerateImage", () => {
 
     await executeGenerateImage({ prompt: "a cat" });
 
-    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockAppFetch.mock.calls[0]![1].body as string);
     expect(body).not.toHaveProperty("provider");
   });
 
@@ -155,7 +155,7 @@ describe("executeGenerateImage", () => {
     mockInvoke.mockResolvedValue(undefined);
 
     await executeGenerateImage({ prompt: "a cat", aspect_ratio: "16:9" });
-    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockAppFetch.mock.calls[0]![1].body as string);
     expect(body.aspect_ratio).toBe("16:9");
   });
 
@@ -183,7 +183,7 @@ describe("executeGenerateImage", () => {
     expect(mockInvoke).toHaveBeenCalledWith("read_file_base64", {
       path: "/Users/test/.verbalis/images/old.png",
     });
-    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockAppFetch.mock.calls[0]![1].body as string);
     expect(body.input_references).toEqual([
       { type: "image_url", image_url: { url: "data:image/png;base64,c291cmNl" } },
     ]);
@@ -197,7 +197,7 @@ describe("executeGenerateImage", () => {
     mockAppFetch.mockResolvedValue(jsonResponse({ data: [{ b64_json: "eA==" }] }));
 
     await executeGenerateImage({ prompt: "edit", source_image: "/tmp/photo.JPG" });
-    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body as string);
+    const body = JSON.parse(mockAppFetch.mock.calls[0]![1].body as string);
     expect(body.input_references[0].image_url.url).toMatch(/^data:image\/jpeg;base64,/);
   });
 

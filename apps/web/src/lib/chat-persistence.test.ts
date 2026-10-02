@@ -53,7 +53,7 @@ describe("serializeMessages", () => {
   it("writes ISO dates and only the persisted tool-call fields", () => {
     const [user, assistant] = serializeMessages(conversation().messages);
     expect(user).toEqual({ id: "u", role: "user", content: "hi", createdAt: "2026-01-01T00:00:01.000Z" });
-    expect(assistant.toolCalls).toEqual([
+    expect(assistant!.toolCalls).toEqual([
       { id: "t", name: "read_file", arguments: { path: "x" }, status: "success", result: "r", error: undefined, durationMs: 3 },
     ]);
   });
@@ -64,8 +64,8 @@ describe("deserializeMessages", () => {
     const original = conversation().messages;
     const restored = deserializeMessages(serializeMessages(original));
     expect(restored[0]).toEqual(original[0]);
-    expect(restored[1].createdAt).toEqual(original[1].createdAt);
-    expect(restored[1].toolCalls?.[0].status).toBe("success");
+    expect(restored[1]!.createdAt).toEqual(original[1]!.createdAt);
+    expect(restored[1]!.toolCalls?.[0]?.status).toBe("success");
   });
 
   it("strips protocol markers and marks interrupted tool calls as errors", () => {
@@ -78,14 +78,14 @@ describe("deserializeMessages", () => {
         toolCalls: [{ id: "t", name: "read_file", arguments: {}, status: "executing" }],
       },
     ]);
-    expect(m.content).toContain("Done");
-    expect(m.content).not.toContain("<|channel|>");
-    expect(m.toolCalls?.[0]).toMatchObject({ status: "error", error: "Interrupted — app closed during execution" });
+    expect(m!.content).toContain("Done");
+    expect(m!.content).not.toContain("<|channel|>");
+    expect(m!.toolCalls?.[0]).toMatchObject({ status: "error", error: "Interrupted — app closed during execution" });
   });
 
   it("omits toolCalls when the stored list is empty", () => {
     const [m] = deserializeMessages([{ id: "a", role: "assistant", content: "", createdAt: "2026-01-01T00:00:00.000Z", toolCalls: [] }]);
-    expect("toolCalls" in m).toBe(false);
+    expect("toolCalls" in m!).toBe(false);
   });
 });
 

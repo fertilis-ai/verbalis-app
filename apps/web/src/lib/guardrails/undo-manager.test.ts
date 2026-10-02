@@ -173,7 +173,7 @@ describe("UndoManager", () => {
 
       const ops = manager.getAvailableOperations();
       expect(ops).toHaveLength(1);
-      expect(ops[0].toolCallId).toBe("tool-2");
+      expect(ops[0]!.toolCallId).toBe("tool-2");
     });
 
     it("should sort by createdAt descending (newest first)", async () => {
@@ -184,8 +184,8 @@ describe("UndoManager", () => {
       await manager.registerUndo("tool-2", "file_delete", {});
 
       const ops = manager.getAvailableOperations();
-      expect(ops[0].toolCallId).toBe("tool-2");
-      expect(ops[1].toolCallId).toBe("tool-1");
+      expect(ops[0]!.toolCallId).toBe("tool-2");
+      expect(ops[1]!.toolCallId).toBe("tool-1");
     });
   });
 
@@ -623,7 +623,7 @@ describe("UndoManager", () => {
 
       const ops = manager.getAvailableOperations();
       expect(ops).toHaveLength(1);
-      expect(ops[0].toolCallId).toBe("tool-2");
+      expect(ops[0]!.toolCallId).toBe("tool-2");
     });
   });
 

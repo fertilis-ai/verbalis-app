@@ -85,7 +85,7 @@ describe("transcribeAudio", () => {
         },
       })
     );
-    const body = JSON.parse((mockAppFetch.mock.calls[0][1] as RequestInit).body as string);
+    const body = JSON.parse((mockAppFetch.mock.calls[0]![1] as RequestInit).body as string);
     expect(body).toEqual({
       model: "openai/whisper-large-v3",
       input_audio: { data: btoa("audio-bytes"), format: "webm" },
@@ -172,7 +172,7 @@ describe("WAV re-encoding", () => {
       apiKey: "k",
       format: "m4a",
     });
-    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body);
+    const body = JSON.parse(mockAppFetch.mock.calls[0]![1].body);
     expect(body.input_audio.format).toBe("wav");
     expect(atob(body.input_audio.data).slice(0, 4)).toBe("RIFF");
     expect(close).toHaveBeenCalled();
@@ -182,7 +182,7 @@ describe("WAV re-encoding", () => {
     decodeAudioData.mockRejectedValue(new Error("EncodingError"));
     mockAppFetch.mockResolvedValue(jsonResponse({ text: "hi" }));
     await transcribeAudio(new Blob(["audio-bytes"]), { model: "m", apiKey: "k", format: "webm" });
-    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body);
+    const body = JSON.parse(mockAppFetch.mock.calls[0]![1].body);
     expect(body.input_audio).toEqual({ data: btoa("audio-bytes"), format: "webm" });
   });
 });

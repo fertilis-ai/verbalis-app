@@ -184,7 +184,7 @@ describe("fetchProviderModels", () => {
         })
       );
       const result = await fetchProviderModels("google", "key");
-      expect(result.models[0].id).toBe("gemini-2.0-flash");
+      expect(result.models[0]!.id).toBe("gemini-2.0-flash");
     });
 
     it("includes API key in URL", async () => {
@@ -210,8 +210,8 @@ describe("fetchProviderModels", () => {
       const result = await fetchProviderModels("openrouter", "or-key");
       expect(result.provider).toBe("openrouter");
       expect(result.models).toHaveLength(2);
-      expect(result.models[0].name).toBe("Claude 3");
-      expect(result.models[1].name).toBe("meta/llama-3");
+      expect(result.models[0]!.name).toBe("Claude 3");
+      expect(result.models[1]!.name).toBe("meta/llama-3");
     });
 
     it("works without an API key", async () => {
@@ -319,7 +319,7 @@ describe("fetchProviderModels", () => {
       const result = await fetchProviderModels("openrouter", "or-key");
       expect(result.error).toBeUndefined();
       expect(result.models).toHaveLength(1);
-      expect(result.models[0].zdr).toBeUndefined();
+      expect(result.models[0]!.zdr).toBeUndefined();
     });
   });
 
@@ -389,7 +389,7 @@ describe("fetchAllProviderModels", () => {
 
     const results = await fetchAllProviderModels({});
     expect(results).toHaveLength(1);
-    expect(results[0].provider).toBe("openrouter");
+    expect(results[0]!.provider).toBe("openrouter");
   });
 
   it("skips providers with empty/whitespace keys", async () => {

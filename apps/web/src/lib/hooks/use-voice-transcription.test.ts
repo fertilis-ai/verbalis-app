@@ -96,7 +96,7 @@ describe("useVoiceTranscription", () => {
     expect(mockGetUserMedia).toHaveBeenCalledWith({ audio: true });
     expect(result.current.status).toBe("recording");
     expect(FakeMediaRecorder.instances).toHaveLength(1);
-    expect(FakeMediaRecorder.instances[0].state).toBe("recording");
+    expect(FakeMediaRecorder.instances[0]!.state).toBe("recording");
   });
 
   it("transcribes a finished segment and starts the next one", async () => {
@@ -106,7 +106,7 @@ describe("useVoiceTranscription", () => {
 
     // Simulate the 15s segment boundary.
     await act(async () => {
-      FakeMediaRecorder.instances[0].stop();
+      FakeMediaRecorder.instances[0]!.stop();
     });
 
     await waitFor(() => expect(onText).toHaveBeenCalledWith("hello"));
@@ -131,10 +131,10 @@ describe("useVoiceTranscription", () => {
     await startRecording(result.current.toggle);
 
     await act(async () => {
-      FakeMediaRecorder.instances[0].stop(); // first segment (slow response)
+      FakeMediaRecorder.instances[0]!.stop(); // first segment (slow response)
     });
     await act(async () => {
-      FakeMediaRecorder.instances[1].stop(); // second segment (fast response)
+      FakeMediaRecorder.instances[1]!.stop(); // second segment (fast response)
     });
     expect(onText).not.toHaveBeenCalled();
 
@@ -165,7 +165,7 @@ describe("useVoiceTranscription", () => {
     const { result } = renderHook(() => useVoiceTranscription({ onText: vi.fn() }));
     await startRecording(result.current.toggle);
 
-    FakeMediaRecorder.instances[0].blobSize = 10;
+    FakeMediaRecorder.instances[0]!.blobSize = 10;
     await act(async () => {
       result.current.toggle();
     });
@@ -231,7 +231,7 @@ describe("useVoiceTranscription", () => {
     await startRecording(result.current.toggle);
 
     await act(async () => {
-      FakeMediaRecorder.instances[0].stop();
+      FakeMediaRecorder.instances[0]!.stop();
     });
 
     await waitFor(() =>

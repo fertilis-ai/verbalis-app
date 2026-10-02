@@ -45,7 +45,7 @@ describe("streamPlain", () => {
   it("sends the system prompt, converted history and options", async () => {
     mockStreamSimple.mockReturnValue(streamOf([]));
     await run(() => {});
-    const [sentModel, context, options] = mockStreamSimple.mock.calls[0];
+    const [sentModel, context, options] = mockStreamSimple.mock.calls[0]!;
     expect(sentModel).toBe(model);
     expect(context.systemPrompt).toBe("sys");
     expect(context.messages).toHaveLength(1);

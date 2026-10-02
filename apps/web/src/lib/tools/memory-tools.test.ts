@@ -26,7 +26,7 @@ describe("executeRemember", () => {
   it("creates a new memory with alwaysInclude when none exists", async () => {
     const out = await executeRemember({ content: "user likes dark mode" });
     expect(mockSave).toHaveBeenCalledOnce();
-    const saved = mockSave.mock.calls[0][0];
+    const saved = mockSave.mock.calls[0]![0];
     expect(saved.name).toBe(DEFAULT_MEMORY_NAME);
     expect(saved.category).toBe("memories");
     const parsed = matter(saved.content);
@@ -44,7 +44,7 @@ describe("executeRemember", () => {
       updatedAt: "",
     });
     await executeRemember({ content: "second fact" });
-    const saved = mockSave.mock.calls[0][0];
+    const saved = mockSave.mock.calls[0]![0];
     const parsed = matter(saved.content);
     expect(parsed.content).toContain("- first fact");
     expect(parsed.content).toContain("- second fact");
@@ -52,7 +52,7 @@ describe("executeRemember", () => {
 
   it("does not force alwaysInclude on well-known SOUL/USER", async () => {
     await executeRemember({ content: "x", name: "USER" });
-    const saved = mockSave.mock.calls[0][0];
+    const saved = mockSave.mock.calls[0]![0];
     expect(saved.name).toBe("USER");
     const parsed = matter(saved.content);
     expect(parsed.data.alwaysInclude).toBeUndefined();
@@ -65,7 +65,7 @@ describe("executeRemember", () => {
 
   it("falls back to default name for unsafe names", async () => {
     await executeRemember({ content: "x", name: "../evil" });
-    const saved = mockSave.mock.calls[0][0];
+    const saved = mockSave.mock.calls[0]![0];
     expect(saved.name).toBe(DEFAULT_MEMORY_NAME);
   });
 });

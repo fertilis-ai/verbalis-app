@@ -78,7 +78,7 @@ describe("trimMessagesToBudget", () => {
       maxTokens: 100,
       minRecentMessages: 1,
     });
-    expect(result.messages[0].role).toBe("user");
+    expect(result.messages[0]!.role).toBe("user");
   });
 
   it("tightens with a lower historyBudgetFactor", () => {

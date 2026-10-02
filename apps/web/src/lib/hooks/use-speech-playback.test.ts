@@ -81,8 +81,8 @@ describe("useSpeechPlayback", () => {
       signal: expect.any(AbortSignal),
     });
     expect(FakeAudio.instances).toHaveLength(1);
-    expect(FakeAudio.instances[0].src).toBe("blob:mock");
-    expect(FakeAudio.instances[0].play).toHaveBeenCalled();
+    expect(FakeAudio.instances[0]!.src).toBe("blob:mock");
+    expect(FakeAudio.instances[0]!.play).toHaveBeenCalled();
   });
 
   it("stops playback on toggle while playing", async () => {
@@ -93,8 +93,8 @@ describe("useSpeechPlayback", () => {
     await toggleAndSettle(result.current.toggle);
 
     expect(result.current.status).toBe("idle");
-    expect(FakeAudio.instances[0].pause).toHaveBeenCalled();
-    expect(FakeAudio.instances[0].currentTime).toBe(0);
+    expect(FakeAudio.instances[0]!.pause).toHaveBeenCalled();
+    expect(FakeAudio.instances[0]!.currentTime).toBe(0);
   });
 
   it("aborts the fetch on toggle while loading, without a toast", async () => {
@@ -122,7 +122,7 @@ describe("useSpeechPlayback", () => {
     await toggleAndSettle(result.current.toggle);
     await waitFor(() => expect(result.current.status).toBe("playing"));
 
-    act(() => FakeAudio.instances[0].onended?.());
+    act(() => FakeAudio.instances[0]!.onended?.());
 
     expect(result.current.status).toBe("idle");
   });
@@ -131,14 +131,14 @@ describe("useSpeechPlayback", () => {
     const { result } = renderHook(() => useSpeechPlayback("Hello"));
     await toggleAndSettle(result.current.toggle);
     await waitFor(() => expect(result.current.status).toBe("playing"));
-    act(() => FakeAudio.instances[0].onended?.());
+    act(() => FakeAudio.instances[0]!.onended?.());
 
     await toggleAndSettle(result.current.toggle);
 
     await waitFor(() => expect(result.current.status).toBe("playing"));
     expect(mockSynthesizeSpeech).toHaveBeenCalledTimes(1);
     expect(FakeAudio.instances).toHaveLength(1);
-    expect(FakeAudio.instances[0].play).toHaveBeenCalledTimes(2);
+    expect(FakeAudio.instances[0]!.play).toHaveBeenCalledTimes(2);
   });
 
   it("refetches when the text changes", async () => {
@@ -147,7 +147,7 @@ describe("useSpeechPlayback", () => {
     });
     await toggleAndSettle(result.current.toggle);
     await waitFor(() => expect(result.current.status).toBe("playing"));
-    act(() => FakeAudio.instances[0].onended?.());
+    act(() => FakeAudio.instances[0]!.onended?.());
 
     rerender({ text: "Second" });
     await toggleAndSettle(result.current.toggle);
@@ -168,7 +168,7 @@ describe("useSpeechPlayback", () => {
 
     await waitFor(() => expect(second.result.current.status).toBe("playing"));
     expect(first.result.current.status).toBe("idle");
-    expect(FakeAudio.instances[0].pause).toHaveBeenCalled();
+    expect(FakeAudio.instances[0]!.pause).toHaveBeenCalled();
   });
 
   it("shows a toast and returns to idle on synthesis failure", async () => {
@@ -188,7 +188,7 @@ describe("useSpeechPlayback", () => {
 
     unmount();
 
-    expect(FakeAudio.instances[0].pause).toHaveBeenCalled();
+    expect(FakeAudio.instances[0]!.pause).toHaveBeenCalled();
     expect(mockRevokeObjectURL).toHaveBeenCalledWith("blob:mock");
   });
 });

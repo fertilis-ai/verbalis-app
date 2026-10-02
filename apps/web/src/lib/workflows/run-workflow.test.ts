@@ -59,8 +59,8 @@ describe("parseWorkflow", () => {
     expect(wf!.name).toBe("Daily");
     expect(wf!.trigger?.schedule).toBe("0 9 * * *");
     expect(wf!.steps).toHaveLength(2);
-    expect(wf!.steps[0].agent).toBe("Researcher");
-    expect(wf!.steps[1].agent).toBeUndefined();
+    expect(wf!.steps[0]!.agent).toBe("Researcher");
+    expect(wf!.steps[1]!.agent).toBeUndefined();
   });
 
   it("returns null for missing steps", () => {
@@ -87,7 +87,7 @@ describe("runWorkflow", () => {
     expect(result.error).toBeUndefined();
     expect(state.sendMessageToConversation).toHaveBeenCalledTimes(2);
     // Second step prompt should contain the first step's output.
-    const secondPrompt = state.sendMessageToConversation.mock.calls[1][1];
+    const secondPrompt = state.sendMessageToConversation.mock.calls[1]![1];
     expect(secondPrompt).toBe("use out:step one");
     expect(result.stepOutputs).toEqual(["out:step one", "out:use out:step one"]);
   });
@@ -95,13 +95,13 @@ describe("runWorkflow", () => {
   it("substitutes {{input}} in the first step", async () => {
     const wf = parseWorkflow("w", "steps:\n  - prompt: 'echo {{input}}'")!;
     await runWorkflow(wf, { input: "hello" });
-    expect(state.sendMessageToConversation.mock.calls[0][1]).toBe("echo hello");
+    expect(state.sendMessageToConversation.mock.calls[0]![1]).toBe("echo hello");
   });
 
   it("passes the step agent through", async () => {
     const wf = parseWorkflow("w", "steps:\n  - agent: Coder\n    prompt: code")!;
     await runWorkflow(wf);
-    expect(state.sendMessageToConversation.mock.calls[0][2]).toMatchObject({ agentId: "Coder" });
+    expect(state.sendMessageToConversation.mock.calls[0]![2]).toMatchObject({ agentId: "Coder" });
   });
 
   it("captures errors without throwing", async () => {

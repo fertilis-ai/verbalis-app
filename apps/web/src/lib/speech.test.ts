@@ -93,7 +93,7 @@ describe("synthesizeSpeech", () => {
         },
       })
     );
-    const body = JSON.parse((mockAppFetch.mock.calls[0][1] as RequestInit).body as string);
+    const body = JSON.parse((mockAppFetch.mock.calls[0]![1] as RequestInit).body as string);
     expect(body).toEqual({
       model: "x-ai/grok-voice-tts-1.0",
       input: "Hello world",
@@ -105,7 +105,7 @@ describe("synthesizeSpeech", () => {
   it("omits the voice field when no voice is given", async () => {
     mockAppFetch.mockResolvedValue(audioResponse());
     await synthesizeSpeech("Hi", { model: "m", apiKey: "k" });
-    const body = JSON.parse((mockAppFetch.mock.calls[0][1] as RequestInit).body as string);
+    const body = JSON.parse((mockAppFetch.mock.calls[0]![1] as RequestInit).body as string);
     expect(body).not.toHaveProperty("voice");
   });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   HUE_PRESETS,
   getHueCssOverrides,
@@ -120,13 +120,6 @@ describe("getHueCssOverrides", () => {
 });
 
 describe("applyHueOverrides", () => {
-  let originalStyle: CSSStyleDeclaration;
-
-  beforeEach(() => {
-    // Store reference so we can verify calls
-    originalStyle = document.documentElement.style;
-  });
-
   afterEach(() => {
     // Clean up any properties we set
     clearHueOverrides();

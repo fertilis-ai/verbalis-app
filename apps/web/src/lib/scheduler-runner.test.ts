@@ -80,10 +80,6 @@ function makeSchedule(overrides: Partial<ScheduleData> = {}): ScheduleData {
   };
 }
 
-function makeTree(nodes: SchedulerTreeNode[]): SchedulerTreeNode[] {
-  return nodes;
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

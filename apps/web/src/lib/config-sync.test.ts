@@ -128,7 +128,7 @@ describe("config-sync", () => {
 
       // Should have written config.yaml since the file didn't exist
       expect(mockWriteFile).toHaveBeenCalled();
-      const writtenPath = mockWriteFile.mock.calls[0][0] as string;
+      const writtenPath = mockWriteFile.mock.calls[0]![0] as string;
       expect(writtenPath).toBe("/home/user/.verbalis/config.yaml");
     });
 
@@ -173,7 +173,7 @@ describe("config-sync", () => {
 
       await initConfigSync();
 
-      const writtenContent = mockWriteFile.mock.calls[0][1] as string;
+      const writtenContent = mockWriteFile.mock.calls[0]![1] as string;
       const parsed = YAML.parse(writtenContent);
       expect(parsed.imageModel).toBe("");
       expect(parsed.availableImageModels).toEqual([]);
@@ -189,7 +189,7 @@ describe("config-sync", () => {
 
       await initConfigSync();
 
-      const parsed = YAML.parse(mockWriteFile.mock.calls[0][1] as string);
+      const parsed = YAML.parse(mockWriteFile.mock.calls[0]![1] as string);
       expect(parsed.modelEffort).toEqual({ "x-ai/grok-4.5": "low" });
       defaultStoreState.modelEffort = {};
     });
@@ -251,7 +251,7 @@ describe("config-sync", () => {
       expect(mockStoreApiKey).toHaveBeenCalledWith("openai", "sk-oai-old");
       // After migration, apiKeys should be stripped from config.yaml and rewritten
       const lastWriteCall = mockWriteFile.mock.calls[mockWriteFile.mock.calls.length - 1];
-      const writtenContent = lastWriteCall[1] as string;
+      const writtenContent = lastWriteCall![1] as string;
       const parsed = YAML.parse(writtenContent);
       expect(parsed.apiKeys).toBeUndefined();
     });

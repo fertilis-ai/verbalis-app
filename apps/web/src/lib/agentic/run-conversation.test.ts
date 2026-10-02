@@ -34,7 +34,7 @@ const tc = (id: string): ToolCallState => ({ id, name: "read_file", arguments: {
 
 describe("updateLastAssistantMessage", () => {
   it("patches the last message only when it is from the assistant", () => {
-    expect(updateLastAssistantMessage([msg("user"), msg("assistant")], { content: "x" })[1].content).toBe("x");
+    expect(updateLastAssistantMessage([msg("user"), msg("assistant")], { content: "x" })[1]!.content).toBe("x");
     const userLast = [msg("assistant"), msg("user", "q")];
     expect(updateLastAssistantMessage(userLast, { content: "x" })).toEqual(userLast);
   });
@@ -64,20 +64,20 @@ describe("applyAdapterEvent", () => {
   it("sets the full streamed content on text_delta", () => {
     const c = conv([msg("assistant", "Hel")]);
     const next = applyAdapterEvent(c, { type: "text_delta", delta: "lo", fullContent: "Hello", iterationId: "i" }, NOW);
-    expect(next.messages[0].content).toBe("Hello");
+    expect(next.messages[0]!.content).toBe("Hello");
   });
 
   it("sets content and merges new tool calls on thinking_completed", () => {
     const c = conv([msg("assistant", "draft", [tc("a")])]);
     const next = applyAdapterEvent(c, { type: "thinking_completed", content: "final", toolCalls: [tc("a"), tc("b")] }, NOW);
-    expect(next.messages[0].content).toBe("final");
-    expect(next.messages[0].toolCalls?.map((t) => t.id)).toEqual(["a", "b"]);
+    expect(next.messages[0]!.content).toBe("final");
+    expect(next.messages[0]!.toolCalls?.map((t) => t.id)).toEqual(["a", "b"]);
   });
 
   it("leaves tool calls alone on thinking_completed without any", () => {
     const c = conv([msg("assistant", "draft")]);
     const next = applyAdapterEvent(c, { type: "thinking_completed", content: "final", toolCalls: [] }, NOW);
-    expect("toolCalls" in next.messages[0]).toBe(false);
+    expect("toolCalls" in next.messages[0]!).toBe(false);
   });
 
   it("ignores thinking_completed when the last message is from the user", () => {
@@ -88,7 +88,7 @@ describe("applyAdapterEvent", () => {
   it("appends a loop error to the last assistant message", () => {
     const c = conv([msg("assistant", "partial")]);
     const next = applyAdapterEvent(c, { type: "loop_error", error: "boom", errorType: "unknown" } as AgentLoopEvent, NOW);
-    expect(next.messages[0].content).toBe("partial\n\nError: boom");
+    expect(next.messages[0]!.content).toBe("partial\n\nError: boom");
   });
 
   it("returns the conversation unchanged for other events", () => {
@@ -208,7 +208,7 @@ describe("runConversation", () => {
     const adapter = fakeAdapter([{ type: "text_delta", delta: "Hi", fullContent: "Hi", iterationId: "i" }]);
     const { deps, conversation } = setup([adapter]);
     await runConversation(params, deps);
-    expect(conversation().messages[1].content).toBe("Hi");
+    expect(conversation().messages[1]!.content).toBe("Hi");
   });
 
   it("provides trimmed history and reports when the window dropped messages", async () => {
@@ -216,7 +216,7 @@ describe("runConversation", () => {
     const { deps } = setup([adapter]);
     await runConversation(params, deps);
 
-    const provider = adapter.setMessageProvider.mock.calls[0][0] as () => Message[];
+    const provider = adapter.setMessageProvider.mock.calls[0]![0] as () => Message[];
     mockTrim.mockReturnValueOnce({ messages: [], trimmed: true, droppedCount: 2 });
     expect(provider()).toEqual([]);
     expect(deps.onContextTrimmed).toHaveBeenCalledTimes(1);
@@ -241,9 +241,9 @@ describe("runConversation", () => {
 
     expect(loopStore.createAdapter).toHaveBeenCalledTimes(2);
     expect(second.run).toHaveBeenCalled();
-    expect(conversation().messages[1].content).toBe("ok");
+    expect(conversation().messages[1]!.content).toBe("ok");
 
-    const provider = second.setMessageProvider.mock.calls[0][0] as () => Message[];
+    const provider = second.setMessageProvider.mock.calls[0]![0] as () => Message[];
     provider();
     expect(mockTrim).toHaveBeenLastCalledWith(expect.objectContaining({ historyBudgetFactor: 0.5 }));
   });
@@ -255,7 +255,7 @@ describe("runConversation", () => {
     await runConversation(params, deps);
 
     expect(loopStore.createAdapter).toHaveBeenCalledTimes(2);
-    expect(conversation().messages[1].content).toBe("\n\nError: too long");
+    expect(conversation().messages[1]!.content).toBe("\n\nError: too long");
   });
 
   it("shows other loop errors without retrying", async () => {
@@ -263,6 +263,6 @@ describe("runConversation", () => {
     const { deps, loopStore, conversation } = setup([fakeAdapter([error])]);
     await runConversation(params, deps);
     expect(loopStore.createAdapter).toHaveBeenCalledTimes(1);
-    expect(conversation().messages[1].content).toBe("\n\nError: bad key");
+    expect(conversation().messages[1]!.content).toBe("\n\nError: bad key");
   });
 });

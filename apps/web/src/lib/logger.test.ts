@@ -80,7 +80,7 @@ describe("logger", () => {
       setLoggingEnabled(true);
       mockIsTauri.mockReturnValue(true);
       logAgent("EVENT", "Some event");
-      const logLine = mockInvoke.mock.calls[0][1].line as string;
+      const logLine = mockInvoke.mock.calls[0]![1].line as string;
       // Should match ISO timestamp pattern [YYYY-MM-DDTHH:MM:SS.sssZ]
       expect(logLine).toMatch(/\[\d{4}-\d{2}-\d{2}T/);
     });
@@ -89,7 +89,7 @@ describe("logger", () => {
       setLoggingEnabled(true);
       mockIsTauri.mockReturnValue(true);
       logAgent("TOOL", "Exec tool", "some data string");
-      const logLine = mockInvoke.mock.calls[0][1].line as string;
+      const logLine = mockInvoke.mock.calls[0]![1].line as string;
       expect(logLine).toContain("Data: some data string");
     });
 
@@ -97,7 +97,7 @@ describe("logger", () => {
       setLoggingEnabled(true);
       mockIsTauri.mockReturnValue(true);
       logAgent("TOOL", "Exec tool", { key: "value" });
-      const logLine = mockInvoke.mock.calls[0][1].line as string;
+      const logLine = mockInvoke.mock.calls[0]![1].line as string;
       expect(logLine).toContain("Data:");
       expect(logLine).toContain('"key"');
       expect(logLine).toContain('"value"');
@@ -108,7 +108,7 @@ describe("logger", () => {
       mockIsTauri.mockReturnValue(true);
       const longString = "x".repeat(2000);
       logAgent("TOOL", "Big data", longString);
-      const logLine = mockInvoke.mock.calls[0][1].line as string;
+      const logLine = mockInvoke.mock.calls[0]![1].line as string;
       expect(logLine).toContain("... (truncated)");
       // Data should be at most 1000 chars + truncation suffix
       expect(logLine.length).toBeLessThan(2200);
@@ -120,7 +120,7 @@ describe("logger", () => {
       const circular: Record<string, unknown> = {};
       circular.self = circular;
       logAgent("TOOL", "Circular", circular);
-      const logLine = mockInvoke.mock.calls[0][1].line as string;
+      const logLine = mockInvoke.mock.calls[0]![1].line as string;
       expect(logLine).toContain("[unable to serialize]");
     });
 

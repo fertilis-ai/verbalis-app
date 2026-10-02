@@ -36,7 +36,7 @@ function sseResponse() {
 
 beforeEach(() => {
   bodies = [];
-  globalThis.fetch = (async (url: unknown, init?: { body?: string }) => {
+  globalThis.fetch = (async (_url: unknown, init?: { body?: string }) => {
     if (init?.body) bodies.push(JSON.parse(init.body));
     return sseResponse();
   }) as unknown as typeof fetch;

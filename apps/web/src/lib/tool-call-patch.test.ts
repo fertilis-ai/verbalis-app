@@ -61,7 +61,7 @@ describe("upsertToolCall", () => {
   it("merges into the existing call: present fields win, omitted fields are kept", () => {
     const c = conv([msg("assistant", [tc("a", "executing", { result: "partial" })])]);
     const next = upsertToolCall(c, { id: "a", name: "read_file", arguments: {}, status: "completed" as never });
-    const updated = next.messages[0].toolCalls?.[0];
+    const updated = next.messages[0]!.toolCalls?.[0];
     expect(updated?.status).toBe("success");
     expect(updated?.result).toBe("partial");
   });
@@ -69,13 +69,13 @@ describe("upsertToolCall", () => {
   it("appends an unknown call to the last assistant message", () => {
     const c = conv([msg("assistant", [tc("a", "success")]), msg("assistant")]);
     const next = upsertToolCall(c, tc("b", "pending"));
-    expect(next.messages[0].toolCalls?.map((t) => t.id)).toEqual(["a"]);
-    expect(next.messages[1].toolCalls?.map((t) => t.id)).toEqual(["b"]);
+    expect(next.messages[0]!.toolCalls?.map((t) => t.id)).toEqual(["a"]);
+    expect(next.messages[1]!.toolCalls?.map((t) => t.id)).toEqual(["b"]);
   });
 
   it("drops an unknown call when the last message is from the user", () => {
     const c = conv([msg("user")]);
-    expect(upsertToolCall(c, tc("b", "pending")).messages[0].toolCalls).toBeUndefined();
+    expect(upsertToolCall(c, tc("b", "pending")).messages[0]!.toolCalls).toBeUndefined();
   });
 });
 
@@ -87,7 +87,7 @@ describe("stopInFlightToolCalls", () => {
     ]);
     const next = stopInFlightToolCalls(c);
     expect(next.messages[0]).toBe(c.messages[0]);
-    expect(next.messages[1].toolCalls?.map((t) => t.status)).toEqual(["stopped", "stopped"]);
+    expect(next.messages[1]!.toolCalls?.map((t) => t.status)).toEqual(["stopped", "stopped"]);
     expect(next.updatedAt).not.toBe(c.updatedAt);
   });
 
@@ -101,17 +101,17 @@ describe("rejectToolCall", () => {
   it("cancels the matching call with the reason and a completion time", () => {
     const c = conv([msg("assistant", [tc("a", "pending_confirmation"), tc("b", "pending_confirmation")])]);
     const next = rejectToolCall(c, "a", "Rejected by user");
-    const [a, b] = next.messages[0].toolCalls ?? [];
-    expect(a.status).toBe("cancelled");
-    expect(a.error).toBe("Rejected by user");
-    expect(a.completedAt).toBeInstanceOf(Date);
-    expect(b.status).toBe("pending_confirmation");
+    const [a, b] = next.messages[0]!.toolCalls ?? [];
+    expect(a!.status).toBe("cancelled");
+    expect(a!.error).toBe("Rejected by user");
+    expect(a!.completedAt).toBeInstanceOf(Date);
+    expect(b!.status).toBe("pending_confirmation");
   });
 
   it("keeps an existing completion time", () => {
     const done = new Date(5);
     const c = conv([msg("assistant", [tc("a", "pending", { completedAt: done })])]);
-    expect(rejectToolCall(c, "a", "x").messages[0].toolCalls?.[0].completedAt).toBe(done);
+    expect(rejectToolCall(c, "a", "x").messages[0]!.toolCalls?.[0]?.completedAt).toBe(done);
   });
 
   it("returns the same conversation when the id is unknown", () => {

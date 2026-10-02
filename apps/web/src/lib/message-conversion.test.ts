@@ -160,7 +160,7 @@ describe("messagesToPiMessages", () => {
       isError: true,
     });
     const content = (result[1] as { content: { text: string }[] }).content;
-    expect(content[0].text).toBe("permission denied");
+    expect(content[0]!.text).toBe("permission denied");
   });
 
   it("ignores tool calls with non-terminal status (pending, executing, cancelled)", () => {
@@ -226,13 +226,13 @@ describe("messagesToPiMessages", () => {
     const result = messagesToPiMessages(msgs, fakeApi, provider, model);
     expect(result).toHaveLength(2);
     const content = (result[1] as { content: { text: string }[] }).content;
-    expect(content[0].text).toBe("");
+    expect(content[0]!.text).toBe("");
   });
 
   it("trims assistant content text", () => {
     const msgs: Message[] = [makeAssistantMsg("  padded text  ")];
     const result = messagesToPiMessages(msgs, fakeApi, provider, model);
     const content = (result[0] as { content: { text: string }[] }).content;
-    expect(content[0].text).toBe("padded text");
+    expect(content[0]!.text).toBe("padded text");
   });
 });

@@ -45,20 +45,20 @@ describe("GuardrailsEvaluator", () => {
       const result = evaluator.evaluate("read_file", { path: "~/.ssh/id_rsa" });
       expect(result.allowed).toBe(false);
       expect(result.violations.length).toBeGreaterThan(0);
-      expect(result.violations[0].type).toBe("blocked_path");
+      expect(result.violations[0]!.type).toBe("blocked_path");
     });
 
     it("should block paths matching ~/.aws/*", () => {
       const result = evaluator.evaluate("read_file", { path: "~/.aws/credentials" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].type).toBe("blocked_path");
-      expect(result.violations[0].severity).toBe("error");
+      expect(result.violations[0]!.type).toBe("blocked_path");
+      expect(result.violations[0]!.severity).toBe("error");
     });
 
     it("should block /etc/* paths", () => {
       const result = evaluator.evaluate("write_file", { path: "/etc/passwd" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].rule).toBe("/etc/*");
+      expect(result.violations[0]!.rule).toBe("/etc/*");
     });
 
     it("should allow non-blocked file paths", () => {
@@ -92,13 +92,13 @@ describe("GuardrailsEvaluator", () => {
       // http_fetch is a known web category tool
       const result = evaluator.evaluate("http_fetch", { url: "http://localhost:3000/api" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].type).toBe("blocked_domain");
+      expect(result.violations[0]!.type).toBe("blocked_domain");
     });
 
     it("should block 127.0.0.1 URLs", () => {
       const result = evaluator.evaluate("http_fetch", { url: "http://127.0.0.1:8080/test" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].type).toBe("blocked_domain");
+      expect(result.violations[0]!.type).toBe("blocked_domain");
     });
 
     it("should block 0.0.0.0 URLs", () => {
@@ -131,14 +131,14 @@ describe("GuardrailsEvaluator", () => {
     it("should block dangerous commands like 'rm -rf *'", () => {
       const result = evaluator.evaluate("shell_execute", { command: "rm -rf /home/user" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].type).toBe("blocked_command");
-      expect(result.violations[0].severity).toBe("critical");
+      expect(result.violations[0]!.type).toBe("blocked_command");
+      expect(result.violations[0]!.severity).toBe("critical");
     });
 
     it("should block sudo commands", () => {
       const result = evaluator.evaluate("shell_execute", { command: "sudo apt install something" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].type).toBe("blocked_command");
+      expect(result.violations[0]!.type).toBe("blocked_command");
     });
 
     it("should block fork bomb", () => {
@@ -174,7 +174,7 @@ describe("GuardrailsEvaluator", () => {
     it("should deny non-allowlisted commands (default deny policy)", () => {
       const result = evaluator.evaluate("shell_execute", { command: "apt-get install something" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].type).toBe("blocked_command");
+      expect(result.violations[0]!.type).toBe("blocked_command");
     });
 
     it("should only check commands for shell_execute tool", () => {
@@ -211,7 +211,7 @@ describe("GuardrailsEvaluator", () => {
     it("should deny chained commands when any segment is not allowlisted", () => {
       const result = evaluator.evaluate("shell_execute", { command: "echo hi && apt-get install x" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].type).toBe("blocked_command");
+      expect(result.violations[0]!.type).toBe("blocked_command");
     });
 
     it("should allow chained commands when every segment is allowlisted", () => {
@@ -245,7 +245,7 @@ describe("GuardrailsEvaluator", () => {
 
       const result = evaluator.evaluate("read_file", { path: "/tmp/ok.txt" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].type).toBe("rate_limit_exceeded");
+      expect(result.violations[0]!.type).toBe("rate_limit_exceeded");
       expect(result.reason).toBe("Rate limit exceeded");
     });
 
@@ -260,7 +260,7 @@ describe("GuardrailsEvaluator", () => {
 
       const result = evaluator.evaluate("read_file", { path: "/tmp/ok.txt" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].message).toContain("/hour");
+      expect(result.violations[0]!.message).toContain("/hour");
     });
 
     it("should block shell_execute after exceeding shell commands per minute", () => {
@@ -273,7 +273,7 @@ describe("GuardrailsEvaluator", () => {
 
       const result = evaluator.evaluate("shell_execute", { command: "git status" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].message).toContain("Shell command rate limit");
+      expect(result.violations[0]!.message).toContain("Shell command rate limit");
     });
 
     it("should block web tools after exceeding API calls per minute", () => {
@@ -286,7 +286,7 @@ describe("GuardrailsEvaluator", () => {
 
       const result = evaluator.evaluate("http_fetch", { url: "https://example.com" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].message).toContain("API call rate limit");
+      expect(result.violations[0]!.message).toContain("API call rate limit");
     });
 
     it("should include reset suggestion when rate limited", () => {
@@ -468,7 +468,7 @@ describe("GuardrailsEvaluator", () => {
       // Both blocklist and rate limit violated
       const result = evaluator.evaluate("read_file", { path: "~/.ssh/id_rsa" });
       expect(result.allowed).toBe(false);
-      expect(result.violations[0].type).toBe("blocked_path");
+      expect(result.violations[0]!.type).toBe("blocked_path");
     });
   });
 });

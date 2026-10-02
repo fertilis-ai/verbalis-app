@@ -337,13 +337,13 @@ describe("ExecutionTracker", () => {
     });
 
     it("returns all records sorted by queuedAt descending", () => {
-      const r1 = tracker.createRecord({
+      tracker.createRecord({
         toolName: "tool_a",
         category: "file_system",
         arguments: {},
         conversationId: "conv-1",
       });
-      const r2 = tracker.createRecord({
+      tracker.createRecord({
         toolName: "tool_b",
         category: "web",
         arguments: {},
@@ -353,7 +353,7 @@ describe("ExecutionTracker", () => {
       const all = tracker.getAllRecords();
       expect(all.length).toBe(2);
       // Most recent first
-      expect(all[0].queuedAt.getTime()).toBeGreaterThanOrEqual(all[1].queuedAt.getTime());
+      expect(all[0]!.queuedAt.getTime()).toBeGreaterThanOrEqual(all[1]!.queuedAt.getTime());
     });
   });
 
@@ -407,7 +407,7 @@ describe("ExecutionTracker", () => {
 
       const executing = tracker.getByStatus("executing");
       expect(executing.length).toBe(1);
-      expect(executing[0].id).toBe(r1.id);
+      expect(executing[0]!.id).toBe(r1.id);
 
       const queued = tracker.getByStatus("queued");
       expect(queued.length).toBe(1);
@@ -481,7 +481,7 @@ describe("ExecutionTracker", () => {
 
       const undoable = tracker.getUndoAvailable();
       expect(undoable.length).toBe(1);
-      expect(undoable[0].id).toBe(r1.id);
+      expect(undoable[0]!.id).toBe(r1.id);
     });
   });
 

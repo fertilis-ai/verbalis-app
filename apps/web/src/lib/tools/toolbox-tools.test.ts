@@ -148,7 +148,7 @@ describe("executeToolboxTool", () => {
       new_string: "line 2",
     });
     expect(mockSave).toHaveBeenCalledOnce();
-    expect(mockSave.mock.calls[0][0].content).toBe("line one\nline 2\nline three");
+    expect(mockSave.mock.calls[0]![0].content).toBe("line one\nline 2\nline three");
     expect(mockToolboxReload).toHaveBeenCalledOnce();
     expect(out).toContain("Edited");
   });
