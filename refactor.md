@@ -231,9 +231,10 @@ Result (2026-10-01, `bunx tauri dev`, driven through macOS accessibility): all p
 - Restart: with logging back on and an every-minute schedule on disk, the timed run after the restart logged its Starting and Completed lines. The logging setting is restored before the runner starts.
 - Not covered in the UI:
   - Nested folders: neither sidebar passes a parent to `createFolder`, so the UI can't create one. `folder-tree-slice.test.ts` covers the nested cases.
-  - The `Error in task …` line: a missing model doesn't throw from `sendMessageToConversation`. `task-runner.test.ts` covers that line.
+  - The `Error in task …` line: a model failure can't trigger it. `streamMessage` (`chat-store.ts`) catches every send error and writes it into the conversation as an `Error: …` message, so `sendMessageToConversation` doesn't throw. Phase 4 behaved the same way. Only a failure creating the conversation reaches the runner's catch, and `task-runner.test.ts` covers that line.
 
 Follow-ups found in Phase 5 (not done here):
+- **Background runs report model failures as success.** Because `streamMessage` swallows send errors, a task whose model call fails ends done/success. A schedule in the same situation keeps `hasError: false`, and the logs say "Completed". This is unchanged from before Phase 5. A fix needs `sendMessageToConversation` to report the failure, either by returning a status or rethrowing for background sends.
 - **Runtime store imports in `lib` remain:** the runners and `run-workflow` (`useChatStore`), `tools`, `image-tools`, `config-sync` and the speech/voice hooks (`useSettingsStore`), `toolbox-tools`, `memory-tools` and `toolbox-schemas` (`useToolboxStore`, `useAgentStore`). Moving types can't remove these; inverting them means passing state or callbacks in.
 - `AgentData` in `lib/storage.ts` has the same shape as `Agent`. Merge them when storage is split (Phase 6).
 - `task-store.ts` `startTask` and `redoTask` repeat the same ~40-line execute/track/complete block. Extract a shared `runTask(taskId)`.
