@@ -855,6 +855,40 @@ describe("chat-store", () => {
       useChatStore.getState().exitGhostSession();
       expect(useChatStore.getState().ghostConversation).toBeNull();
     });
+
+    it("exiting returns to the conversation that was open before the ghost session", () => {
+      useChatStore.setState({
+        conversations: [makeConversation({ id: "c1" }), makeConversation({ id: "c2" })],
+        currentConversationId: "c2",
+      });
+      useChatStore.getState().startGhostSession();
+      useChatStore.getState().exitGhostSession();
+      expect(useChatStore.getState().currentConversationId).toBe("c2");
+    });
+
+    it("exiting loads the messages of a chat not yet read from disk", async () => {
+      useChatStore.setState({
+        conversations: [makeConversation({ id: "c1", path: "/mock-data/chats/c1.json", messages: [] })],
+        currentConversationId: "c1",
+      });
+      mockLoadChatByPath.mockResolvedValueOnce({
+        id: "c1",
+        title: "Loaded",
+        model: "gpt-4o",
+        agentId: null,
+        messages: [{ id: "m1", role: "user" as const, content: "Hello", createdAt: "2025-01-01T00:00:00.000Z" }],
+        createdAt: "2025-01-01T00:00:00.000Z",
+        updatedAt: "2025-01-02T00:00:00.000Z",
+      });
+
+      useChatStore.getState().startGhostSession();
+      useChatStore.getState().exitGhostSession();
+
+      await vi.waitFor(() => {
+        expect(useChatStore.getState().getCurrentConversation()?.messages).toHaveLength(1);
+      });
+      expect(mockLoadChatByPath).toHaveBeenCalledWith("/mock-data/chats/c1.json");
+    });
   });
 
   // -----------------------------------------------------------------------

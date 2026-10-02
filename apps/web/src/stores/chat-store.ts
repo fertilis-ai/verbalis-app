@@ -151,6 +151,9 @@ function deriveConversationTitle(content: string, maxLength = 50): string | null
   return trimmed.slice(0, maxLength);
 }
 
+/** The conversation that was open when the ghost session started; reopened on exit. */
+let conversationBeforeGhost: string | null = null;
+
 /**
  * Apply `updater` to the conversation with this id, ghost or regular. Returns
  * the state unchanged when there is no such conversation or nothing changed.
@@ -840,6 +843,7 @@ export const useChatStore = create<ChatState>((set, get) => {
 
   // Ghost mode
   startGhostSession: () => {
+    if (!get().isGhostMode) conversationBeforeGhost = get().currentConversationId;
     set({
       isGhostMode: true,
       ghostConversation: null,
@@ -848,11 +852,13 @@ export const useChatStore = create<ChatState>((set, get) => {
   },
 
   exitGhostSession: () => {
-    set({
-      isGhostMode: false,
-      ghostConversation: null,
-      currentConversationId: get().conversations[0]?.id ?? null,
-    });
+    const { conversations } = get();
+    const next = conversations.find((c) => c.id === conversationBeforeGhost) ?? conversations[0];
+    conversationBeforeGhost = null;
+    set({ isGhostMode: false, ghostConversation: null, currentConversationId: null });
+    // Go through selectConversation: chats load their messages lazily, and
+    // pointing currentConversationId at an unloaded chat shows it empty.
+    if (next) void get().selectConversation(next.id);
   },
 
   // Tool execution - delegates to loop engine
