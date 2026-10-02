@@ -169,7 +169,9 @@ Dev smoke test (`bun run dev`, Tauri): `chat-store.test.ts` doesn't cover the ad
 
 Result (2026-10-01, run in the packaged build instead of `bun run dev`): no regression from the split.
 - Passed: approve and reject, Decline All, several tool iterations, Stop mid-stream, the ghost chat with a tool call (nothing written to disk), and rename in a subfolder that survives a restart in the same folder without a copy in the root.
-- **Not run:** the local model turn (no LM Studio or Ollama running) and the `dev:web` `streamPlain` path.
+- Local model (LM Studio, `qwen/qwen3.6-35b-a3b`) through the adapter: the tool call (`read_directory`) and the answer are correct.
+- `bun run dev:web` with the same local model (`streamPlain`): the answer streams in chunks, from one `POST /v1/chat/completions` with status 200 and no console errors.
+- **Not run:** a cloud turn in `dev:web`. It needs an API key entered in the browser build.
 
 The smoke test found three bugs that also exist on `main`. Each one is fixed with a regression test that fails without the fix:
 - `643a926` **Stop during a pending confirmation left the Stop button stuck and the input disabled.** `stop()` emits `loop_aborted`, and then each rejected confirmation emits `tool_cancelled`, which set the status back to `thinking`. `tool_cancelled` now leaves an ended loop alone.
