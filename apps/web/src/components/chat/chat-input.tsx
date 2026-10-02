@@ -1,26 +1,15 @@
 import * as React from "react";
-import { Send, Square, Plus, ChevronDown, X, Mic, Loader2 } from "lucide-react";
+import { Send, Square, Plus, X, Mic, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { getActiveModels, getProviderLabel } from "@/lib/models";
-import {
-  EFFORT_LABELS,
-  getEffortCapability,
-  resolveEffortFor,
-  type EffortLevel,
-} from "@/lib/reasoning";
+import { getActiveModels } from "@/lib/models";
+import { getEffortCapability, resolveEffortFor } from "@/lib/reasoning";
 import { useChatStore, type ContextFile } from "@/stores/chat-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { expandPromptInput } from "@/lib/prompts/expand-prompt";
 import { useVoiceTranscription } from "@/lib/hooks/use-voice-transcription";
+import { ModelQuickSelect } from "./model-quick-select";
+import { EffortSelect } from "./effort-select";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -39,21 +28,12 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles
     useSettingsStore();
   const activeModels = getActiveModels(selectedModels);
   const [input, setInput] = React.useState("");
-  const [modelMenuOpen, setModelMenuOpen] = React.useState(false);
-  const [effortMenuOpen, setEffortMenuOpen] = React.useState(false);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
-
-  const selectedModel = activeModels.find((m) => m.id === model) ?? activeModels[0];
-  const localProviderLabel = getProviderLabel(localLLM.provider);
-  const localModelLabel = localLLM.model.trim() || `${localProviderLabel} (default)`;
-  const selectedLocalLabel = localLLM.enabled ? localModelLabel : "Local LLM (disabled)";
-  const selectedModelLabel =
-    model === "local" ? selectedLocalLabel : (selectedModel?.name ?? model) || "No model";
 
   // Reasoning effort is contextual: only models known to be reasoning models get
   // a picker, and only with the levels that model actually supports.
   // Local models are never reasoning models (see buildLocalModel in chat-store).
-  // Matched on the exact id — `selectedModel` falls back to the first active
+  // Matched on the exact id — `ModelQuickSelect` falls back to the first active
   // model for display, but effort keys off what the request will actually send.
   const effortModel = activeModels.find((m) => m.id === model);
   const effortCapability = effortModel ? getEffortCapability(effortModel) : null;
@@ -168,86 +148,22 @@ export function ChatInput({ onSend, disabled, isLoopActive, onStop, contextFiles
               <Plus className="h-4 w-4" />
             </Button>
 
-            {/* Compact Model Selector */}
-            <DropdownMenu open={modelMenuOpen} onOpenChange={setModelMenuOpen}>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                    disabled={disabled}
-                  />
-                }
-              >
-                <span>{selectedModelLabel}</span>
-                <ChevronDown className="ml-1 h-3 w-3" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-auto">
-                {activeModels.length === 0 && (
-                  <div className="px-2 py-1.5 text-xs text-muted-foreground whitespace-nowrap">
-                    No models selected — add some in Settings → Models.
-                  </div>
-                )}
-                <DropdownMenuRadioGroup value={model} onValueChange={(v) => { setModel(v); setModelMenuOpen(false); }}>
-                  {activeModels.map((m) => (
-                    <DropdownMenuRadioItem key={m.id} value={m.id} className="whitespace-nowrap">
-                      <span>{m.name}</span>
-                      <span className="ml-2 text-muted-foreground">({getProviderLabel(m.provider)})</span>
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup value={model} onValueChange={(v) => { setModel(v); setModelMenuOpen(false); }}>
-                  <DropdownMenuRadioItem
-                    value="local"
-                    disabled={!localLLM.enabled}
-                    className="whitespace-nowrap"
-                  >
-                    <span>{localLLM.enabled ? localModelLabel : "Local LLM (disabled)"}</span>
-                    <span className="ml-2 text-muted-foreground">({localProviderLabel})</span>
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <ModelQuickSelect
+              model={model}
+              activeModels={activeModels}
+              localLLM={localLLM}
+              disabled={disabled}
+              setModel={setModel}
+            />
 
             {/* Reasoning effort — only for models that support it */}
             {effortLevels.length > 0 && (
-              <DropdownMenu open={effortMenuOpen} onOpenChange={setEffortMenuOpen}>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                      disabled={disabled}
-                      title="Reasoning effort"
-                    />
-                  }
-                >
-                  <span>{EFFORT_LABELS[effort]}</span>
-                  <ChevronDown className="ml-1 h-3 w-3" />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-auto">
-                  <DropdownMenuRadioGroup
-                    value={effort}
-                    onValueChange={(v) => {
-                      setModelEffort(model, v as EffortLevel);
-                      setEffortMenuOpen(false);
-                    }}
-                  >
-                    {effortLevels.map((level) => (
-                      <DropdownMenuRadioItem
-                        key={level}
-                        value={level}
-                        className="whitespace-nowrap"
-                      >
-                        {EFFORT_LABELS[level]}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <EffortSelect
+                effort={effort}
+                effortLevels={effortLevels}
+                disabled={disabled}
+                onChange={(level) => setModelEffort(model, level)}
+              />
             )}
 
             {/* Sliding-window indicator */}
