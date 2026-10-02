@@ -1,197 +1,14 @@
 import * as React from "react";
-import {
-  Shield,
-  ChevronDown,
-  ChevronRight,
-  Download,
-  Upload,
-  RotateCcw,
-  Plus,
-  X,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Shield, Download, Upload, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
 import type { CategoryConfirmationMatrix } from "@/lib/guardrails/types";
 import type { ToolCategory } from "@/lib/tools/categories";
-import { CATEGORY_CONFIG, RISK_LEVEL_CONFIG } from "@/lib/tools/categories";
-import { PRESET_LABELS, type UserModePreset, detectPreset } from "@/lib/guardrails/presets";
 import { downloadFile } from "@/lib/download";
-
-// ============================================================================
-// Types
-// ============================================================================
-
-interface CategorySectionProps {
-  category: ToolCategory;
-  config: CategoryConfirmationMatrix;
-  onChange: (config: CategoryConfirmationMatrix) => void;
-  defaultExpanded?: boolean;
-}
-
-interface RestrictionsListProps {
-  title: string;
-  items: string[];
-  placeholder: string;
-  onChange: (items: string[]) => void;
-}
-
-// ============================================================================
-// Sub-Components
-// ============================================================================
-
-function CategorySection({
-  category,
-  config,
-  onChange,
-  defaultExpanded = false,
-}: CategorySectionProps) {
-  const [isExpanded, setIsExpanded] = React.useState(defaultExpanded);
-  const categoryInfo = CATEGORY_CONFIG[category];
-
-  const handleToggle = (level: keyof CategoryConfirmationMatrix) => {
-    onChange({ ...config, [level]: !config[level] });
-  };
-
-  return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <button
-        className="w-full flex items-center gap-2 p-3 hover:bg-muted/50 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        )}
-        <span className="font-medium text-sm">{categoryInfo.label}</span>
-        <span className="text-xs text-muted-foreground">
-          ({categoryInfo.description})
-        </span>
-      </button>
-
-      {isExpanded && (
-        <div className="px-3 pb-3 space-y-2">
-          {(["low", "medium", "high", "critical"] as const).map((level) => {
-            const levelConfig = RISK_LEVEL_CONFIG[level];
-            return (
-              <label
-                key={level}
-                className="flex items-center gap-3 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={config[level]}
-                  onChange={() => handleToggle(level)}
-                  className="h-4 w-4 rounded border-input"
-                />
-                <div className="flex items-center gap-2">
-                  <span className={cn("text-sm", levelConfig.color)}>
-                    {levelConfig.label}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    (require confirmation)
-                  </span>
-                </div>
-              </label>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RestrictionsList({
-  title,
-  items,
-  placeholder,
-  onChange,
-}: RestrictionsListProps) {
-  const [newItem, setNewItem] = React.useState("");
-  const [isExpanded, setIsExpanded] = React.useState(false);
-
-  const handleAdd = () => {
-    const trimmed = newItem.trim();
-    if (trimmed && !items.includes(trimmed)) {
-      onChange([...items, trimmed]);
-      setNewItem("");
-    }
-  };
-
-  const handleRemove = (index: number) => {
-    const newItems = [...items];
-    newItems.splice(index, 1);
-    onChange(newItems);
-  };
-
-  return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <button
-        className="w-full flex items-center gap-2 p-3 hover:bg-muted/50 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        )}
-        <span className="font-medium text-sm">{title}</span>
-        <span className="text-xs text-muted-foreground">
-          ({items.length} items)
-        </span>
-      </button>
-
-      {isExpanded && (
-        <div className="px-3 pb-3 space-y-2">
-          {/* Existing items */}
-          {items.length > 0 && (
-            <div className="space-y-1">
-              {items.map((item, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 text-sm bg-muted/50 rounded px-2 py-1"
-                >
-                  <code className="flex-1 text-xs">{item}</code>
-                  <button
-                    onClick={() => handleRemove(index)}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Add new item */}
-          <div className="flex gap-2">
-            <Input
-              value={newItem}
-              onChange={(e) => setNewItem(e.target.value)}
-              placeholder={placeholder}
-              className="text-sm"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAdd();
-                }
-              }}
-            />
-            <Button size="sm" variant="outline" onClick={handleAdd}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// Main Component
-// ============================================================================
+import { CategorySection } from "./guardrails/category-section";
+import { RestrictionsList } from "./guardrails/restrictions-list";
+import { GuardrailsPresets } from "./guardrails/guardrails-presets";
+import { RateLimitsEditor } from "./guardrails/rate-limits-editor";
 
 export function GuardrailsSection() {
   const {
@@ -204,7 +21,6 @@ export function GuardrailsSection() {
   } = useSettingsStore();
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const currentPreset = detectPreset(guardrailsConfig);
 
   // ============================================================================
   // Handlers
@@ -261,67 +77,11 @@ export function GuardrailsSection() {
         Guardrails
       </h2>
 
-      {/* Master toggle */}
-      <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-        <div>
-          <label className="text-sm font-medium flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={guardrailsConfig.enabled}
-              onChange={(e) => setGuardrailsConfig({ enabled: e.target.checked })}
-              className="h-4 w-4 rounded border-input"
-            />
-            Enable Guardrails
-          </label>
-          <p className="text-xs text-muted-foreground mt-1">
-            {guardrailsConfig.enabled
-              ? "Tool execution is protected by guardrails"
-              : "Guardrails disabled - all tools execute without restrictions"}
-          </p>
-        </div>
-
-        {/* Current preset indicator */}
-        <div
-          className={cn(
-            "px-3 py-1 rounded-full text-xs font-medium",
-            ({
-              yolo: "bg-red-500/20 text-red-500",
-              advanced: "bg-yellow-500/20 text-yellow-500",
-              normal: "bg-green-500/20 text-green-500",
-              custom: "bg-muted text-muted-foreground",
-            } as const)[currentPreset]
-          )}
-        >
-          {currentPreset === "custom" ? "Custom" : PRESET_LABELS[currentPreset as UserModePreset].label}
-        </div>
-      </div>
-
-      {/* Presets */}
-      <div>
-        <label className="text-sm font-medium">Quick Presets</label>
-        <div className="mt-2 flex gap-2">
-          {(["normal", "advanced", "yolo"] as const).map((preset) => {
-            const presetInfo = PRESET_LABELS[preset];
-            return (
-              <Button
-                key={preset}
-                variant={currentPreset === preset ? "secondary" : "outline"}
-                size="sm"
-                onClick={() => applyGuardrailsPreset(preset)}
-                className={cn(
-                  "flex-1",
-                  preset === "yolo" && "border-red-500/30 hover:border-red-500/50"
-                )}
-              >
-                <span className={presetInfo.color}>{presetInfo.label}</span>
-              </Button>
-            );
-          })}
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {currentPreset !== "custom" && PRESET_LABELS[currentPreset as UserModePreset]?.description}
-        </p>
-      </div>
+      <GuardrailsPresets
+        guardrailsConfig={guardrailsConfig}
+        setGuardrailsConfig={setGuardrailsConfig}
+        applyGuardrailsPreset={applyGuardrailsPreset}
+      />
 
       {/* Category confirmations */}
       {guardrailsConfig.enabled && (
@@ -425,39 +185,10 @@ export function GuardrailsSection() {
 
       {/* Rate limits */}
       {guardrailsConfig.enabled && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium">Rate Limits</h3>
-
-          <div className="grid grid-cols-2 gap-4">
-            {([
-              { label: "Tools/min", key: "toolCallsPerMinute", fallback: 30, min: 1, max: 1000 },
-              { label: "Tools/hour", key: "toolCallsPerHour", fallback: 500, min: 1, max: 10000 },
-              { label: "API calls/min", key: "apiCallsPerMinute", fallback: 10, min: 1, max: 100 },
-              { label: "Shell/min", key: "shellCommandsPerMinute", fallback: 5, min: 1, max: 100 },
-            ] as const).map(({ label, key, fallback, min, max }) => (
-              <div key={key}>
-                <label className="text-xs text-muted-foreground">
-                  {label}
-                </label>
-                <Input
-                  type="number"
-                  value={guardrailsConfig.rateLimits[key]}
-                  onChange={(e) =>
-                    setGuardrailsConfig({
-                      rateLimits: {
-                        ...guardrailsConfig.rateLimits,
-                        [key]: parseInt(e.target.value, 10) || fallback,
-                      },
-                    })
-                  }
-                  min={min}
-                  max={max}
-                  className="mt-1"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <RateLimitsEditor
+          rateLimits={guardrailsConfig.rateLimits}
+          onChange={(rateLimits) => setGuardrailsConfig({ rateLimits })}
+        />
       )}
 
       {/* Import/Export/Reset */}
