@@ -180,7 +180,7 @@ The smoke test found three bugs that also exist on `main`. Each one is fixed wit
 
 After the fixes: `tsc`, the full Vitest suite (94 files, 2112 tests) and Biome (54 warnings, unchanged) all pass.
 
-## Phase 5: Shared tree/folder model and runners — ✅ code done, ⏳ dev smoke test not yet run (branch `refactor/phase-5`, stacked on `refactor/phase-4`)
+## Phase 5: Shared tree/folder model and runners — ✅ done (branch `refactor/phase-5`, stacked on `refactor/phase-4`; dev smoke test passed 2026-10-01)
 1. ✅ **Domain types out of the stores.**
    - `lib/types/chat.ts` holds `Message`, `Conversation`, `ContextFile`, `ToolCallState` and `ToolCallStatus`.
    - `lib/types/agent.ts` holds `Agent`, and `lib/types/settings.ts` holds `Theme`, `UserMode` and `LocalLlmProvider`.
@@ -220,7 +220,18 @@ Dev smoke test (`bun run dev`, Tauri):
 - A task run that fails (e.g. no model configured) still writes an `Error in task "…"` line and leaves the task incomplete.
 - Optional: quit with a schedule due, restart, and check it runs once the app has initialized (the logging setting is restored before the runner starts).
 
-Result: **not yet run.** The 2026-10-01 attempt couldn't drive the app (computer-use daemon unavailable), so this checklist still needs a manual pass before merging.
+Result (2026-10-01, `bunx tauri dev`, driven through macOS accessibility): all passed.
+- Chat: a second "New Folder" became "New Folder 2" on disk. Rename by Enter committed and closed the field, and renamed the directory. Pin and unpin moved the folder and wrote `isPinned` to `_meta.yaml`. Expand and collapse worked, and delete removed the directory.
+- Scheduler: the same folder checks passed. A schedule created inside a pinned folder was saved there. Run now wrote the Starting and Completed lines and saved `lastRun`, with `hasError: false`. Deleting the folder removed the schedule with it.
+- Tasks: a new backlog was selected and kept the plain name "New Folder". Rename by Enter and pin were written to `folder.yaml`.
+  - Starting a task with an empty description wrote `Skipped task "New Task" (…) - empty description` and left the task done/incomplete, as before.
+  - With a description, Redo wrote the Starting and Completed lines and ended done/success.
+  - Deleting the selected backlog cleared the selection ("No folder selected").
+- Logging off: a task run and a schedule Run now both succeeded and wrote nothing. `tasks.txt` stayed at 5 lines and `scheduler.txt` at 28; before this change `scheduler.txt` would have grown.
+- Restart: with logging back on and an every-minute schedule on disk, the timed run after the restart logged its Starting and Completed lines. The logging setting is restored before the runner starts.
+- Not covered in the UI:
+  - Nested folders: neither sidebar passes a parent to `createFolder`, so the UI can't create one. `folder-tree-slice.test.ts` covers the nested cases.
+  - The `Error in task …` line: a missing model doesn't throw from `sendMessageToConversation`. `task-runner.test.ts` covers that line.
 
 Follow-ups found in Phase 5 (not done here):
 - **Runtime store imports in `lib` remain:** the runners and `run-workflow` (`useChatStore`), `tools`, `image-tools`, `config-sync` and the speech/voice hooks (`useSettingsStore`), `toolbox-tools`, `memory-tools` and `toolbox-schemas` (`useToolboxStore`, `useAgentStore`). Moving types can't remove these; inverting them means passing state or callbacks in.
