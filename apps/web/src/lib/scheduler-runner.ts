@@ -1,7 +1,5 @@
 import CronExpressionParser from "cron-parser";
-import { isTauri } from "@tauri-apps/api/core";
-import { appendLogFile } from "@/lib/tauri/commands";
-import { useChatStore } from "@/stores/chat-store";
+import { appendRunLog, runBackgroundConversation } from "@/lib/background-run";
 import { resolveScheduleAgentId, useAgentStore } from "@/stores/agent-store";
 import {
   loadSchedulerTree,
@@ -10,20 +8,19 @@ import {
   type ScheduleData,
   type SchedulerTreeNode,
 } from "@/lib/storage";
-import { YOLO_MODE_CONFIG } from "@/lib/guardrails/presets";
 import { collectFromTree } from "@/lib/tree-utils";
 import { listWorkflows, loadWorkflow, runWorkflow } from "@/lib/workflows/run-workflow";
 import { dirname } from "@/lib/path-resolution";
 
 const DEFAULT_TICK_MS = 60_000;
 const DEFAULT_SCHEDULE_TITLE = "Scheduled Run";
+const SCHEDULER_LOG = "scheduler.txt";
 
 let schedulerTimer: number | null = null;
 let tickInFlight = false;
 
 async function appendSchedulerLog(line: string): Promise<void> {
-  if (!isTauri()) return;
-  appendLogFile("scheduler.txt", line).catch(console.warn);
+  await appendRunLog(SCHEDULER_LOG, line);
 }
 
 function collectSchedulePaths(tree: SchedulerTreeNode[]): string[] {
@@ -100,34 +97,24 @@ async function executeSchedule(
     return { conversationId: null, startedAt: nowIso };
   }
 
-  try {
-    await appendSchedulerLog(`[${nowIso}] Starting schedule "${schedule.name}" (${schedule.id})`);
+  const run = await runBackgroundConversation({
+    logFile: SCHEDULER_LOG,
+    kind: "schedule",
+    id: schedule.id,
+    name: schedule.name,
+    title: schedule.name?.trim() || DEFAULT_SCHEDULE_TITLE,
+    prompt,
+    agentId: resolveScheduleAgentId(
+      schedule.agentId,
+      useAgentStore.getState().agents.map((a) => a.name)
+    ),
+    onConversationCreated: options.onConversationCreated,
+  });
 
-    const chatStore = useChatStore.getState();
-    const conversation = await chatStore.createConversationInBackground({
-      title: schedule.name?.trim() || DEFAULT_SCHEDULE_TITLE,
-    });
-
-    options.onConversationCreated?.(conversation.id);
-
-    await chatStore.sendMessageToConversation(conversation.id, prompt, {
-      agentId: resolveScheduleAgentId(
-        schedule.agentId,
-        useAgentStore.getState().agents.map((a) => a.name)
-      ),
-      allowAutoRename: false,
-      setStreaming: false,
-      guardrailsConfig: YOLO_MODE_CONFIG,
-    });
-
-    await appendSchedulerLog(`[${new Date().toISOString()}] Completed schedule "${schedule.name}" (${schedule.id})`);
-
-    return { conversationId: conversation.id, startedAt: nowIso };
-  } catch (error) {
-    await appendSchedulerLog(`[${new Date().toISOString()}] Error in schedule "${schedule.name}": ${error}`);
-    await markScheduleError(updatedSchedule, schedulePath, error);
-    return { conversationId: null, startedAt: nowIso };
+  if (run.conversationId === null) {
+    await markScheduleError(updatedSchedule, schedulePath, run.error);
   }
+  return { conversationId: run.conversationId, startedAt: nowIso };
 }
 
 async function normalizeSchedule(schedule: ScheduleData, schedulePath: string): Promise<void> {

@@ -55,6 +55,7 @@ import {
 } from "./scheduler-runner";
 import type { ScheduleData, SchedulerTreeNode } from "@/lib/storage";
 import { useAgentStore } from "@/stores/agent-store";
+import { setLoggingEnabled } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -594,6 +595,9 @@ describe("scheduler-runner", () => {
   // appendSchedulerLog
   // =========================================================================
   describe("appendSchedulerLog (via execution)", () => {
+    beforeEach(() => setLoggingEnabled(true));
+    afterEach(() => setLoggingEnabled(false));
+
     it("should call invoke to append log when in Tauri", async () => {
       mockIsTauri.mockReturnValue(true);
       const schedule = makeSchedule();
@@ -618,6 +622,35 @@ describe("scheduler-runner", () => {
         "append_log_file",
         expect.anything()
       );
+    });
+
+    it("should not call invoke when logging is disabled", async () => {
+      setLoggingEnabled(false);
+      mockIsTauri.mockReturnValue(true);
+      const schedule = makeSchedule();
+      mockLoadSchedule.mockResolvedValue(schedule);
+
+      await runScheduleNow("/scheduler/sched-1.yaml");
+
+      expect(mockInvoke).not.toHaveBeenCalledWith(
+        "append_log_file",
+        expect.anything()
+      );
+    });
+
+    it("writes the start and completion lines", async () => {
+      mockIsTauri.mockReturnValue(true);
+      mockLoadSchedule.mockResolvedValue(makeSchedule());
+
+      await runScheduleNow("/scheduler/sched-1.yaml");
+
+      const lines = mockInvoke.mock.calls
+        .filter(([cmd]) => cmd === "append_log_file")
+        .map(([, args]) => (args as { line: string }).line);
+      expect(lines).toEqual([
+        expect.stringMatching(/^\[.+\] Starting schedule "Test Schedule" \(sched-1\)$/),
+        expect.stringMatching(/^\[.+\] Completed schedule "Test Schedule" \(sched-1\)$/),
+      ]);
     });
   });
 

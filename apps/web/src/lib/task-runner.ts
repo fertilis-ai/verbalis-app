@@ -1,14 +1,7 @@
-import { appendLogFile } from "@/lib/tauri/commands";
-import { isTauri } from "@/lib/storage";
-import { isLoggingEnabled } from "@/lib/logger";
-import { useChatStore } from "@/stores/chat-store";
 import type { TaskData } from "@/lib/storage";
-import { YOLO_MODE_CONFIG } from "@/lib/guardrails/presets";
+import { appendRunLog, runBackgroundConversation } from "@/lib/background-run";
 
-async function appendTaskLog(line: string): Promise<void> {
-  if (!isLoggingEnabled() || !isTauri()) return;
-  appendLogFile("tasks.txt", line).catch(console.warn);
-}
+const TASK_LOG = "tasks.txt";
 
 export interface ExecuteTaskOptions {
   onConversationCreated?: (conversationId: string) => void;
@@ -23,36 +16,26 @@ export async function executeTask(
   task: TaskData,
   options?: ExecuteTaskOptions
 ): Promise<ExecuteTaskResult> {
-  const nowIso = new Date().toISOString();
   const prompt = task.description?.trim() ?? "";
 
   if (!prompt) {
-    await appendTaskLog(`[${nowIso}] Skipped task "${task.title}" (${task.id}) - empty description`);
+    await appendRunLog(
+      TASK_LOG,
+      `[${new Date().toISOString()}] Skipped task "${task.title}" (${task.id}) - empty description`
+    );
     return { conversationId: null, success: false };
   }
 
-  try {
-    await appendTaskLog(`[${nowIso}] Starting task "${task.title}" (${task.id})`);
+  const { conversationId } = await runBackgroundConversation({
+    logFile: TASK_LOG,
+    kind: "task",
+    id: task.id,
+    name: task.title,
+    title: task.title || "Task Run",
+    prompt,
+    agentId: task.agent,
+    onConversationCreated: options?.onConversationCreated,
+  });
 
-    const chatStore = useChatStore.getState();
-    const conversation = await chatStore.createConversationInBackground({
-      title: task.title || "Task Run",
-    });
-
-    options?.onConversationCreated?.(conversation.id);
-
-    await chatStore.sendMessageToConversation(conversation.id, prompt, {
-      agentId: task.agent,
-      allowAutoRename: false,
-      setStreaming: false,
-      guardrailsConfig: YOLO_MODE_CONFIG,
-    });
-
-    await appendTaskLog(`[${new Date().toISOString()}] Completed task "${task.title}" (${task.id})`);
-
-    return { conversationId: conversation.id, success: true };
-  } catch (error) {
-    await appendTaskLog(`[${new Date().toISOString()}] Error in task "${task.title}": ${error}`);
-    return { conversationId: null, success: false };
-  }
+  return { conversationId, success: conversationId !== null };
 }

@@ -6,11 +6,6 @@ vi.mock("@tauri-apps/api/core", () => ({
   isTauri: vi.fn(() => false),
 }));
 
-// Mock storage
-vi.mock("@/lib/storage", () => ({
-  isTauri: vi.fn(() => false),
-}));
-
 // Mock logger
 vi.mock("@/lib/logger", () => ({
   isLoggingEnabled: vi.fn(() => false),
@@ -32,7 +27,7 @@ vi.mock("@/stores/chat-store", () => ({
 import { executeTask } from "./task-runner";
 import type { TaskData } from "@/lib/storage";
 import { isLoggingEnabled } from "@/lib/logger";
-import { isTauri } from "@/lib/storage";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 const mockIsLoggingEnabled = vi.mocked(isLoggingEnabled);
 const mockIsTauri = vi.mocked(isTauri);
@@ -187,7 +182,6 @@ describe("task-runner", () => {
     });
 
     it("does not log when not in Tauri", async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
       mockIsLoggingEnabled.mockReturnValue(true);
       mockIsTauri.mockReturnValue(false);
 
@@ -195,6 +189,46 @@ describe("task-runner", () => {
       await executeTask(task);
 
       expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("writes the start and completion lines to tasks.txt", async () => {
+      mockIsLoggingEnabled.mockReturnValue(true);
+      mockIsTauri.mockReturnValue(true);
+      vi.mocked(invoke).mockResolvedValue(undefined);
+
+      await executeTask(makeTask());
+
+      expect(vi.mocked(invoke).mock.calls).toEqual([
+        ["append_log_file", { filename: "tasks.txt", line: expect.stringMatching(/^\[.+\] Starting task "Test Task" \(task-1\)$/) }],
+        ["append_log_file", { filename: "tasks.txt", line: expect.stringMatching(/^\[.+\] Completed task "Test Task" \(task-1\)$/) }],
+      ]);
+    });
+
+    it("writes the error line when the run fails", async () => {
+      mockIsLoggingEnabled.mockReturnValue(true);
+      mockIsTauri.mockReturnValue(true);
+      vi.mocked(invoke).mockResolvedValue(undefined);
+      mockSendMessageToConversation.mockRejectedValue(new Error("boom"));
+
+      await executeTask(makeTask());
+
+      expect(vi.mocked(invoke)).toHaveBeenLastCalledWith("append_log_file", {
+        filename: "tasks.txt",
+        line: expect.stringMatching(/^\[.+\] Error in task "Test Task": Error: boom$/),
+      });
+    });
+
+    it("logs a skipped task with an empty description", async () => {
+      mockIsLoggingEnabled.mockReturnValue(true);
+      mockIsTauri.mockReturnValue(true);
+      vi.mocked(invoke).mockResolvedValue(undefined);
+
+      await executeTask(makeTask({ description: "  " }));
+
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith("append_log_file", {
+        filename: "tasks.txt",
+        line: expect.stringMatching(/^\[.+\] Skipped task "Test Task" \(task-1\) - empty description$/),
+      });
     });
   });
 });
