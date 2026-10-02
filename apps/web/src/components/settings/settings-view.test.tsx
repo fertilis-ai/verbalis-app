@@ -264,7 +264,7 @@ describe("SettingsView", () => {
       await user.type(anthropicInput, "test-key");
       expect(mockSetApiKey).toHaveBeenCalled();
       // Each character triggers onChange, so check first call
-      expect(mockSetApiKey.mock.calls[0][0]).toBe("anthropic");
+      expect(mockSetApiKey.mock.calls[0]![0]).toBe("anthropic");
     });
 
     it("shows (Get key) link for OpenRouter", () => {

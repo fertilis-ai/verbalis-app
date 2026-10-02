@@ -72,7 +72,7 @@ vi.mock("@/lib/hooks/use-polling-loader", () => ({
 }));
 
 vi.mock("@/lib/hooks/use-inline-editing", () => ({
-  useInlineEditing: ({ onRename }: any) => ({
+  useInlineEditing: (_options: any) => ({
     editingId: null,
     editingName: "",
     startEditing: vi.fn(),

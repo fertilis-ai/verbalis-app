@@ -8,12 +8,12 @@ import type * as React from "react";
 // ---------------------------------------------------------------------------
 
 vi.mock("lucide-react", () => ({
-  ShieldAlert: (props: Record<string, unknown>) => <span data-testid="icon-ShieldAlert">ShieldAlert</span>,
-  ShieldCheck: (props: Record<string, unknown>) => <span data-testid="icon-ShieldCheck">ShieldCheck</span>,
-  Shield: (props: Record<string, unknown>) => <span data-testid="icon-Shield">Shield</span>,
-  ShieldX: (props: Record<string, unknown>) => <span data-testid="icon-ShieldX">ShieldX</span>,
-  CheckCircle2: (props: Record<string, unknown>) => <span data-testid="icon-CheckCircle2">CheckCircle2</span>,
-  XCircle: (props: Record<string, unknown>) => <span data-testid="icon-XCircle">XCircle</span>,
+  ShieldAlert: (_props: Record<string, unknown>) => <span data-testid="icon-ShieldAlert">ShieldAlert</span>,
+  ShieldCheck: (_props: Record<string, unknown>) => <span data-testid="icon-ShieldCheck">ShieldCheck</span>,
+  Shield: (_props: Record<string, unknown>) => <span data-testid="icon-Shield">Shield</span>,
+  ShieldX: (_props: Record<string, unknown>) => <span data-testid="icon-ShieldX">ShieldX</span>,
+  CheckCircle2: (_props: Record<string, unknown>) => <span data-testid="icon-CheckCircle2">CheckCircle2</span>,
+  XCircle: (_props: Record<string, unknown>) => <span data-testid="icon-XCircle">XCircle</span>,
 }));
 
 vi.mock("@/components/ui/button", () => ({
@@ -22,7 +22,6 @@ vi.mock("@/components/ui/button", () => ({
     onClick,
     disabled,
     variant,
-    ...rest
   }: {
     children?: React.ReactNode;
     onClick?: () => void;

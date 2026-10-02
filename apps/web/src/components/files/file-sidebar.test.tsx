@@ -129,7 +129,7 @@ describe("FileSidebar", () => {
     it("shows folder input when clicking FolderPlus button", async () => {
       const user = userEvent.setup();
       // Folder needs to be expanded for the input to appear inside it
-      mockFileStore.tree[0].isExpanded = true;
+      mockFileStore.tree[0]!.isExpanded = true;
       render(<FileSidebar />);
 
       const folderRow = screen.getByText("test-folder").closest("div");
@@ -146,7 +146,7 @@ describe("FileSidebar", () => {
     it("shows file input when clicking Plus button", async () => {
       const user = userEvent.setup();
       // Folder needs to be expanded for the input to appear inside it
-      mockFileStore.tree[0].isExpanded = true;
+      mockFileStore.tree[0]!.isExpanded = true;
       render(<FileSidebar />);
 
       const folderRow = screen.getByText("test-folder").closest("div");
@@ -162,7 +162,7 @@ describe("FileSidebar", () => {
 
     it("calls createFolder when submitting folder name", async () => {
       const user = userEvent.setup();
-      mockFileStore.tree[0].isExpanded = true;
+      mockFileStore.tree[0]!.isExpanded = true;
 
       render(<FileSidebar />);
 
@@ -183,7 +183,7 @@ describe("FileSidebar", () => {
 
     it("calls createFile when submitting file name", async () => {
       const user = userEvent.setup();
-      mockFileStore.tree[0].isExpanded = true;
+      mockFileStore.tree[0]!.isExpanded = true;
 
       render(<FileSidebar />);
 

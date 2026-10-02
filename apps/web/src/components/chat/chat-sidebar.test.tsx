@@ -109,7 +109,6 @@ vi.mock("@/components/ui/button", () => ({
     onClick,
     disabled,
     title,
-    ...rest
   }: {
     children?: React.ReactNode;
     onClick?: () => void;

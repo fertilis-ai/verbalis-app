@@ -60,7 +60,7 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
 }));
 
 vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, ...rest }: { children?: React.ReactNode; [k: string]: unknown }) => (
+  Button: ({ children }: { children?: React.ReactNode; [k: string]: unknown }) => (
     <span>{children}</span>
   ),
 }));
@@ -143,7 +143,7 @@ describe("AgentSelector", () => {
     const user = userEvent.setup();
     render(<AgentSelector />);
     const items = screen.getAllByTestId("dropdown-item");
-    await user.click(items[1]); // click "coder"
+    await user.click(items[1]!); // click "coder"
     expect(mockSetAgentId).toHaveBeenCalledWith("coder");
   });
 
@@ -151,7 +151,7 @@ describe("AgentSelector", () => {
     const user = userEvent.setup();
     render(<AgentSelector />);
     const items = screen.getAllByTestId("dropdown-item");
-    await user.click(items[2]); // click "researcher"
+    await user.click(items[2]!); // click "researcher"
     expect(mockSetAgentId).toHaveBeenCalledWith("researcher");
   });
 

@@ -245,7 +245,7 @@ describe("FileTabs", () => {
       const closeButtons = screen.getAllByTitle("Close");
 
       // The second button (inactive tab) should have opacity-0 class
-      expect(closeButtons[1].className).toContain("opacity-0");
+      expect(closeButtons[1]!.className).toContain("opacity-0");
     });
 
     it("close button is always visible for modified inactive tabs", () => {
@@ -272,7 +272,7 @@ describe("FileTabs", () => {
       const closeButtons = screen.getAllByTitle("Close");
 
       // The second button (inactive but modified) should NOT have opacity-0
-      expect(closeButtons[1].className).not.toContain("opacity-0");
+      expect(closeButtons[1]!.className).not.toContain("opacity-0");
     });
   });
 });

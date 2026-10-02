@@ -131,7 +131,6 @@ vi.mock("@/components/ui/button", () => ({
     onClick,
     disabled,
     variant,
-    ...rest
   }: {
     children?: React.ReactNode;
     onClick?: () => void;
@@ -305,7 +304,7 @@ describe("ChatInput", () => {
     const files = [{ path: "/a.ts", name: "a.ts", content: "" }];
     render(<ChatInput {...defaultProps} contextFiles={files} />);
     const xIcons = screen.getAllByTestId("icon-X");
-    await user.click(xIcons[0]);
+    await user.click(xIcons[0]!);
     expect(defaultProps.onRemoveFile).toHaveBeenCalledWith("/a.ts");
   });
 

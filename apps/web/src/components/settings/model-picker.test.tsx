@@ -47,7 +47,6 @@ vi.mock("@/components/ui/button", () => ({
     onClick,
     disabled,
     title,
-    ...rest
   }: {
     children?: React.ReactNode;
     onClick?: () => void;
@@ -209,7 +208,7 @@ describe("ModelPicker", () => {
       ];
       render(<ModelPicker />);
       const filterInputs = screen.getAllByPlaceholderText("Filter...");
-      await user.type(filterInputs[0], "Claude");
+      await user.type(filterInputs[0]!, "Claude");
       expect(screen.getByText("Claude 1")).toBeInTheDocument();
       expect(screen.queryByText("GPT-4o")).not.toBeInTheDocument();
     });
@@ -301,7 +300,7 @@ describe("ModelPicker", () => {
       ];
       render(<ModelPicker />);
       const filterInputs = screen.getAllByPlaceholderText("Filter...");
-      await user.type(filterInputs[1], "GPT");
+      await user.type(filterInputs[1]!, "GPT");
       // Claude should no longer match the filter in the right panel
       expect(screen.getByText("GPT-4o")).toBeInTheDocument();
       // Check via "No matches" not showing (both are rendered), but Claude 1 should still show
@@ -315,7 +314,7 @@ describe("ModelPicker", () => {
       ];
       render(<ModelPicker />);
       const filterInputs = screen.getAllByPlaceholderText("Filter...");
-      await user.type(filterInputs[1], "zzzzz");
+      await user.type(filterInputs[1]!, "zzzzz");
       expect(screen.getByText("No matches")).toBeInTheDocument();
     });
   });
