@@ -297,26 +297,72 @@ A second packaged run (2026-10-01, the same `Verbalis.app`, from a fresh backup 
 
 `loadSchedule`, the per-schedule load used by the scheduler tick, is covered by the unit tests (a legacy valid file, malformed YAML, and a non-boolean `enabled`).
 
-## Phase 7: Components
-- **`CodeOverlayEditor`.** One shared component for `file-editor.tsx` and `toolbox-editor.tsx`, covering highlight with fallback, scroll sync, Tab indent and the gutter. The CLAUDE.md invariants (`text-transparent` only when the overlay is non-empty, `leading-5` placement) must live inside it, and `editor-highlight-fallback.test.tsx` has to keep passing for both callers.
-- **`settings-view.tsx` (749 lines):**
-  - Put each section in `components/settings/sections/*`.
-  - Add a `SettingsSection` wrapper (about 9 copies of the header today) and a `useScrollSpy` hook.
-  - Add a `DiscoverableModelSelect` to replace the four Refresh/spinner/error/select blocks.
-- **Sidebars:** build a generic folder-tree sidebar for chat and scheduler (only a 96-line diff between them). The toolbox and file sidebars should adopt `useInlineEditing`, `shared/item-context-menu.tsx`, `usePollingLoader` and `confirm-modal` instead of native `confirm()`.
-- **Split large components:**
-  - `tool-call-card.tsx`: Header/Details/Actions; move `useToolboxDiff` into the toolbox layer.
-  - `guardrails-section.tsx`
-  - `loop-progress-panel.tsx`
-  - `chat-input.tsx`: `ModelQuickSelect` and `EffortSelect`
-- **Store selectors.** Replace whole-store `useXStore()` subscriptions with selectors or `useShallow` in `settings-view`, `model-picker`, `guardrails-section`, `chat-view`, `chat-sidebar` and the editors.
-- **Bootstrap hook.** Move the `routes/__root.tsx:55–78` bootstrap into `useAppBootstrap`.
+## Phase 7: Components — ✅ code done (branch `refactor/phase-7`, stacked on `refactor/phase-6`); packaged smoke test still to run, see below
+1. ✅ **`CodeOverlayEditor`.** `components/shared/code-overlay-editor.tsx` holds the highlight-with-fallback effect, scroll sync, Tab indent and the gutter. `file-editor.tsx` and `toolbox-editor.tsx` pass `content`, `language` and `onChange`; the Toolbox adds Cmd+S through `onKeyDown`. The CLAUDE.md invariants (`text-transparent` only when the overlay is non-empty, the `.catch` fallback, `leading-5` after `text-sm`) now live in this one component, and CLAUDE.md names it.
+2. ✅ **`useAppBootstrap`.** The `routes/__root.tsx` startup moved to `lib/hooks/use-app-bootstrap.ts` with the same promise chain, the scheduler start after init, and the agent restore.
+3. ✅ **Split large components.**
+   - `tool-call-card.tsx`: `ToolCallHeader`, `ToolCallDetails` and `ToolCallActions` in their own files, with the icon and status maps in `tool-call-card-config.ts`. `useToolboxDiff` moved to `lib/toolbox/use-toolbox-diff.ts`.
+   - `chat-input.tsx`: `ModelQuickSelect` and `EffortSelect` are presentational; `ChatInput` still reads the stores and resolves the effort capability.
+   - `guardrails-section.tsx`: `CategorySection`, `RestrictionsList`, `GuardrailsPresets` (master toggle, preset badge, Quick Presets) and `RateLimitsEditor` live in `components/settings/guardrails/`. The section keeps the store wiring, import/export and the shell-command lists.
+   - `loop-progress-panel.tsx` was deleted rather than split: it has had no caller since the initial commit.
+4. ✅ **`settings-view.tsx` (749 → 56 lines).**
+   - Each section is in `components/settings/sections/*`, Guardrails included.
+   - The shared header is `SettingsSectionLayout`, not `SettingsSection` as planned, because that name is already the sidebar's section-id type.
+   - `useScrollSpy` (`lib/hooks/use-scroll-spy.ts`) holds the click-to-scroll and IntersectionObserver sync.
+   - `DiscoverableModelSelect` (with `ModelDiscoveryHeader`, also used alone by the text-model discovery row) replaces the Refresh/spinner/error/select blocks. The Phase 2 behaviour (ZDR filtering that keeps the current selection, "None (disabled)" for a stale default, provider labels) is unchanged.
+5. ✅ **Sidebars.**
+   - `components/shared/folder-tree-sidebar.tsx` is the generic folder-tree sidebar. It owns polling, inline rename, the pinned/unpinned split, move targets and the in-memory rows. `ChatSidebar` and `SchedulerSidebar` are thin wrappers that pass store data, actions and labels; chat's incognito row goes in through a `header` slot.
+   - `ToolboxSidebar` uses the shared `LeafContextMenu` instead of its private copy.
+   - The file sidebar's native `confirm()` is replaced by `components/shared/confirm-dialog.tsx`; the task `ConfirmModal` is now a thin wrapper around it. Its refresh timer moved onto `usePollingLoader`, which gained an `immediate` option (the file sidebar passes `false`, because its first load waits for `workingDirectory`).
+   - Not adopted, on purpose: see Follow-ups.
+6. ✅ **Store selectors.** The settings sections, `ModelPicker`, `GuardrailsSection`, `ChatView`, the chat and scheduler sidebars and both editors select the same keys through `useShallow` instead of destructuring the whole store. Every selector returns only bare `s.key` values, so no selector builds a new array or object per call (which would loop under Zustand v5).
+
+Intentional differences:
+- **Deleting a file or folder opens `ConfirmDialog`** ("Delete File" / "Delete Folder", a destructive Delete button) instead of `window.confirm`, which the packaged webview shows as a bare system prompt.
+- **The Guardrails heading-to-content gap is 16px instead of 24px**, the same as the other sections, now that it renders through `SettingsSectionLayout`. The About section body is wrapped in an unstyled div.
+- **The ToolCallDetails copy tick resets when the card collapses**, because the tick state moved into the details panel.
+- **The highlight warning prefix is now `[code-overlay-editor]`** (it was `[file-editor]` / `[toolbox-editor]`).
+- **Components re-render only when their selected keys change**, not on every store update.
+- `LoopProgressPanel` is gone (it was never mounted).
+
+Tests:
+- The existing suite passes. `editor-highlight-fallback.test.tsx` keeps its assertions for both editors; only its doc comment changed to name `CodeOverlayEditor`.
+- New: `code-overlay-editor` (5), `use-app-bootstrap` (5, step order and the failure path), `use-toolbox-diff` (3), `use-scroll-spy` (3), `discoverable-model-select` (7), `confirm-dialog` (3).
+- Extended: `file-sidebar` (+2, delete confirm and cancel) and `use-polling-loader` (+1, `immediate: false`).
+
+Verified: `tsc`, the full Vitest suite (102 files, 2181 tests), `bun run quick_test` (2181 passed), and Biome (50 warnings, down from 55 at the Phase 6 tip; the remaining ones moved with their code, e.g. `noDangerouslySetInnerHtml` is now in `code-overlay-editor.tsx` and `noArrayIndexKey` in `guardrails/restrictions-list.tsx`).
+
+Dev run (2026-10-01, `vite dev` in Chrome, a fresh browser profile). There were no console errors or warnings in any view; React's dev build warns about uncached `getSnapshot` results and update loops, and none appeared.
+- Settings: every section rendered. Sidebar clicks scrolled to the section, and scrolling the content moved the sidebar highlight. The Advanced preset applied (badge and checkboxes). Entering an OpenRouter key showed the Image and Transcription selects, and ZDR toggled.
+- Chat sidebar: a new folder and a new chat, pin (the menu then shows Unpin), and rename by Enter. Incognito mode toggled. The model quick select opened.
+- Scheduler: a new schedule opened in the form.
+- Toolbox: an agent opened with highlighting and an aligned gutter; typing marked it dirty; the row menu showed Rename and Delete.
+- Not covered by the browser: Files (needs the Tauri filesystem), the Debug section (Tauri-only, as before), model Refresh, real data, chat moves, and anything needing an API key.
+
+Packaged build (2026-10-01): `bunx tauri build --bundles dmg` compiled and bundled `Verbalis.app`, then `bundle_dmg.sh` failed again. This time the cause is visible with `--verbose`: `hdiutil` could not unmount the temporary volume ("Resource busy"), so it is the build machine, not the code. Two stale images from earlier runs were still attached and were detached.
+
+**Packaged smoke test: not yet run.** The automated run could not drive the app: the computer-use daemon was not set up, and screen capture was not permitted. A cold launch of the built `Verbalis.app` in an isolated `HOME` started without errors (its log held only the expected keychain warnings). The installed app was left alone and `~/.verbalis` matched the backup afterwards. Still to check by hand in the built `Verbalis.app`, highest risk first:
+1. Cold launch: settings hydrate, the agent is restored, and the scheduler starts.
+2. Files: the tree fills on launch without a 5s wait (`immediate: false`), and a file created from the shell appears within about 5s. Delete confirm and cancel on a throwaway file and folder, and check that Cancel, the backdrop and Escape close the dialog without selecting the row underneath. The Workspace editor highlights.
+3. ToolCallCard: a confirmation, accepted and declined; an `edit_toolbox_item` confirmation shows the diff; a `generate_image` preview renders in the card; the copy tick resets on collapse.
+4. `ModelQuickSelect` and `EffortSelect` with a real reasoning model.
+5. Chat sidebar with real conversations: move a chat to a folder.
+6. Settings: the Debug toggle, Refresh on the text and speech selects, and the voice select for a speech model with voices.
+7. One scheduler Run now and one task run (the runners were not touched).
+Voice was not re-checked: Phase 7 changed only its settings select. The highlight fallback is covered by `editor-highlight-fallback` and `highlighter.csp.test` rather than a staged failure.
+
+Follow-ups:
+- Toolbox sidebar: it doesn't use `usePollingLoader`, because polling would re-read every Toolbox file every 5s and toggle `isLoading`. It doesn't use `useInlineEditing` either: on an empty-name submit the hook leaves the editor open, while the toolbox closes it. Align the behaviour first. Its deletes still have no confirmation.
+- File sidebar: it doesn't use `useInlineEditing`, because its editing state lives in `useFileStore`; move that state out first. Its row dropdown is not `item-context-menu` (it uses `MoreHorizontal` and opens to the side).
+- Whole-store subscriptions remain in components outside the plan's list (e.g. `toolbox-sidebar`, `file-sidebar`).
+- Dead code: the `paused` branches, the shell-command guardrails UI and the task-store `runTask`.
+- The guardrails import still reports errors with `alert()`.
 
 ## Phase 8: Tooling and tests
 - **Strict TS config.** Make `apps/web/tsconfig.json` extend `@verbalis-app/config/tsconfig.base.json` (`noUncheckedIndexedAccess`, `noUnused*`) and fix the resulting errors. This can run in parallel with earlier phases, one directory at a time.
-- **Biome.** Set `noExplicitAny: warn`, and make `noDangerouslySetInnerHtml` an error everywhere except the two editors and the markdown renderer (per-line ignores there).
+- **Biome.** Set `noExplicitAny: warn`, and make `noDangerouslySetInnerHtml` an error everywhere except `CodeOverlayEditor` and the markdown renderer (per-line ignores there).
 - **`chat-store.test.ts` (2380 lines).** Split it by concern: conversations/folders, tool execution, sendMessage/reasoning/ZDR, context. Use the unused shared mocks `test/mocks/storage.ts` and `test/mocks/tauri.ts` in place of 29 inline `@/lib/storage` mocks.
-- **New tests:** `loop-progress-panel`, `scheduler-view`, the new pure modules (prompt builder, event reducer, resolve-model, openrouter helper), and `image-tools` ZDR.
+- **New tests:** `scheduler-view`, the new pure modules (prompt builder, event reducer, resolve-model, openrouter helper), and `image-tools` ZDR.
 - **Quick test script.** Fix the CLAUDE.md note, or the script: `quick_test` currently runs the full suite, not a subset.
 
 ## Out of scope / later
