@@ -152,7 +152,8 @@ Dev smoke test (`bun run dev`, Tauri): `chat-store.test.ts` doesn't cover the ad
 - Stop mid-turn: in-flight tool calls show as stopped.
 - A ghost chat with a tool call, then leave ghost mode.
 - Rename a chat in a subfolder, restart, and check that it reloads from the same folder.
-- A local model (LM Studio/Ollama) and a web-only cloud turn, both of which stream.
+- A local model (LM Studio/Ollama) turn through the adapter.
+- In the browser build (`bun run dev:web`), a cloud and a local turn both stream; this is the `streamPlain` path.
 
 ## Phase 5: Shared tree/folder model and runners
 - **Folder-tree factory.** Chat, scheduler and task stores repeat folder CRUD, pin/expand and load-from-disk logic (`chat-store.ts:1189–1344`, `scheduler-store.ts:120–160`, `task-store.ts:101–137`). Move it into a `createFolderTreeSlice` factory, and fix the top-level-only `findNodeInTree` copy in `task-store.ts:75–83`.
