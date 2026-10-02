@@ -109,6 +109,10 @@ function unsubscribeAdapter(conversationId: string): void {
   adapterUnsubscribers.delete(conversationId);
 }
 
+function isLoopEnded(status: AgentLoopStatus): boolean {
+  return status === "completed" || status === "error" || status === "aborted";
+}
+
 export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
   // Initial State
   activeAdapters: new Map(),
@@ -407,7 +411,9 @@ export const useAgenticLoopStore = create<AgenticLoopState>((set, get) => ({
       case "tool_cancelled":
         // Notify external listeners (chat-store)
         notifyToolStateChange(conversationId, event.toolCall);
-        if (isCurrentLoop) {
+        // stop() emits loop_aborted before the pending confirmations it rejects
+        // report tool_cancelled; don't resurrect an ended loop as "thinking".
+        if (isCurrentLoop && !isLoopEnded(get().currentStatus)) {
           set({ currentStatus: "thinking" });
         }
         break;

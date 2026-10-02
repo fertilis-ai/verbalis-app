@@ -506,6 +506,18 @@ describe("agentic-loop-store", () => {
       expect(useAgenticLoopStore.getState().currentStatus).toBe("thinking");
     });
 
+    it("tool_cancelled after loop_aborted keeps the loop aborted (stop during confirmation)", () => {
+      useAgenticLoopStore.setState({ currentStatus: "tool_pending", pendingToolCalls: [makeToolCall({ id: "tc-1" })] });
+      const { handleLoopEvent } = useAgenticLoopStore.getState();
+      handleLoopEvent("conv-1", { type: "loop_aborted" });
+      handleLoopEvent("conv-1", {
+        type: "tool_cancelled",
+        toolCall: makeToolCall({ id: "tc-1", status: "cancelled" }),
+        reason: "Loop stopped by user",
+      });
+      expect(useAgenticLoopStore.getState().currentStatus).toBe("aborted");
+    });
+
     it("loop_paused sets status to paused", () => {
       useAgenticLoopStore.getState().handleLoopEvent("conv-1", {
         type: "loop_paused",
