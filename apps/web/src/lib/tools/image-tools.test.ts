@@ -123,6 +123,28 @@ describe("executeGenerateImage", () => {
     expect(result).toContain("Cost: $0.0400");
   });
 
+  it("routes to zero-retention endpoints when ZDR is on", async () => {
+    configureSettings({ openRouterZdrOnly: true });
+    mockAppFetch.mockResolvedValue(jsonResponse({ data: [{ b64_json: "aW1hZ2U=" }] }));
+    mockInvoke.mockResolvedValue(undefined);
+
+    await executeGenerateImage({ prompt: "a cat" });
+
+    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body as string);
+    expect(body.provider).toEqual({ zdr: true });
+  });
+
+  it("does not restrict routing when ZDR is off", async () => {
+    configureSettings({ openRouterZdrOnly: false });
+    mockAppFetch.mockResolvedValue(jsonResponse({ data: [{ b64_json: "aW1hZ2U=" }] }));
+    mockInvoke.mockResolvedValue(undefined);
+
+    await executeGenerateImage({ prompt: "a cat" });
+
+    const body = JSON.parse(mockAppFetch.mock.calls[0][1].body as string);
+    expect(body).not.toHaveProperty("provider");
+  });
+
   it("omits the cost line when usage is absent", async () => {
     mockAppFetch.mockResolvedValue(jsonResponse({ data: [{ b64_json: "aW1hZ2U=" }] }));
     mockInvoke.mockResolvedValue(undefined);
