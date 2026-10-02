@@ -126,20 +126,33 @@ Follow-ups found in Phase 3 (not done here):
 - **Undo trash is never cleaned.** `undo-manager.ts` `cleanupTrash` lists `~/.verbalis/trash` with `list_files`. That command returns file *stems* and skips directories, so `deletePath(trash/<stem>)` misses any trashed file with an extension, and trashed directories are never considered. Needs a listing that returns full names, including directories.
 - `FILE_TREE_DEPTH` could be raised now that the depth reaches Rust, if deep folders should show in the Workspace tree.
 
-## Phase 4: Split `chat-store.ts` (1550 lines)
-Extract pure modules and keep the store as a thin coordinator:
+## Phase 4: Split `chat-store.ts` (1550 lines) — ✅ done (branch `refactor/phase-4`, stacked on `refactor/phase-3`; dev smoke test pending)
+`chat-store.ts` is down from 1550 to 918 lines and now coordinates the modules below. New lib modules use `import type` only from `@/stores/chat-store`, and Phase 5 moves those types out.
 
-| New module | Source lines | Contents |
-|---|---|---|
-| `lib/llm/resolve-model.ts` | 64–166 | Model resolution and the unknown-model error text (900–916), with a typed wrapper for the `getModel` cast (`chat-store.ts:116`) |
-| `lib/llm/local-model.ts` | 186–223 | Local model resolution |
-| `lib/prompt/build-system-prompt.ts` | 546–605 | System prompt assembly as a pure function; add unit tests |
-| `lib/agentic/run-conversation.ts` | 610–823 | The adapter run, with the event switch as a pure reducer; add unit tests |
-| `streamPlain()` helper | 873–891, 934–961 | One streaming loop replacing the two copies |
-| `lib/chat-persistence.ts` | 349–380, 1047–1099, 1300–1308 | Serialize/deserialize and the folder-path rule (3 copies); `createConversationInternal` uses `conversationToChatData` |
-| `lib/tool-call-patch.ts` | — | The pending/executing checks and merge rules |
+1. ✅ **`lib/tool-call-patch.ts`:** `isToolCallInFlight`, `mergeToolCalls`, `upsertToolCall` (moved verbatim), `stopInFlightToolCalls`, `rejectToolCall` and `restoreToolCall` (an in-flight call loaded from disk becomes `error`). The stop and reject patches return the same conversation when no call changed.
+2. ✅ **`lib/chat-persistence.ts`:** `serializeMessages`, `deserializeMessages`, `conversationToChatData`, `chatFolderArg` (the folder rule: `undefined` for the root chats directory, which had 3 copies) and `saveConversation`. `createConversationInternal`, `renameChat`, the end-of-turn save and the YAML migration use these.
+3. ✅ **`lib/llm/resolve-model.ts`:** `resolveModelObject` (moved verbatim) and `unresolvedModelMessage` (the no-key, unknown-model and no-model texts). The `getModel` cast is in one private `lookupRegistryModel`. **`lib/llm/local-model.ts`:** `resolveLocalModel` and `buildLocalModel`, moved verbatim.
+4. ✅ **`lib/llm/stream-plain.ts`:** `streamPlain()` replaces the local and cloud web-only streaming loops. Each call site keeps its own options and fallback error (`"Local LLM error"` / `"Failed to send message"`).
+5. ✅ **`lib/prompt/build-system-prompt.ts`:** `loadToolboxPromptSections()` does the I/O (memories, skills, inventory), and `buildSystemPrompt()` is pure. Section order and text are byte-identical; the tests pin them.
+6. ✅ **`lib/agentic/run-conversation.ts`:** `runConversation(params, deps)` owns the adapter lifecycle: stop the old adapter, create a new one, provide trimmed history, report the context budget, retry once at half the history budget on context overflow, and call `releaseAdapter` in `finally`. The event switch is the pure reducer `applyAdapterEvent`. The store injects the loop store, a fresh-message reader and the update function.
+7. ✅ **One ghost-or-regular update.** `updateConversationInState` replaces the three copies (adapter events, the loop-bus tool-call subscriber, and `applyUpdate` for stop/reject).
 
-Also merge the three "update conversation, ghost or regular" copies into one.
+Intentional differences (no visible behavior change):
+- The update helper returns the previous state when the updater returns the same conversation, so no-op updates no longer notify subscribers. The adapter handler now routes every event through the reducer, which returns `c` for events it doesn't handle.
+- Ghost detection uses `ghostConversation?.id` alone, without `isGhostMode`. `ghostConversation` is only set in ghost mode.
+- The prompt-section warnings are logged with the `[system-prompt]` prefix.
+
+Tests: `tool-call-patch` (13), `chat-persistence` (9), `resolve-model` (9, against the real pi-ai registry), `local-model` (6), `stream-plain` (5), `build-system-prompt` (10) and `run-conversation` (17: the reducer, adapter lifecycle, trimming, overflow retry, a second overflow shown, and release on throw). `chat-store.test.ts` still passes unchanged (157).
+
+Verified: `tsc`, the full Vitest suite (94 files, 2107 tests) and Biome (54 warnings in `src`, the same count as before; the touched files have none). Phase 4 doesn't touch the CSP or webview dependencies, so a packaged build isn't required.
+
+Dev smoke test (`bun run dev`, Tauri): `chat-store.test.ts` doesn't cover the adapter path, so check:
+- A chat turn with a tool call that needs confirmation: approve one and reject one.
+- A turn with several tool iterations: each new assistant message appears and the first one isn't duplicated.
+- Stop mid-turn: in-flight tool calls show as stopped.
+- A ghost chat with a tool call, then leave ghost mode.
+- Rename a chat in a subfolder, restart, and check that it reloads from the same folder.
+- A local model (LM Studio/Ollama) and a web-only cloud turn, both of which stream.
 
 ## Phase 5: Shared tree/folder model and runners
 - **Folder-tree factory.** Chat, scheduler and task stores repeat folder CRUD, pin/expand and load-from-disk logic (`chat-store.ts:1189–1344`, `scheduler-store.ts:120–160`, `task-store.ts:101–137`). Move it into a `createFolderTreeSlice` factory, and fix the top-level-only `findNodeInTree` copy in `task-store.ts:75–83`.
