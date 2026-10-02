@@ -297,6 +297,21 @@ A second packaged run (2026-10-01, the same `Verbalis.app`, from a fresh backup 
 
 `loadSchedule`, the per-schedule load used by the scheduler tick, is covered by the unit tests (a legacy valid file, malformed YAML, and a non-boolean `enabled`).
 
+## Phase 7: Components
+- **`CodeOverlayEditor`.** One shared component for `file-editor.tsx` and `toolbox-editor.tsx`, covering highlight with fallback, scroll sync, Tab indent and the gutter. The CLAUDE.md invariants (`text-transparent` only when the overlay is non-empty, `leading-5` placement) must live inside it, and `editor-highlight-fallback.test.tsx` has to keep passing for both callers.
+- **`settings-view.tsx` (749 lines):**
+  - Put each section in `components/settings/sections/*`.
+  - Add a `SettingsSection` wrapper (about 9 copies of the header today) and a `useScrollSpy` hook.
+  - Add a `DiscoverableModelSelect` to replace the four Refresh/spinner/error/select blocks.
+- **Sidebars:** build a generic folder-tree sidebar for chat and scheduler (only a 96-line diff between them). The toolbox and file sidebars should adopt `useInlineEditing`, `shared/item-context-menu.tsx`, `usePollingLoader` and `confirm-modal` instead of native `confirm()`.
+- **Split large components:**
+  - `tool-call-card.tsx`: Header/Details/Actions; move `useToolboxDiff` into the toolbox layer.
+  - `guardrails-section.tsx`
+  - `loop-progress-panel.tsx`
+  - `chat-input.tsx`: `ModelQuickSelect` and `EffortSelect`
+- **Store selectors.** Replace whole-store `useXStore()` subscriptions with selectors or `useShallow` in `settings-view`, `model-picker`, `guardrails-section`, `chat-view`, `chat-sidebar` and the editors.
+- **Bootstrap hook.** Move the `routes/__root.tsx:55–78` bootstrap into `useAppBootstrap`.
+
 ## Phase 8: Tooling and tests
 - **Strict TS config.** Make `apps/web/tsconfig.json` extend `@verbalis-app/config/tsconfig.base.json` (`noUncheckedIndexedAccess`, `noUnused*`) and fix the resulting errors. This can run in parallel with earlier phases, one directory at a time.
 - **Biome.** Set `noExplicitAny: warn`, and make `noDangerouslySetInnerHtml` an error everywhere except the two editors and the markdown renderer (per-line ignores there).
