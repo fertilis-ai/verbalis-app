@@ -51,3 +51,5 @@ export const loadToolboxItem = vi.fn().mockResolvedValue(null);
 export const listToolboxItems = vi.fn().mockResolvedValue([]);
 export const deleteToolboxItem = vi.fn().mockResolvedValue(undefined);
 export const renameToolboxItem = vi.fn().mockResolvedValue(undefined);
+export const ensureWellKnownMemories = vi.fn().mockResolvedValue(undefined);
+export const ensureDefaultToolboxItems = vi.fn().mockResolvedValue(undefined);
