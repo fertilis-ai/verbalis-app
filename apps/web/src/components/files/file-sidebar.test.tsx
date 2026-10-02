@@ -56,6 +56,8 @@ vi.mock("lucide-react", () => ({
   MoreHorizontal: () => <span data-testid="more-icon">More</span>,
   Pencil: () => <span data-testid="pencil-icon">Pencil</span>,
   Trash2: () => <span data-testid="trash-icon">Trash</span>,
+  AlertTriangle: () => <span data-testid="alert-icon">Alert</span>,
+  X: () => <span data-testid="x-icon">X</span>,
 }));
 
 // Import after mocks
@@ -209,6 +211,41 @@ describe("FileSidebar", () => {
 
       // Component should render without errors
       expect(screen.getByText("Workspace")).toBeInTheDocument();
+    });
+  });
+
+  describe("Delete confirmation", () => {
+    beforeEach(() => {
+      mockFileStore.tree = [
+        { name: "notes.md", path: "/test/workspace/notes.md", isDirectory: false },
+      ];
+    });
+
+    async function openDeleteDialog() {
+      const user = userEvent.setup();
+      render(<FileSidebar />);
+      await user.click(screen.getByTitle("More actions"));
+      await user.click(await screen.findByText("Delete"));
+      return user;
+    }
+
+    it("asks before deleting, and deletes on confirm", async () => {
+      const user = await openDeleteDialog();
+
+      expect(screen.getByText('Are you sure you want to delete "notes.md"?')).toBeInTheDocument();
+      expect(mockFileStore.deleteItem).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+      expect(mockFileStore.deleteItem).toHaveBeenCalledWith("/test/workspace/notes.md");
+      expect(mockFileStore.openFile).not.toHaveBeenCalled();
+    });
+
+    it("does not delete on cancel", async () => {
+      const user = await openDeleteDialog();
+
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(mockFileStore.deleteItem).not.toHaveBeenCalled();
+      expect(screen.queryByText('Are you sure you want to delete "notes.md"?')).not.toBeInTheDocument();
     });
   });
 });

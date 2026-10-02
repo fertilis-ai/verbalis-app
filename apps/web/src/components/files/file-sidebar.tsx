@@ -22,6 +22,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { usePollingLoader } from "@/lib/hooks/use-polling-loader";
 import { useFileStore, type FileNode } from "@/stores/file-store";
 import { useSettingsStore } from "@/stores/settings-store";
 
@@ -68,13 +70,9 @@ export function FileSidebar() {
     }
   }, [workingDirectory, loadFileTree]);
 
-  // Polling for external file changes (5 seconds)
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      refreshTree();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [refreshTree]);
+  // Polling for external file changes. The initial load is the effect above,
+  // which waits for workingDirectory.
+  usePollingLoader(refreshTree, 5000, { immediate: false });
 
   // Keyboard shortcut for search
   React.useEffect(() => {
@@ -338,14 +336,25 @@ function FileTreeNode({
     }
   };
 
-  const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete "${node.name}"?`)) {
-      deleteItem(node.path);
-    }
-  };
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
 
   return (
     <div>
+      {/* Outside the clickable row: React events bubble out of the portal. */}
+      {confirmingDelete && (
+        <ConfirmDialog
+          open
+          title={node.isDirectory ? "Delete Folder" : "Delete File"}
+          description={`Are you sure you want to delete "${node.name}"?`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            deleteItem(node.path);
+          }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
       <div
         className={cn(
           "group flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 text-xs hover:bg-muted",
@@ -452,7 +461,7 @@ function FileTreeNode({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
-                  onClick={handleDelete}
+                  onClick={() => setConfirmingDelete(true)}
                 >
                   <Trash2 className="h-3 w-3 mr-2" />
                   Delete

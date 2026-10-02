@@ -88,4 +88,14 @@ describe("usePollingLoader", () => {
     // loadFn1 should not be called again after the switch
     expect(loadFn1).toHaveBeenCalledTimes(1);
   });
+
+  it("skips the mount call when immediate is false", () => {
+    const loadFn = vi.fn();
+    renderHook(() => usePollingLoader(loadFn, 5000, { immediate: false }));
+
+    expect(loadFn).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(5000);
+    expect(loadFn).toHaveBeenCalledTimes(1);
+  });
 });
