@@ -250,11 +250,11 @@ describe("task-store", () => {
       await useTaskStore.getState().createTask("New Task", "Description", "default", "");
 
       expect(mockSaveTaskFolder).toHaveBeenCalledTimes(1);
-      const savedData = mockSaveTaskFolder.mock.calls[0][0] as TaskFolderData;
+      const savedData = mockSaveTaskFolder.mock.calls[0]![0] as TaskFolderData;
       expect(savedData.tasks).toHaveLength(1);
-      expect(savedData.tasks[0].title).toBe("New Task");
-      expect(savedData.tasks[0].description).toBe("Description");
-      expect(savedData.tasks[0].stage).toBe("backlog");
+      expect(savedData.tasks[0]!.title).toBe("New Task");
+      expect(savedData.tasks[0]!.description).toBe("Description");
+      expect(savedData.tasks[0]!.stage).toBe("backlog");
     });
 
     it("does nothing when no folder is selected", async () => {
@@ -290,7 +290,7 @@ describe("task-store", () => {
 
       await useTaskStore.getState().updateTask("t1", { title: "Updated Title" });
 
-      const savedData = mockSaveTaskFolder.mock.calls[0][0] as TaskFolderData;
+      const savedData = mockSaveTaskFolder.mock.calls[0]![0] as TaskFolderData;
       const updatedTask = savedData.tasks.find((t) => t.id === "t1");
       expect(updatedTask?.title).toBe("Updated Title");
     });
@@ -321,9 +321,9 @@ describe("task-store", () => {
 
       await useTaskStore.getState().deleteTask("t1");
 
-      const savedData = mockSaveTaskFolder.mock.calls[0][0] as TaskFolderData;
+      const savedData = mockSaveTaskFolder.mock.calls[0]![0] as TaskFolderData;
       expect(savedData.tasks).toHaveLength(1);
-      expect(savedData.tasks[0].id).toBe("t2");
+      expect(savedData.tasks[0]!.id).toBe("t2");
     });
 
     it("closes the modal if the deleted task was being edited", async () => {
@@ -470,7 +470,7 @@ describe("task-store", () => {
 
       await useTaskStore.getState().completeTask("t1", "success");
 
-      const savedData = mockSaveTaskFolder.mock.calls[0][0] as TaskFolderData;
+      const savedData = mockSaveTaskFolder.mock.calls[0]![0] as TaskFolderData;
       const updated = savedData.tasks.find((t) => t.id === "t1");
       expect(updated?.stage).toBe("done");
       expect(updated?.resultStatus).toBe("success");
@@ -593,15 +593,15 @@ describe("task-store", () => {
 
       await useTaskStore.getState().createTask("Minimal Task");
 
-      const savedData = mockSaveTaskFolder.mock.calls[0][0] as TaskFolderData;
-      expect(savedData.tasks[0].description).toBe("");
-      expect(savedData.tasks[0].agent).toBe("default");
-      expect(savedData.tasks[0].outputFolder).toBe("");
-      expect(savedData.tasks[0].resultStatus).toBeNull();
-      expect(savedData.tasks[0].stage).toBe("backlog");
-      expect(savedData.tasks[0].id).toBeDefined();
-      expect(savedData.tasks[0].createdAt).toBeDefined();
-      expect(savedData.tasks[0].updatedAt).toBeDefined();
+      const savedData = mockSaveTaskFolder.mock.calls[0]![0] as TaskFolderData;
+      expect(savedData.tasks[0]!.description).toBe("");
+      expect(savedData.tasks[0]!.agent).toBe("default");
+      expect(savedData.tasks[0]!.outputFolder).toBe("");
+      expect(savedData.tasks[0]!.resultStatus).toBeNull();
+      expect(savedData.tasks[0]!.stage).toBe("backlog");
+      expect(savedData.tasks[0]!.id).toBeDefined();
+      expect(savedData.tasks[0]!.createdAt).toBeDefined();
+      expect(savedData.tasks[0]!.updatedAt).toBeDefined();
     });
   });
 
@@ -672,8 +672,8 @@ describe("task-store", () => {
       });
 
       const callArgs = mockExecuteTask.mock.calls[0];
-      expect(callArgs[0]).toEqual(task);
-      expect(callArgs[1]).toHaveProperty("onConversationCreated");
+      expect(callArgs![0]).toEqual(task);
+      expect(callArgs![1]).toHaveProperty("onConversationCreated");
     });
 
     it("sets running conversation when onConversationCreated is called", async () => {
@@ -733,7 +733,7 @@ describe("task-store", () => {
       });
 
       // The second saveTaskFolder call should have stage "done"
-      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1][0] as TaskFolderData;
+      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1]![0] as TaskFolderData;
       const completedTask = lastSavedData.tasks.find((t) => t.id === "t1");
       expect(completedTask?.stage).toBe("done");
       expect(completedTask?.resultStatus).toBe("success");
@@ -758,7 +758,7 @@ describe("task-store", () => {
         expect(mockSaveTaskFolder.mock.calls.length).toBeGreaterThanOrEqual(2);
       });
 
-      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1][0] as TaskFolderData;
+      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1]![0] as TaskFolderData;
       const completedTask = lastSavedData.tasks.find((t) => t.id === "t1");
       expect(completedTask?.resultStatus).toBe("incomplete");
     });
@@ -782,7 +782,7 @@ describe("task-store", () => {
         expect(mockSaveTaskFolder.mock.calls.length).toBeGreaterThanOrEqual(2);
       });
 
-      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1][0] as TaskFolderData;
+      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1]![0] as TaskFolderData;
       const completedTask = lastSavedData.tasks.find((t) => t.id === "t1");
       expect(completedTask?.resultStatus).toBe("incomplete");
     });
@@ -1000,7 +1000,7 @@ describe("task-store", () => {
 
       // Check that updateTask was called with stage: "in_progress" and resultStatus: null
       expect(mockSaveTaskFolder).toHaveBeenCalled();
-      const savedData = mockSaveTaskFolder.mock.calls[0][0] as TaskFolderData;
+      const savedData = mockSaveTaskFolder.mock.calls[0]![0] as TaskFolderData;
       const updatedTask = savedData.tasks.find((t) => t.id === "t1");
       expect(updatedTask?.stage).toBe("in_progress");
       expect(updatedTask?.resultStatus).toBeNull();
@@ -1028,7 +1028,7 @@ describe("task-store", () => {
         expect(mockSaveTaskFolder.mock.calls.length).toBeGreaterThanOrEqual(2);
       });
 
-      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1][0] as TaskFolderData;
+      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1]![0] as TaskFolderData;
       const completedTask = lastSavedData.tasks.find((t) => t.id === "t1");
       expect(completedTask?.stage).toBe("done");
       expect(completedTask?.resultStatus).toBe("success");
@@ -1053,7 +1053,7 @@ describe("task-store", () => {
         expect(mockSaveTaskFolder.mock.calls.length).toBeGreaterThanOrEqual(2);
       });
 
-      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1][0] as TaskFolderData;
+      const lastSavedData = mockSaveTaskFolder.mock.calls[mockSaveTaskFolder.mock.calls.length - 1]![0] as TaskFolderData;
       const completedTask = lastSavedData.tasks.find((t) => t.id === "t1");
       expect(completedTask?.resultStatus).toBe("incomplete");
     });
@@ -1269,7 +1269,7 @@ describe("task-store", () => {
 
       await useTaskStore.getState().completeTask("t1", "incomplete");
 
-      const savedData = mockSaveTaskFolder.mock.calls[0][0] as TaskFolderData;
+      const savedData = mockSaveTaskFolder.mock.calls[0]![0] as TaskFolderData;
       const updated = savedData.tasks.find((t) => t.id === "t1");
       expect(updated?.resultStatus).toBe("incomplete");
     });
@@ -1286,7 +1286,7 @@ describe("task-store", () => {
 
       await useTaskStore.getState().completeTask("t1", "bug");
 
-      const savedData = mockSaveTaskFolder.mock.calls[0][0] as TaskFolderData;
+      const savedData = mockSaveTaskFolder.mock.calls[0]![0] as TaskFolderData;
       const updated = savedData.tasks.find((t) => t.id === "t1");
       expect(updated?.resultStatus).toBe("bug");
     });

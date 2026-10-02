@@ -122,10 +122,10 @@ describe("toolbox-store", () => {
       await getState().loadItemsFromDisk();
 
       expect(getState().items).toHaveLength(2);
-      expect(getState().items[0].name).toBe("p1");
-      expect(getState().items[0].category).toBe("prompts");
-      expect(getState().items[1].name).toBe("a1");
-      expect(getState().items[1].category).toBe("agents");
+      expect(getState().items[0]!.name).toBe("p1");
+      expect(getState().items[0]!.category).toBe("prompts");
+      expect(getState().items[1]!.name).toBe("a1");
+      expect(getState().items[1]!.category).toBe("agents");
       expect(getState().isLoading).toBe(false);
     });
 
@@ -141,7 +141,7 @@ describe("toolbox-store", () => {
 
       await getState().loadItemsFromDisk();
       expect(getState().items).toHaveLength(1);
-      expect(getState().items[0].name).toBe("exists");
+      expect(getState().items[0]!.name).toBe("exists");
     });
 
     it("handles errors gracefully", async () => {
@@ -158,15 +158,15 @@ describe("toolbox-store", () => {
       await getState().createItem("new-prompt", "prompts");
 
       expect(mockSaveToolboxItem).toHaveBeenCalledOnce();
-      const savedArg = mockSaveToolboxItem.mock.calls[0][0];
+      const savedArg = mockSaveToolboxItem.mock.calls[0]![0];
       expect(savedArg.name).toBe("new-prompt");
       expect(savedArg.category).toBe("prompts");
       expect(savedArg.content).toContain("new-prompt");
 
       const { items, selectedItem } = getState();
       expect(items).toHaveLength(1);
-      expect(items[0].name).toBe("new-prompt");
-      expect(items[0].category).toBe("prompts");
+      expect(items[0]!.name).toBe("new-prompt");
+      expect(items[0]!.category).toBe("prompts");
       expect(selectedItem).not.toBeNull();
     });
 
@@ -177,35 +177,35 @@ describe("toolbox-store", () => {
 
       const { openItems, activeItemKey } = getState();
       expect(openItems).toHaveLength(1);
-      expect(openItems[0].name).toBe("my-agent");
-      expect(openItems[0].category).toBe("agents");
+      expect(openItems[0]!.name).toBe("my-agent");
+      expect(openItems[0]!.category).toBe("agents");
       expect(activeItemKey).toBe("agents/my-agent");
     });
 
     it("generates correct default content for each category", async () => {
       await getState().createItem("test", "prompts");
-      expect(mockSaveToolboxItem.mock.calls[0][0].content).toContain("{{input}}");
+      expect(mockSaveToolboxItem.mock.calls[0]![0].content).toContain("{{input}}");
 
       vi.clearAllMocks();
       useToolboxStore.setState({ items: [], openItems: [] });
       await getState().createItem("test", "memories");
-      expect(mockSaveToolboxItem.mock.calls[0][0].content).toContain("# test");
+      expect(mockSaveToolboxItem.mock.calls[0]![0].content).toContain("# test");
 
       vi.clearAllMocks();
       useToolboxStore.setState({ items: [], openItems: [] });
       await getState().createItem("test", "agents");
-      expect(mockSaveToolboxItem.mock.calls[0][0].content).toContain("temperature:");
-      expect(mockSaveToolboxItem.mock.calls[0][0].content).not.toContain("model:");
+      expect(mockSaveToolboxItem.mock.calls[0]![0].content).toContain("temperature:");
+      expect(mockSaveToolboxItem.mock.calls[0]![0].content).not.toContain("model:");
 
       vi.clearAllMocks();
       useToolboxStore.setState({ items: [], openItems: [] });
       await getState().createItem("test", "skills");
-      expect(mockSaveToolboxItem.mock.calls[0][0].content).toContain("trigger:");
+      expect(mockSaveToolboxItem.mock.calls[0]![0].content).toContain("trigger:");
 
       vi.clearAllMocks();
       useToolboxStore.setState({ items: [], openItems: [] });
       await getState().createItem("test", "workflows");
-      expect(mockSaveToolboxItem.mock.calls[0][0].content).toContain("schedule:");
+      expect(mockSaveToolboxItem.mock.calls[0]![0].content).toContain("schedule:");
     });
   });
 
@@ -217,7 +217,7 @@ describe("toolbox-store", () => {
       await getState().updateItem("prompts", "edit-me", "new content");
 
       expect(mockSaveToolboxItem).toHaveBeenCalledOnce();
-      expect(getState().items[0].content).toBe("new content");
+      expect(getState().items[0]!.content).toBe("new content");
     });
 
     it("updates selectedItem if it matches", async () => {
@@ -286,7 +286,7 @@ describe("toolbox-store", () => {
       await getState().renameItem("agents", "old-name", "new-name");
 
       expect(mockRenameToolboxItem).toHaveBeenCalledWith("agents", "old-name", "new-name");
-      expect(getState().items[0].name).toBe("new-name");
+      expect(getState().items[0]!.name).toBe("new-name");
     });
 
     it("updates selectedItem if it matches", async () => {
@@ -310,7 +310,7 @@ describe("toolbox-store", () => {
 
       await getState().renameItem("agents", "old-name", "new-name");
 
-      expect(getState().openItems[0].name).toBe("new-name");
+      expect(getState().openItems[0]!.name).toBe("new-name");
       expect(getState().activeItemKey).toBe("agents/new-name");
     });
   });
@@ -324,10 +324,10 @@ describe("toolbox-store", () => {
 
       const { openItems, activeItemKey, selectedItem } = getState();
       expect(openItems).toHaveLength(1);
-      expect(openItems[0].name).toBe("open-me");
-      expect(openItems[0].originalContent).toBe("hello");
-      expect(openItems[0].currentContent).toBe("hello");
-      expect(openItems[0].isModified).toBe(false);
+      expect(openItems[0]!.name).toBe("open-me");
+      expect(openItems[0]!.originalContent).toBe("hello");
+      expect(openItems[0]!.currentContent).toBe("hello");
+      expect(openItems[0]!.isModified).toBe(false);
       expect(activeItemKey).toBe("prompts/open-me");
       expect(selectedItem?.name).toBe("open-me");
     });
@@ -376,7 +376,7 @@ describe("toolbox-store", () => {
       getState().closeItem("prompts", "a");
 
       expect(getState().openItems).toHaveLength(1);
-      expect(getState().openItems[0].name).toBe("b");
+      expect(getState().openItems[0]!.name).toBe("b");
       expect(getState().activeItemKey).toBe("prompts/b");
     });
 
@@ -470,8 +470,8 @@ describe("toolbox-store", () => {
       getState().updateOpenItemContent("prompts", "edit", "modified");
 
       const open = getState().openItems[0];
-      expect(open.currentContent).toBe("modified");
-      expect(open.isModified).toBe(true);
+      expect(open!.currentContent).toBe("modified");
+      expect(open!.isModified).toBe(true);
     });
 
     it("clears isModified when content matches original", () => {
@@ -483,7 +483,7 @@ describe("toolbox-store", () => {
 
       getState().updateOpenItemContent("prompts", "edit", "original");
 
-      expect(getState().openItems[0].isModified).toBe(false);
+      expect(getState().openItems[0]!.isModified).toBe(false);
     });
   });
 
@@ -498,9 +498,9 @@ describe("toolbox-store", () => {
       getState().markOpenItemSaved("prompts", "save", "new");
 
       const open = getState().openItems[0];
-      expect(open.originalContent).toBe("new");
-      expect(open.currentContent).toBe("new");
-      expect(open.isModified).toBe(false);
+      expect(open!.originalContent).toBe("new");
+      expect(open!.currentContent).toBe("new");
+      expect(open!.isModified).toBe(false);
     });
   });
 });

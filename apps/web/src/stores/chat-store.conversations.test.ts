@@ -158,12 +158,12 @@ describe("chat-store", () => {
       await useChatStore.getState().createConversation();
       const state = useChatStore.getState();
       expect(state.conversations).toHaveLength(1);
-      expect(state.currentConversationId).toBe(state.conversations[0].id);
+      expect(state.currentConversationId).toBe(state.conversations[0]!.id);
     });
 
     it("sets default title 'New Chat'", async () => {
       await useChatStore.getState().createConversation();
-      expect(useChatStore.getState().conversations[0].title).toBe("New Chat");
+      expect(useChatStore.getState().conversations[0]!.title).toBe("New Chat");
     });
 
     it("clears context files on creation", async () => {
@@ -180,15 +180,15 @@ describe("chat-store", () => {
       await useChatStore.getState().createConversation();
       const state = useChatStore.getState();
       expect(state.conversations).toHaveLength(2);
-      expect(state.conversations[0].id).not.toBe("existing");
-      expect(state.conversations[1].id).toBe("existing");
+      expect(state.conversations[0]!.id).not.toBe("existing");
+      expect(state.conversations[1]!.id).toBe("existing");
     });
 
     it("sets the path based on app data dir when no folder", async () => {
       await useChatStore.getState().createConversation();
       const conv = useChatStore.getState().conversations[0];
-      expect(conv.path).toContain("/mock-data/chats/");
-      expect(conv.path).toMatch(/\.json$/);
+      expect(conv!.path).toContain("/mock-data/chats/");
+      expect(conv!.path).toMatch(/\.json$/);
     });
 
     it("sets path within folder when folderId is provided and folder exists in tree", async () => {
@@ -199,26 +199,26 @@ describe("chat-store", () => {
       useChatStore.setState({ chatTree: [folder] });
       await useChatStore.getState().createConversation("f1");
       const conv = useChatStore.getState().conversations[0];
-      expect(conv.path).toContain("/mock-data/chats/my-folder/");
+      expect(conv!.path).toContain("/mock-data/chats/my-folder/");
     });
 
     it("falls back to default path when folderId not found in tree", async () => {
       useChatStore.setState({ chatTree: [] });
       await useChatStore.getState().createConversation("nonexistent-folder");
       const conv = useChatStore.getState().conversations[0];
-      expect(conv.path).toContain("/mock-data/chats/");
+      expect(conv!.path).toContain("/mock-data/chats/");
     });
 
     it("creates conversation with empty messages", async () => {
       await useChatStore.getState().createConversation();
-      expect(useChatStore.getState().conversations[0].messages).toEqual([]);
+      expect(useChatStore.getState().conversations[0]!.messages).toEqual([]);
     });
 
     it("sets createdAt and updatedAt", async () => {
       await useChatStore.getState().createConversation();
       const conv = useChatStore.getState().conversations[0];
-      expect(conv.createdAt).toBeInstanceOf(Date);
-      expect(conv.updatedAt).toBeInstanceOf(Date);
+      expect(conv!.createdAt).toBeInstanceOf(Date);
+      expect(conv!.updatedAt).toBeInstanceOf(Date);
     });
   });
 
@@ -241,17 +241,17 @@ describe("chat-store", () => {
       await useChatStore.getState().createConversationInBackground();
       const state = useChatStore.getState();
       expect(state.conversations).toHaveLength(2);
-      expect(state.conversations[0].id).toBe("existing");
+      expect(state.conversations[0]!.id).toBe("existing");
     });
 
     it("uses provided title", async () => {
       await useChatStore.getState().createConversationInBackground({ title: "Background Task" });
-      expect(useChatStore.getState().conversations[0].title).toBe("Background Task");
+      expect(useChatStore.getState().conversations[0]!.title).toBe("Background Task");
     });
 
     it("defaults to 'New Chat' when no title given", async () => {
       await useChatStore.getState().createConversationInBackground();
-      expect(useChatStore.getState().conversations[0].title).toBe("New Chat");
+      expect(useChatStore.getState().conversations[0]!.title).toBe("New Chat");
     });
 
     it("marks conversation as background", async () => {
@@ -299,7 +299,7 @@ describe("chat-store", () => {
       await useChatStore.getState().deleteConversation("c1");
       const state = useChatStore.getState();
       expect(state.conversations).toHaveLength(1);
-      expect(state.conversations[0].id).toBe("c2");
+      expect(state.conversations[0]!.id).toBe("c2");
     });
 
     it("selects the next conversation when current is deleted", async () => {
@@ -449,7 +449,7 @@ describe("chat-store", () => {
       const updated = useChatStore.getState().conversations.find((c) => c.id === "c1");
       expect(updated?.title).toBe("Loaded Title");
       expect(updated?.messages).toHaveLength(1);
-      expect(updated?.messages[0].content).toBe("Hello");
+      expect(updated?.messages[0]?.content).toBe("Hello");
     });
 
     it("marks pending/executing tool calls as error when loading from disk", async () => {
@@ -487,19 +487,19 @@ describe("chat-store", () => {
       await useChatStore.getState().selectConversation("c1");
 
       const updated = useChatStore.getState().conversations.find((c) => c.id === "c1");
-      const toolCalls = updated?.messages[0].toolCalls;
+      const toolCalls = updated?.messages[0]?.toolCalls;
       expect(toolCalls).toHaveLength(6);
-      expect(toolCalls![0].status).toBe("error");
-      expect(toolCalls![0].error).toBe("Interrupted — app closed during execution");
-      expect(toolCalls![1].status).toBe("error");
-      expect(toolCalls![1].error).toBe("Interrupted — app closed during execution");
-      expect(toolCalls![2].status).toBe("success");
-      expect(toolCalls![3].status).toBe("success");
-      expect(toolCalls![3].result).toBe("legacy ok");
-      expect(toolCalls![4].status).toBe("error");
-      expect(toolCalls![4].error).toBe("legacy err");
-      expect(toolCalls![5].status).toBe("error");
-      expect(toolCalls![5].error).toBe("Interrupted — app closed during execution");
+      expect(toolCalls![0]!.status).toBe("error");
+      expect(toolCalls![0]!.error).toBe("Interrupted — app closed during execution");
+      expect(toolCalls![1]!.status).toBe("error");
+      expect(toolCalls![1]!.error).toBe("Interrupted — app closed during execution");
+      expect(toolCalls![2]!.status).toBe("success");
+      expect(toolCalls![3]!.status).toBe("success");
+      expect(toolCalls![3]!.result).toBe("legacy ok");
+      expect(toolCalls![4]!.status).toBe("error");
+      expect(toolCalls![4]!.error).toBe("legacy err");
+      expect(toolCalls![5]!.status).toBe("error");
+      expect(toolCalls![5]!.error).toBe("Interrupted — app closed during execution");
     });
 
     it("does not call loadChatByPath if conversation has no path", async () => {
@@ -696,8 +696,8 @@ describe("chat-store", () => {
 
       const state = useChatStore.getState();
       expect(state.conversations).toHaveLength(2);
-      expect(state.conversations[0].messages[0].content).toBe("msg1");
-      expect(state.conversations[1].messages[0].content).toBe("msg3");
+      expect(state.conversations[0]!.messages[0]!.content).toBe("msg1");
+      expect(state.conversations[1]!.messages[0]!.content).toBe("msg3");
     });
   });
 
@@ -721,7 +721,7 @@ describe("chat-store", () => {
       const conv = makeConversation({ id: "c1", title: "Old Title" });
       useChatStore.setState({ conversations: [conv] });
       await useChatStore.getState().renameChat("c1", "");
-      expect(useChatStore.getState().conversations[0].title).toBe("");
+      expect(useChatStore.getState().conversations[0]!.title).toBe("");
     });
 
     it("handles special characters in folder names", async () => {

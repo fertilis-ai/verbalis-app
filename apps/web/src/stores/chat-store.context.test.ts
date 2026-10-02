@@ -32,7 +32,7 @@ describe("chat-store", () => {
       useChatStore.getState().removeContextFile("/a.txt");
       const files = useChatStore.getState().contextFiles;
       expect(files).toHaveLength(1);
-      expect(files[0].path).toBe("/b.txt");
+      expect(files[0]!.path).toBe("/b.txt");
     });
 
     it("clearContextFiles empties the list", () => {
@@ -68,15 +68,15 @@ describe("chat-store", () => {
       await useChatStore.getState().addContextFiles(["/test/file.txt"]);
       const files = useChatStore.getState().contextFiles;
       expect(files).toHaveLength(1);
-      expect(files[0].path).toBe("/test/file.txt");
-      expect(files[0].name).toBe("file.txt");
-      expect(files[0].content).toBe("file content here");
+      expect(files[0]!.path).toBe("/test/file.txt");
+      expect(files[0]!.name).toBe("file.txt");
+      expect(files[0]!.content).toBe("file content here");
     });
 
     it("extracts filename from path", async () => {
       mockReadFile.mockResolvedValue("data");
       await useChatStore.getState().addContextFiles(["/some/deep/path/myfile.ts"]);
-      expect(useChatStore.getState().contextFiles[0].name).toBe("myfile.ts");
+      expect(useChatStore.getState().contextFiles[0]!.name).toBe("myfile.ts");
     });
 
     it("skips duplicate paths", async () => {
@@ -100,8 +100,8 @@ describe("chat-store", () => {
       mockReadFile.mockResolvedValue(longContent);
       await useChatStore.getState().addContextFiles(["/big.txt"]);
       const file = useChatStore.getState().contextFiles[0];
-      expect(file.content.length).toBeLessThan(60_000);
-      expect(file.content).toContain("... (truncated)");
+      expect(file!.content.length).toBeLessThan(60_000);
+      expect(file!.content).toContain("... (truncated)");
     });
 
     it("handles file read errors gracefully", async () => {

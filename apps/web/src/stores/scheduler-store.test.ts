@@ -383,7 +383,7 @@ describe("scheduler-store", () => {
       await useSchedulerStore.getState().updateSchedule("s1", { prompt: "Updated prompt" });
 
       expect(mockSaveSchedule).toHaveBeenCalledTimes(1);
-      const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
+      const savedSchedule = mockSaveSchedule.mock.calls[0]![0] as ScheduleData;
       expect(savedSchedule.prompt).toBe("Updated prompt");
 
       const inMemory = useSchedulerStore.getState().schedules.find((s) => s.id === "s1");
@@ -437,7 +437,7 @@ describe("scheduler-store", () => {
       await useSchedulerStore.getState().createSchedule("Daily Check");
 
       expect(mockSaveSchedule).toHaveBeenCalledTimes(1);
-      const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
+      const savedSchedule = mockSaveSchedule.mock.calls[0]![0] as ScheduleData;
       expect(savedSchedule.name).toBe("Daily Check");
       expect(savedSchedule.cron).toBe("0 9 * * *");
       expect(savedSchedule.enabled).toBe(false);
@@ -449,7 +449,7 @@ describe("scheduler-store", () => {
       await useSchedulerStore.getState().createSchedule("My Schedule");
 
       expect(mockSaveSchedule).toHaveBeenCalledTimes(1);
-      const basePath = mockSaveSchedule.mock.calls[0][1] as string;
+      const basePath = mockSaveSchedule.mock.calls[0]![1] as string;
       expect(basePath).toBe("/mock-data/scheduler");
     });
 
@@ -461,7 +461,7 @@ describe("scheduler-store", () => {
       await useSchedulerStore.getState().createSchedule("Nested Schedule", "folder-1");
 
       expect(mockSaveSchedule).toHaveBeenCalledTimes(1);
-      const basePath = mockSaveSchedule.mock.calls[0][1] as string;
+      const basePath = mockSaveSchedule.mock.calls[0]![1] as string;
       expect(basePath).toBe("/mock-data/scheduler/folder-1");
     });
 
@@ -481,7 +481,7 @@ describe("scheduler-store", () => {
 
       await useSchedulerStore.getState().createSchedule("Defaults Check");
 
-      const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
+      const savedSchedule = mockSaveSchedule.mock.calls[0]![0] as ScheduleData;
       expect(savedSchedule.agentId).toBe("default");
       expect(savedSchedule.prompt).toBe("");
       expect(savedSchedule.hasError).toBe(false);
@@ -498,7 +498,7 @@ describe("scheduler-store", () => {
 
       await useSchedulerStore.getState().createSchedule("Orphan", "nonexistent-folder");
 
-      const basePath = mockSaveSchedule.mock.calls[0][1] as string;
+      const basePath = mockSaveSchedule.mock.calls[0]![1] as string;
       expect(basePath).toBe("/mock-data/scheduler");
     });
   });
@@ -621,7 +621,7 @@ describe("scheduler-store", () => {
 
       await useSchedulerStore.getState().updateSchedule("s1", { enabled: true });
 
-      const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
+      const savedSchedule = mockSaveSchedule.mock.calls[0]![0] as ScheduleData;
       expect(savedSchedule.nextRun).toBe("2025-06-01T09:00:00.000Z");
       expect(savedSchedule.enabled).toBe(true);
     });
@@ -637,7 +637,7 @@ describe("scheduler-store", () => {
 
       await useSchedulerStore.getState().updateSchedule("s1", { enabled: false });
 
-      const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
+      const savedSchedule = mockSaveSchedule.mock.calls[0]![0] as ScheduleData;
       expect(savedSchedule.nextRun).toBeNull();
       expect(savedSchedule.enabled).toBe(false);
     });
@@ -654,7 +654,7 @@ describe("scheduler-store", () => {
       await useSchedulerStore.getState().updateSchedule("s1", { cron: "0 12 * * *" });
 
       expect(mockCronParse).toHaveBeenCalledWith("0 12 * * *");
-      const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
+      const savedSchedule = mockSaveSchedule.mock.calls[0]![0] as ScheduleData;
       expect(savedSchedule.nextRun).toBe("2025-06-01T09:00:00.000Z");
     });
 
@@ -670,7 +670,7 @@ describe("scheduler-store", () => {
 
       await useSchedulerStore.getState().updateSchedule("s1", { cron: "bad cron" });
 
-      const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
+      const savedSchedule = mockSaveSchedule.mock.calls[0]![0] as ScheduleData;
       expect(savedSchedule.nextRun).toBeNull();
     });
 
@@ -698,7 +698,7 @@ describe("scheduler-store", () => {
 
       await useSchedulerStore.getState().updateSchedule("s1", { name: "Renamed" });
 
-      const folderPath = mockSaveSchedule.mock.calls[0][1] as string;
+      const folderPath = mockSaveSchedule.mock.calls[0]![1] as string;
       expect(folderPath).toBe("/mock-data/scheduler/deep/folder");
     });
 
@@ -713,7 +713,7 @@ describe("scheduler-store", () => {
 
       await useSchedulerStore.getState().updateSchedule("s1", { prompt: "New" });
 
-      const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
+      const savedSchedule = mockSaveSchedule.mock.calls[0]![0] as ScheduleData;
       expect(savedSchedule.updatedAt).not.toBe("2020-01-01T00:00:00.000Z");
     });
   });
@@ -733,7 +733,7 @@ describe("scheduler-store", () => {
 
       await useSchedulerStore.getState().renameSchedule("s1", "New Name");
 
-      const savedSchedule = mockSaveSchedule.mock.calls[0][0] as ScheduleData;
+      const savedSchedule = mockSaveSchedule.mock.calls[0]![0] as ScheduleData;
       expect(savedSchedule.name).toBe("New Name");
     });
   });

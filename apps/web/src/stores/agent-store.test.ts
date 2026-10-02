@@ -86,15 +86,15 @@ describe("agent-store", () => {
       useAgentStore.getState().createAgent(newAgent);
       const agents = useAgentStore.getState().agents;
       expect(agents).toHaveLength(5);
-      expect(agents[4].name).toBe("NewAgent");
+      expect(agents[4]!.name).toBe("NewAgent");
     });
 
     it("appends to the end", () => {
       useAgentStore.getState().createAgent(makeAgent("First"));
       useAgentStore.getState().createAgent(makeAgent("Second"));
       const agents = useAgentStore.getState().agents;
-      expect(agents[agents.length - 1].name).toBe("Second");
-      expect(agents[agents.length - 2].name).toBe("First");
+      expect(agents[agents.length - 1]!.name).toBe("Second");
+      expect(agents[agents.length - 2]!.name).toBe("First");
     });
   });
 
@@ -166,7 +166,7 @@ describe("agent-store", () => {
       );
       await useAgentStore.getState().loadAgentsFromDisk();
       const agents = useAgentStore.getState().agents;
-      expect(agents[0].name).toBe("default");
+      expect(agents[0]!.name).toBe("default");
       expect(agents).toHaveLength(3);
     });
 
@@ -231,9 +231,9 @@ describe("agent-store", () => {
       );
       await useAgentStore.getState().loadAgentsFromDisk();
       const agents = useAgentStore.getState().agents;
-      expect(agents[0].name).toBe("default");
-      expect(agents[1].name).toBe("Alpha");
-      expect(agents[2].name).toBe("Zeta");
+      expect(agents[0]!.name).toBe("default");
+      expect(agents[1]!.name).toBe("Alpha");
+      expect(agents[2]!.name).toBe("Zeta");
     });
   });
 });

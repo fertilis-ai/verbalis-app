@@ -443,7 +443,7 @@ describe("settings-store", () => {
       useSettingsStore.setState({ selectedModels: [existing] });
       useSettingsStore.getState().addSelectedModels([existing, newModel]);
       expect(useSettingsStore.getState().selectedModels).toHaveLength(2);
-      expect(useSettingsStore.getState().selectedModels[1].id).toBe("m2");
+      expect(useSettingsStore.getState().selectedModels[1]!.id).toBe("m2");
     });
 
     it("removeSelectedModels removes by ID", () => {
@@ -454,7 +454,7 @@ describe("settings-store", () => {
       useSettingsStore.setState({ selectedModels: models, defaultModel: "m1" });
       useSettingsStore.getState().removeSelectedModels(["m1"]);
       expect(useSettingsStore.getState().selectedModels).toHaveLength(1);
-      expect(useSettingsStore.getState().selectedModels[0].id).toBe("m2");
+      expect(useSettingsStore.getState().selectedModels[0]!.id).toBe("m2");
     });
 
     it("removeSelectedModels resets defaultModel if removed", () => {

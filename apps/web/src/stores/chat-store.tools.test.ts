@@ -39,7 +39,7 @@ describe("chat-store", () => {
         toolCall: { id: "tc1", name: "read_file", arguments: { path: "a" }, status: "success", result: "ok" },
       });
 
-      const tc = useChatStore.getState().conversations[0].messages[0].toolCalls![0];
+      const tc = useChatStore.getState().conversations[0]!.messages[0]!.toolCalls![0];
       expect(tc).toMatchObject({ status: "success", result: "ok", riskLevel: "low" });
     });
 
@@ -53,7 +53,7 @@ describe("chat-store", () => {
         toolCall: { id: "tc9", name: "write_file", arguments: {}, status: "pending_confirmation" },
       });
 
-      const calls = useChatStore.getState().conversations[0].messages[0].toolCalls!;
+      const calls = useChatStore.getState().conversations[0]!.messages[0]!.toolCalls!;
       expect(calls.map((tc) => tc.id)).toEqual(["tc9"]);
     });
 
@@ -74,7 +74,7 @@ describe("chat-store", () => {
         toolCall: { id: "tc1", name: "t", arguments: {}, status: "error", error: "boom" },
       });
 
-      expect(useChatStore.getState().ghostConversation!.messages[0].toolCalls![0]).toMatchObject({
+      expect(useChatStore.getState().ghostConversation!.messages[0]!.toolCalls![0]).toMatchObject({
         status: "error",
         error: "boom",
       });
@@ -90,7 +90,7 @@ describe("chat-store", () => {
 
       publish({ type: "loop_ended", conversationId: "c1" });
 
-      expect(useChatStore.getState().conversations[0].messages[0].toolCalls![0].status).toBe("stopped");
+      expect(useChatStore.getState().conversations[0]!.messages[0]!.toolCalls![0]!.status).toBe("stopped");
     });
   });
 
@@ -114,10 +114,10 @@ describe("chat-store", () => {
 
       useChatStore.getState().markToolCallsStopped("c1");
 
-      const updated = useChatStore.getState().conversations[0].messages[0];
-      expect(updated.toolCalls![0].status).toBe("stopped");
-      expect(updated.toolCalls![1].status).toBe("stopped");
-      expect(updated.toolCalls![2].status).toBe("success"); // unchanged
+      const updated = useChatStore.getState().conversations[0]!.messages[0];
+      expect(updated!.toolCalls![0]!.status).toBe("stopped");
+      expect(updated!.toolCalls![1]!.status).toBe("stopped");
+      expect(updated!.toolCalls![2]!.status).toBe("success"); // unchanged
     });
 
     it("does not modify conversations without the matching id", () => {
@@ -131,8 +131,8 @@ describe("chat-store", () => {
 
       useChatStore.getState().markToolCallsStopped("c-other");
 
-      const unchanged = useChatStore.getState().conversations[0].messages[0];
-      expect(unchanged.toolCalls![0].status).toBe("pending");
+      const unchanged = useChatStore.getState().conversations[0]!.messages[0];
+      expect(unchanged!.toolCalls![0]!.status).toBe("pending");
     });
 
     it("marks ghost conversation tool calls as stopped", () => {
@@ -150,7 +150,7 @@ describe("chat-store", () => {
       useChatStore.getState().markToolCallsStopped("ghost-1");
 
       const updated = useChatStore.getState().ghostConversation!.messages[0];
-      expect(updated.toolCalls![0].status).toBe("stopped");
+      expect(updated!.toolCalls![0]!.status).toBe("stopped");
     });
 
     it("does not change messages without tool calls", () => {
@@ -160,9 +160,9 @@ describe("chat-store", () => {
 
       useChatStore.getState().markToolCallsStopped("c1");
 
-      const unchanged = useChatStore.getState().conversations[0].messages[0];
-      expect(unchanged.toolCalls).toBeUndefined();
-      expect(unchanged.content).toBe("Hello");
+      const unchanged = useChatStore.getState().conversations[0]!.messages[0];
+      expect(unchanged!.toolCalls).toBeUndefined();
+      expect(unchanged!.content).toBe("Hello");
     });
 
     it("marks pending_confirmation tool calls as stopped", () => {
@@ -178,8 +178,8 @@ describe("chat-store", () => {
 
       useChatStore.getState().markToolCallsStopped("c1");
 
-      const updated = useChatStore.getState().conversations[0].messages[0];
-      expect(updated.toolCalls![0].status).toBe("stopped");
+      const updated = useChatStore.getState().conversations[0]!.messages[0];
+      expect(updated!.toolCalls![0]!.status).toBe("stopped");
     });
 
     it("handles multiple messages in conversation", () => {
@@ -199,8 +199,8 @@ describe("chat-store", () => {
       useChatStore.getState().markToolCallsStopped("c1");
 
       const updated = useChatStore.getState().conversations[0];
-      expect(updated.messages[0].toolCalls![0].status).toBe("stopped");
-      expect(updated.messages[1].toolCalls![0].status).toBe("stopped");
+      expect(updated!.messages[0]!.toolCalls![0]!.status).toBe("stopped");
+      expect(updated!.messages[1]!.toolCalls![0]!.status).toBe("stopped");
     });
 
     it("does not modify ghost conversation when id doesn't match", () => {
@@ -218,7 +218,7 @@ describe("chat-store", () => {
       useChatStore.getState().markToolCallsStopped("different-id");
 
       const unchanged = useChatStore.getState().ghostConversation!.messages[0];
-      expect(unchanged.toolCalls![0].status).toBe("pending");
+      expect(unchanged!.toolCalls![0]!.status).toBe("pending");
     });
   });
 
@@ -271,7 +271,7 @@ describe("chat-store", () => {
 
       useChatStore.getState().rejectToolExecution("tc-1");
 
-      const updated = useChatStore.getState().conversations[0].messages[0].toolCalls?.[0];
+      const updated = useChatStore.getState().conversations[0]!.messages[0]!.toolCalls?.[0];
       expect(updated?.status).toBe("cancelled");
       expect(updated?.error).toBe("Rejected by user");
     });

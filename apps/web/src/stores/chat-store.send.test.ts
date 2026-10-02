@@ -185,8 +185,8 @@ describe("chat-store", () => {
       const state = useChatStore.getState();
       expect(state.isStreaming).toBe(false);
       // The error message should be in the assistant's content
-      const lastMsg = state.conversations[0].messages[state.conversations[0].messages.length - 1];
-      expect(lastMsg.content).toContain("Rate limited");
+      const lastMsg = state.conversations[0]!.messages[state.conversations[0]!.messages.length - 1];
+      expect(lastMsg!.content).toContain("Rate limited");
     });
 
     it("shows error when model not found and no API key", async () => {
@@ -209,9 +209,9 @@ describe("chat-store", () => {
       await useChatStore.getState().sendMessage("Hello");
 
       const state = useChatStore.getState();
-      const lastMsg = state.conversations[0].messages[state.conversations[0].messages.length - 1];
-      expect(lastMsg.role).toBe("assistant");
-      expect(lastMsg.content).toContain("Unknown model");
+      const lastMsg = state.conversations[0]!.messages[state.conversations[0]!.messages.length - 1];
+      expect(lastMsg!.role).toBe("assistant");
+      expect(lastMsg!.content).toContain("Unknown model");
     });
 
     it("shows error when local LLM is disabled", async () => {
@@ -232,8 +232,8 @@ describe("chat-store", () => {
       await useChatStore.getState().sendMessage("Hello");
 
       const state = useChatStore.getState();
-      const lastMsg = state.conversations[0].messages[state.conversations[0].messages.length - 1];
-      expect(lastMsg.content).toContain("Local LLM is disabled");
+      const lastMsg = state.conversations[0]!.messages[state.conversations[0]!.messages.length - 1];
+      expect(lastMsg!.content).toContain("Local LLM is disabled");
     });
   });
 
@@ -277,7 +277,7 @@ describe("chat-store", () => {
       await useChatStore.getState().sendMessageToConversation("c1", "Hello");
       const state = useChatStore.getState();
       // Messages should exist
-      expect(state.conversations[0].messages.length).toBeGreaterThanOrEqual(2); // user + assistant
+      expect(state.conversations[0]!.messages.length).toBeGreaterThanOrEqual(2); // user + assistant
     });
 
     it("does nothing if conversation not found", async () => {

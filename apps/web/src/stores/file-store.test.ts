@@ -138,7 +138,7 @@ describe("file-store", () => {
 
       getState().toggleDirectory("/src");
 
-      expect(getState().tree[0].isExpanded).toBe(true);
+      expect(getState().tree[0]!.isExpanded).toBe(true);
     });
 
     it("toggles back to collapsed", () => {
@@ -150,7 +150,7 @@ describe("file-store", () => {
 
       getState().toggleDirectory("/src");
 
-      expect(getState().tree[0].isExpanded).toBe(false);
+      expect(getState().tree[0]!.isExpanded).toBe(false);
     });
 
     it("toggles nested nodes", () => {
@@ -170,7 +170,7 @@ describe("file-store", () => {
 
       getState().toggleDirectory("/src/lib");
 
-      expect(getState().tree[0].children![0].isExpanded).toBe(true);
+      expect(getState().tree[0]!.children![0]!.isExpanded).toBe(true);
     });
   });
 
@@ -190,10 +190,10 @@ describe("file-store", () => {
 
       const tree = getState().tree;
       expect(tree).toHaveLength(3);
-      expect(tree[0].name).toBe("a-dir");
-      expect(tree[0].isDirectory).toBe(true);
-      expect(tree[1].name).toBe("a.ts");
-      expect(tree[2].name).toBe("b.ts");
+      expect(tree[0]!.name).toBe("a-dir");
+      expect(tree[0]!.isDirectory).toBe(true);
+      expect(tree[1]!.name).toBe("a.ts");
+      expect(tree[2]!.name).toBe("b.ts");
     });
 
     it("handles errors gracefully", async () => {
@@ -241,11 +241,11 @@ describe("file-store", () => {
       expect(mockReadFile).toHaveBeenCalledWith("/test/hello.ts");
       const { openFiles, activeFilePath, selectedFile, fileContent } = getState();
       expect(openFiles).toHaveLength(1);
-      expect(openFiles[0].path).toBe("/test/hello.ts");
-      expect(openFiles[0].originalContent).toBe("file content");
-      expect(openFiles[0].currentContent).toBe("file content");
-      expect(openFiles[0].isModified).toBe(false);
-      expect(openFiles[0].language).toBe("typescript");
+      expect(openFiles[0]!.path).toBe("/test/hello.ts");
+      expect(openFiles[0]!.originalContent).toBe("file content");
+      expect(openFiles[0]!.currentContent).toBe("file content");
+      expect(openFiles[0]!.isModified).toBe(false);
+      expect(openFiles[0]!.language).toBe("typescript");
       expect(activeFilePath).toBe("/test/hello.ts");
       expect(selectedFile).toBe("/test/hello.ts");
       expect(fileContent).toBe("file content");
@@ -255,14 +255,14 @@ describe("file-store", () => {
       mockReadFile.mockResolvedValue("");
 
       await getState().openFile("/test/script.py");
-      expect(getState().openFiles[0].language).toBe("python");
+      expect(getState().openFiles[0]!.language).toBe("python");
     });
 
     it("uses plaintext for unknown extensions", async () => {
       mockReadFile.mockResolvedValue("");
 
       await getState().openFile("/test/data.xyz");
-      expect(getState().openFiles[0].language).toBe("plaintext");
+      expect(getState().openFiles[0]!.language).toBe("plaintext");
     });
 
     it("activates already-open file without duplicating", async () => {
@@ -385,8 +385,8 @@ describe("file-store", () => {
       getState().updateFileContent("/a.ts", "changed");
 
       const file = getState().openFiles[0];
-      expect(file.currentContent).toBe("changed");
-      expect(file.isModified).toBe(true);
+      expect(file!.currentContent).toBe("changed");
+      expect(file!.isModified).toBe(true);
       expect(getState().fileContent).toBe("changed");
     });
 
@@ -398,7 +398,7 @@ describe("file-store", () => {
 
       getState().updateFileContent("/a.ts", "original");
 
-      expect(getState().openFiles[0].isModified).toBe(false);
+      expect(getState().openFiles[0]!.isModified).toBe(false);
     });
 
     it("does not update fileContent for non-active file", () => {
@@ -427,8 +427,8 @@ describe("file-store", () => {
 
       expect(mockWriteFile).toHaveBeenCalledWith("/a.ts", "saved");
       const file = getState().openFiles[0];
-      expect(file.originalContent).toBe("saved");
-      expect(file.isModified).toBe(false);
+      expect(file!.originalContent).toBe("saved");
+      expect(file!.isModified).toBe(false);
     });
 
     it("does nothing for non-existent file", async () => {
@@ -445,7 +445,7 @@ describe("file-store", () => {
       await getState().saveFile("/a.ts");
 
       // Should not crash; file stays modified
-      expect(getState().openFiles[0].isModified).toBe(true);
+      expect(getState().openFiles[0]!.isModified).toBe(true);
     });
   });
 
@@ -523,7 +523,7 @@ describe("file-store", () => {
       await getState().renameItem("/root/old.ts", "new.ts");
 
       expect(mockRenamePath).toHaveBeenCalledWith("/root/old.ts", "/root/new.ts");
-      expect(getState().openFiles[0].path).toBe("/root/new.ts");
+      expect(getState().openFiles[0]!.path).toBe("/root/new.ts");
       expect(getState().activeFilePath).toBe("/root/new.ts");
       expect(getState().selectedFile).toBe("/root/new.ts");
     });

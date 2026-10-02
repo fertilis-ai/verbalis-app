@@ -138,9 +138,9 @@ describe("chat-store", () => {
       const state = useChatStore.getState();
       expect(state.chatTree).toEqual([chatNode]);
       expect(state.conversations).toHaveLength(1);
-      expect(state.conversations[0].id).toBe("chat-from-disk");
-      expect(state.conversations[0].title).toBe("Disk Chat Title");
-      expect(state.conversations[0].path).toBe("/mock-data/chats/chat-from-disk.json");
+      expect(state.conversations[0]!.id).toBe("chat-from-disk");
+      expect(state.conversations[0]!.title).toBe("Disk Chat Title");
+      expect(state.conversations[0]!.path).toBe("/mock-data/chats/chat-from-disk.json");
     });
 
     it("preserves in-memory messages when syncing from tree", async () => {
@@ -157,7 +157,7 @@ describe("chat-store", () => {
 
       const updated = useChatStore.getState().conversations.find((c) => c.id === "c1");
       expect(updated?.messages).toHaveLength(1);
-      expect(updated?.messages[0].content).toBe("In memory");
+      expect(updated?.messages[0]?.content).toBe("In memory");
     });
 
     it("keeps in-memory-only conversations that are not on disk", async () => {
@@ -191,7 +191,7 @@ describe("chat-store", () => {
 
       const state = useChatStore.getState();
       expect(state.conversations).toHaveLength(1);
-      expect(state.conversations[0].id).toBe("nested-chat");
+      expect(state.conversations[0]!.id).toBe("nested-chat");
     });
 
     it("uses 'Untitled' for chats without a title", async () => {
@@ -200,7 +200,7 @@ describe("chat-store", () => {
 
       await useChatStore.getState().loadChatsFromDisk();
 
-      expect(useChatStore.getState().conversations[0].title).toBe("Untitled");
+      expect(useChatStore.getState().conversations[0]!.title).toBe("Untitled");
     });
 
     it("handles loadChatTree failure gracefully", async () => {

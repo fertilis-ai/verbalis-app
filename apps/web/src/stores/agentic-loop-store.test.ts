@@ -417,7 +417,7 @@ describe("agentic-loop-store", () => {
       const s = useAgenticLoopStore.getState();
       expect(s.currentStatus).toBe("tool_pending");
       expect(s.pendingToolCalls).toHaveLength(1);
-      expect(s.pendingToolCalls[0].id).toBe("tc-1");
+      expect(s.pendingToolCalls[0]!.id).toBe("tc-1");
     });
 
     it("tool_confirmed removes from pending", () => {
