@@ -382,9 +382,31 @@ describe("settings-store", () => {
       expect(useSettingsStore.getState().apiKeys.openai).toBe("");
     });
 
-    it("calls storeApiKey for keychain storage", () => {
-      useSettingsStore.getState().setApiKey("openai", "sk-openai");
-      expect(mockStoreApiKey).toHaveBeenCalledWith("openai", "sk-openai");
+    it("calls storeApiKey for keychain storage after a debounce", () => {
+      vi.useFakeTimers();
+      try {
+        useSettingsStore.getState().setApiKey("openai", "sk-openai");
+        expect(mockStoreApiKey).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(600);
+        expect(mockStoreApiKey).toHaveBeenCalledWith("openai", "sk-openai");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("writes the keychain once for rapid edits, with the last value", () => {
+      vi.useFakeTimers();
+      try {
+        const { setApiKey } = useSettingsStore.getState();
+        setApiKey("openai", "s");
+        setApiKey("openai", "sk");
+        setApiKey("openai", "sk-final");
+        vi.advanceTimersByTime(600);
+        expect(mockStoreApiKey).toHaveBeenCalledTimes(1);
+        expect(mockStoreApiKey).toHaveBeenCalledWith("openai", "sk-final");
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("handles all providers", () => {

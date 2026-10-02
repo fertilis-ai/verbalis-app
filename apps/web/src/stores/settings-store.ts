@@ -128,6 +128,24 @@ interface SettingsState {
   exportGuardrailsConfig: () => string;
 }
 
+// Keychain writes are debounced per provider so typing a key doesn't hit the OS
+// keychain on every keystroke; on macOS each access can be a password prompt.
+const KEYCHAIN_WRITE_DELAY_MS = 600;
+const pendingKeychainWrites = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleKeychainWrite(provider: string, key: string): void {
+  clearTimeout(pendingKeychainWrites.get(provider));
+  pendingKeychainWrites.set(
+    provider,
+    setTimeout(() => {
+      pendingKeychainWrites.delete(provider);
+      storeApiKey(provider, key).catch((err) => {
+        console.warn("[settings] Failed to store key in keychain:", err);
+      });
+    }, KEYCHAIN_WRITE_DELAY_MS),
+  );
+}
+
 // Shape checks for the persisted settings, one per field. A field that fails
 // is dropped so the default refills it; the rest of the state is kept. Nested
 // objects and arrays are checked only for their outer type. Unknown keys pass
@@ -232,9 +250,7 @@ export const useSettingsStore = create<SettingsState>()(
         set((state) => ({
           apiKeys: { ...state.apiKeys, [provider]: key },
         }));
-        storeApiKey(provider, key).catch((err) => {
-          console.warn("[settings] Failed to store key in keychain:", err);
-        });
+        scheduleKeychainWrite(provider, key);
       },
       setLocalLLM: (updates) =>
         set((state) => ({

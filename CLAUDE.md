@@ -64,4 +64,4 @@ packaged build — `cd apps/web && bunx tauri build --bundles dmg` — not just 
 - Bun is the package manager - do not use npm/yarn/pnpm
 - The `routeTree.gen.ts` file is auto-generated - never edit manually
 - Use `bunx tauri icon ~/assets/fertilis_logo_white.png` to generate app icons
-- Use `bunx tauri build --bundles dmg` to bundle a new mac release (.dmg)
+- Use `APPLE_SIGNING_IDENTITY="Verbalis Local Signing" bunx tauri build --bundles dmg` to bundle a new mac release (.dmg). Create the "Verbalis Local Signing" Code Signing cert in Keychain Access first. A stable identity should keep macOS keychain "Always Allow" valid across builds (not yet verified); an ad-hoc signed build gets a new code identity every time and re-prompts for the keychain password
