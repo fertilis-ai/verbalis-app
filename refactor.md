@@ -284,11 +284,18 @@ Packaged smoke test (2026-10-01). Before the run, broken and edge-case fixtures 
 - A live chat ran an `http_fetch` tool call through `http_request`: status 200 and the full body in 137ms. The chat was saved.
 - Afterwards the fixtures and the smoke chat were removed. `~/.verbalis` matched the backup, apart from logs.
 
-Not covered in this run:
-- A schedule Run now, selecting a schedule, and a task run. A relaunch for them was blocked by the macOS keychain password prompt.
-- A tool confirmation. Guardrails are off (YOLO) in this profile, so the live tool call ran without one.
-- Voice, read-aloud and image generation. Phase 6 doesn't touch their code paths or the CSP; the moved Rust commands were checked through the log viewer, keychain, fs and HTTP items above.
-- `loadSchedule`, the per-schedule load used by the scheduler tick, is covered by the unit tests (a legacy valid file, malformed YAML, and a non-boolean `enabled`).
+A second packaged run (2026-10-01, the same `Verbalis.app`, from a fresh backup of `~/.verbalis`) covered the remaining smoke items. Every item passed except voice, which was only partly checked:
+- Selecting the real schedule opened it in the form (the `resolveScheduleAgentId` path). The Agent select stays empty until the Toolbox has been opened once, because Toolbox items load lazily. That's pre-existing, not a Phase 6 change.
+- Run now on a throwaway schedule: `scheduler.txt` logged Starting and Completed, `lastRun` was saved, and the preview showed the reply.
+- A task run on a throwaway backlog: `tasks.txt` logged Starting and Completed, and the task ended `stage: done`, `resultStatus: success`.
+- A tool confirmation, with the Normal guardrails preset: `write_file` waited for approval. Accept wrote the file; Decline gave "Rejected by user" and a Cancelled status. The Normal preset also switches `userMode` to `normal` and replaces the blocklists, so restore `config.yaml` afterwards.
+- Read-aloud, with ZDR on, started playback.
+- Image generation, with ZDR on: the provider refused the first two prompts; the third rendered. Save As wrote a byte-identical copy, and Show in Folder opened Finder with the file selected in `~/.verbalis/images`.
+- Voice, partly checked: macOS asked for microphone access on first use of this build. The packaged build recorded, and the transcript reached the chat input. But the transcript was speech in the room, not the played test phrase, and a second take with the phrase wasn't checked, because someone else was using the app at the time. In a third run, two more takes again reached the input but neither contained the requested phrase, and the two transcripts were nearly the same. So it's still open whether the mic captured real speech or the model invented text from near-silence. A test phrase played through the Mac's own speakers can't be used: `getUserMedia({ audio: true })` keeps WebKit's echo cancellation on, which removes the Mac's output from the recording. Finishing this needs someone speaking.
+- The editors (Toolbox and Workspace, with highlighting) were covered in the first run.
+- Afterwards the throwaway schedule, backlog, chat and image were removed and `config.yaml` was restored. `~/.verbalis` matched the backup, apart from logs.
+
+`loadSchedule`, the per-schedule load used by the scheduler tick, is covered by the unit tests (a legacy valid file, malformed YAML, and a non-boolean `enabled`).
 
 ## Phase 8: Tooling and tests
 - **Strict TS config.** Make `apps/web/tsconfig.json` extend `@verbalis-app/config/tsconfig.base.json` (`noUncheckedIndexedAccess`, `noUnused*`) and fix the resulting errors. This can run in parallel with earlier phases, one directory at a time.
