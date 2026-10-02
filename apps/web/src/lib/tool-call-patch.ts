@@ -56,10 +56,10 @@ export function upsertToolCall(c: Conversation, toolCall: ToolCallState): Conver
   });
   if (!found) {
     const lastIdx = messages.length - 1;
-    if (lastIdx >= 0 && messages[lastIdx].role === "assistant") {
+    if (lastIdx >= 0 && messages[lastIdx]!.role === "assistant") {
       messages[lastIdx] = {
-        ...messages[lastIdx],
-        toolCalls: [...(messages[lastIdx].toolCalls ?? []), toolCall],
+        ...messages[lastIdx]!,
+        toolCalls: [...(messages[lastIdx]!.toolCalls ?? []), toolCall],
       };
     }
   }

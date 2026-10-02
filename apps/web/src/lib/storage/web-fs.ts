@@ -94,7 +94,7 @@ export function webReadDirectory(dirPath: string): WebFileNode[] {
   const results: WebFileNode[] = [];
   const seen = new Set<string>();
 
-  for (const [path, entry] of Object.entries(vfs)) {
+  for (const [path, _entry] of Object.entries(vfs)) {
     // Check if this path is a direct child of dirPath
     if (path.startsWith(`${normalizedDir}/`)) {
       const relativePath = path.substring(normalizedDir.length + 1);

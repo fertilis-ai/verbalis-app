@@ -372,7 +372,6 @@ export class VerbalisAgentAdapter {
     // Run the agent loop
     const eventStream = agentLoop(prompts, context, loopConfig, this.abortController?.signal);
 
-    let currentAssistantContent = "";
     const toolCallsInIteration: ToolCallState[] = [];
 
     try {
@@ -386,7 +385,7 @@ export class VerbalisAgentAdapter {
         await this.handleAgentEvent(
           event,
           iteration,
-          (content) => { currentAssistantContent = content; },
+          () => {},
           toolCallsInIteration
         );
       }
@@ -397,7 +396,7 @@ export class VerbalisAgentAdapter {
       }
 
       // Get final result
-      const result = await eventStream.result;
+      await eventStream.result;
 
       if (this.abortController?.signal.aborted || this.loopContext.status === "aborted") {
         return this.getMessagesCallback!();
@@ -682,8 +681,8 @@ export class VerbalisAgentAdapter {
     return async (
       toolCallId: string,
       params: Static<TSchema>,
-      signal?: AbortSignal,
-      onUpdate?: AgentToolUpdateCallback
+      _signal?: AbortSignal,
+      _onUpdate?: AgentToolUpdateCallback
     ): Promise<AgentToolResult<unknown>> => {
       const config = this.config!;
       const evaluator = getGuardrailsEvaluator(config.guardrailsConfig);

@@ -62,7 +62,7 @@ export function encodeWav(audio: PcmSource): ArrayBuffer {
   view.setUint32(40, length * 2, true);
   for (let i = 0; i < length; i++) {
     let sample = 0;
-    for (const channel of channels) sample += channel[i];
+    for (const channel of channels) sample += channel[i]!;
     sample = Math.max(-1, Math.min(1, sample / Math.max(1, numberOfChannels)));
     view.setInt16(44 + i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
   }

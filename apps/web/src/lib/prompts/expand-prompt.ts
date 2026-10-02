@@ -18,7 +18,7 @@ export interface SlashCommand {
 export function parseSlashCommand(input: string): SlashCommand | null {
   const match = input.match(/^\/([A-Za-z0-9_-]+)(?:\s+([\s\S]*))?$/);
   if (!match) return null;
-  return { name: match[1], rest: (match[2] ?? "").trim() };
+  return { name: match[1]!, rest: (match[2] ?? "").trim() };
 }
 
 /** Substitute every `{{input}}` placeholder with the provided text. */

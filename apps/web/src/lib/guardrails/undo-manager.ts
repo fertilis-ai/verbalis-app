@@ -334,7 +334,7 @@ class UndoManager {
         // Extract timestamp from filename
         const match = file.match(/^(\d+)_/);
         if (match) {
-          const timestamp = parseInt(match[1], 10);
+          const timestamp = parseInt(match[1]!, 10);
           if (now - timestamp > maxAge) {
             await commands.deletePath(`${trashDir}/${file}`);
           }

@@ -13,8 +13,8 @@ import type { Conversation, Message } from "@/lib/types/chat";
 export function updateLastAssistantMessage(messages: Message[], updates: Partial<Message>): Message[] {
   const result = [...messages];
   const lastIdx = result.length - 1;
-  if (lastIdx >= 0 && result[lastIdx].role === "assistant") {
-    result[lastIdx] = { ...result[lastIdx], ...updates };
+  if (lastIdx >= 0 && result[lastIdx]!.role === "assistant") {
+    result[lastIdx] = { ...result[lastIdx]!, ...updates };
   }
   return result;
 }
@@ -46,13 +46,13 @@ export function applyAdapterEvent(c: Conversation, event: AgentLoopEvent, now = 
       };
     case "thinking_completed": {
       const lastIdx = c.messages.length - 1;
-      if (lastIdx < 0 || c.messages[lastIdx].role !== "assistant") return c;
+      if (lastIdx < 0 || c.messages[lastIdx]!.role !== "assistant") return c;
       const messages = [...c.messages];
       messages[lastIdx] = {
-        ...messages[lastIdx],
+        ...messages[lastIdx]!,
         content: event.content,
         ...(event.toolCalls.length > 0
-          ? { toolCalls: mergeToolCalls(messages[lastIdx].toolCalls ?? [], event.toolCalls) }
+          ? { toolCalls: mergeToolCalls(messages[lastIdx]!.toolCalls ?? [], event.toolCalls) }
           : {}),
       };
       return { ...c, messages, updatedAt: now };

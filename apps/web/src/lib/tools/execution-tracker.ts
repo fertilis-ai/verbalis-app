@@ -354,7 +354,7 @@ class ExecutionTracker {
     entries.sort((a, b) => a[1].queuedAt.getTime() - b[1].queuedAt.getTime());
     const removeCount = entries.length - this.maxRecords;
     for (let i = 0; i < removeCount; i++) {
-      this.records.delete(entries[i][0]);
+      this.records.delete(entries[i]![0]);
     }
   }
 

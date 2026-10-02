@@ -207,7 +207,7 @@ export class GuardrailsEvaluator {
       const parsed = new URL(url);
       domain = parsed.hostname + (parsed.port ? `:${parsed.port}` : "");
     } catch {
-      domain = url.replace(/^https?:\/\//, "").split("/")[0];
+      domain = url.replace(/^https?:\/\//, "").split("/")[0]!;
     }
     return this.checkRestriction(url, domain, this.config.domains, "blocked_domain");
   }

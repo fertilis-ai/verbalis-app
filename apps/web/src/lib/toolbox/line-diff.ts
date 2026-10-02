@@ -44,16 +44,16 @@ export function computeLineDiff(oldText: string, newText: string): DiffLine[] {
   const headStart = Math.max(0, start - CONTEXT_LINES);
   if (headStart > 0) lines.push({ type: "context", text: "⋯" });
   for (let i = headStart; i < start; i++) {
-    lines.push({ type: "context", text: oldLines[i] });
+    lines.push({ type: "context", text: oldLines[i]! });
   }
 
-  for (let i = start; i < oldEnd; i++) lines.push({ type: "removed", text: oldLines[i] });
-  for (let i = start; i < newEnd; i++) lines.push({ type: "added", text: newLines[i] });
+  for (let i = start; i < oldEnd; i++) lines.push({ type: "removed", text: oldLines[i]! });
+  for (let i = start; i < newEnd; i++) lines.push({ type: "added", text: newLines[i]! });
 
   // Trailing context (elide the rest)
   const tailEnd = Math.min(oldLines.length, oldEnd + CONTEXT_LINES);
   for (let i = oldEnd; i < tailEnd; i++) {
-    lines.push({ type: "context", text: oldLines[i] });
+    lines.push({ type: "context", text: oldLines[i]! });
   }
   if (tailEnd < oldLines.length) lines.push({ type: "context", text: "⋯" });
 

@@ -76,7 +76,7 @@ export function trimMessagesToBudget(params: TrimParams): TrimResult {
 
   // Normalise the window to start on a user message (without going below
   // minKeep / dropping the in-flight last message).
-  while (result.length > minKeep && result[0].role !== "user") {
+  while (result.length > minKeep && result[0]!.role !== "user") {
     result.shift();
     dropped++;
   }

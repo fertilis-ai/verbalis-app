@@ -189,9 +189,9 @@ function parseSearchResults(html: string, maxResults: number): SearchResult[] {
   let match: RegExpExecArray | null;
   while ((match = resultRegex.exec(html)) !== null && results.length < maxResults) {
     results.push({
-      url: match[1],
-      title: decodeHtmlEntities(match[2]),
-      snippet: decodeHtmlEntities(match[3]),
+      url: match[1]!,
+      title: decodeHtmlEntities(match[2]!),
+      snippet: decodeHtmlEntities(match[3]!),
     });
   }
 
@@ -208,7 +208,7 @@ function formatSearchResults(query: string, results: SearchResult[]): string {
   lines.push("");
 
   for (let i = 0; i < results.length; i++) {
-    const result = results[i];
+    const result = results[i]!;
     lines.push(`${i + 1}. ${result.title}`);
     lines.push(`   URL: ${result.url}`);
     lines.push(`   ${result.snippet}`);
@@ -221,7 +221,7 @@ function formatSearchResults(query: string, results: SearchResult[]): string {
 function parseWebpage(html: string, selector?: string): ScrapeResult {
   // Extract title
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  const title = titleMatch ? decodeHtmlEntities(titleMatch[1]) : "Untitled";
+  const title = titleMatch ? decodeHtmlEntities(titleMatch[1]!) : "Untitled";
 
   // Remove script and style tags
   let cleanHtml = html
@@ -236,13 +236,13 @@ function parseWebpage(html: string, selector?: string): ScrapeResult {
       const id = selector.slice(1);
       const match = cleanHtml.match(new RegExp(`<[^>]+id="${id}"[^>]*>([\\s\\S]*?)<\\/`, "i"));
       if (match) {
-        cleanHtml = match[1];
+        cleanHtml = match[1]!;
       }
     } else if (selector.startsWith(".")) {
       const className = selector.slice(1);
       const match = cleanHtml.match(new RegExp(`<[^>]+class="[^"]*${className}[^"]*"[^>]*>([\\s\\S]*?)<\\/`, "i"));
       if (match) {
-        cleanHtml = match[1];
+        cleanHtml = match[1]!;
       }
     }
   }
@@ -252,8 +252,8 @@ function parseWebpage(html: string, selector?: string): ScrapeResult {
   const links: string[] = [];
   let linkMatch: RegExpExecArray | null;
   while ((linkMatch = linkRegex.exec(cleanHtml)) !== null && links.length < 50) {
-    if (linkMatch[1].startsWith("http")) {
-      links.push(linkMatch[1]);
+    if (linkMatch[1]!.startsWith("http")) {
+      links.push(linkMatch[1]!);
     }
   }
 

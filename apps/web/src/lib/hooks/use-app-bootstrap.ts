@@ -44,7 +44,7 @@ export function useAppBootstrap(): boolean {
     if (!agentId && agents.length > 0) {
       // Restore the persisted agent selection if it still exists, else default.
       const persisted = useSettingsStore.getState().selectedAgentId;
-      const restored = persisted && agents.some((a) => a.name === persisted) ? persisted : agents[0].name;
+      const restored = persisted && agents.some((a) => a.name === persisted) ? persisted : agents[0]!.name;
       setAgentId(restored);
     }
   }, [initialized, agentId, agents, setAgentId]);

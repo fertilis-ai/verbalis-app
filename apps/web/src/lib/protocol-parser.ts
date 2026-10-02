@@ -54,9 +54,9 @@ export function parseProtocolMarkers(text: string): ParseResult {
   while ((match = constrainRegex.exec(text)) !== null) {
     const [fullMatch, toolName, jsonStr] = match;
     try {
-      const args = JSON.parse(jsonStr);
+      const args = JSON.parse(jsonStr!);
       toolCalls.push({
-        name: toolName,
+        name: toolName!,
         arguments: args,
         rawMatch: fullMatch,
       });
@@ -74,9 +74,9 @@ export function parseProtocolMarkers(text: string): ParseResult {
     if (alreadyMatched) continue;
 
     try {
-      const args = JSON.parse(jsonStr);
+      const args = JSON.parse(jsonStr!);
       toolCalls.push({
-        name: toolName,
+        name: toolName!,
         arguments: args,
         rawMatch: fullMatch,
       });

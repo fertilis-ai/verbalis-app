@@ -90,7 +90,7 @@ function lastAssistantContent(conversationId: string): string {
   const conv = useChatStore.getState().conversations.find((c) => c.id === conversationId);
   if (!conv) return "";
   for (let i = conv.messages.length - 1; i >= 0; i--) {
-    if (conv.messages[i].role === "assistant") return conv.messages[i].content ?? "";
+    if (conv.messages[i]!.role === "assistant") return conv.messages[i]!.content ?? "";
   }
   return "";
 }
