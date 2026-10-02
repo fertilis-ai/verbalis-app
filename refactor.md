@@ -180,10 +180,48 @@ The smoke test found three bugs that also exist on `main`. Each one is fixed wit
 
 After the fixes: `tsc`, the full Vitest suite (94 files, 2112 tests) and Biome (54 warnings, unchanged) all pass.
 
-## Phase 5: Shared tree/folder model and runners
-- **Folder-tree factory.** Chat, scheduler and task stores repeat folder CRUD, pin/expand and load-from-disk logic (`chat-store.ts:1189–1344`, `scheduler-store.ts:120–160`, `task-store.ts:101–137`). Move it into a `createFolderTreeSlice` factory, and fix the top-level-only `findNodeInTree` copy in `task-store.ts:75–83`.
-- **One background runner.** Create `runBackgroundConversation()` for `task-runner.ts` and `scheduler-runner.ts`, including shared logging that respects `isLoggingEnabled`.
-- **Move domain types out of stores.** `Message`, `Conversation` and similar go into `lib/types`, so that `lib/*` no longer imports from `@/stores/*`.
+## Phase 5: Shared tree/folder model and runners — ✅ done (branch `refactor/phase-5`, stacked on `refactor/phase-4`)
+1. ✅ **Domain types out of the stores.**
+   - `lib/types/chat.ts` holds `Message`, `Conversation`, `ContextFile`, `ToolCallState` and `ToolCallStatus`.
+   - `lib/types/agent.ts` holds `Agent`, and `lib/types/settings.ts` holds `Theme`, `UserMode` and `LocalLlmProvider`.
+   - The stores and `lib/tools.ts` re-export them, so component imports are unchanged.
+   - `run-conversation` types the four loop-store actions it uses as a local interface instead of `Pick<ReturnType<typeof useAgenticLoopStore.getState>>`.
+   - No `lib` module imports a type from `@/stores/*` now.
+2. ✅ **One background runner.** `lib/background-run.ts`:
+   - `runBackgroundConversation()` creates the background conversation, reports its id, sends the prompt with `YOLO_MODE_CONFIG`, and writes the start, completion and error lines. It never throws: a failure returns `{ conversationId: null, error }`.
+   - `executeTask` and `executeSchedule` keep the parts that differ: the empty-prompt handling (task logs "Skipped"; schedule saves `lastRun` and marks an error only on a timed run), the schedule agent resolution, and `markScheduleError`.
+   - `appendRunLog(file, line)` is the one writer for `tasks.txt` and `scheduler.txt`, including the scheduled-workflow lines. It checks `isLoggingEnabled()` and `isTauri()`.
+   - The log line formats are unchanged; the tests now pin them.
+3. ✅ **Folder-tree factory.** `stores/folder-tree-slice.ts`:
+   - `createFolderActions` covers rename, delete and pin. Each action finds the folder by id anywhere in the tree (`findNodeInTree`), runs the disk operation on its path and reloads. An unknown id or a non-folder node is ignored.
+   - `createFolderTreeSlice` adds `createFolder`, which de-duplicates the name among its siblings and creates the folder in the parent or at the root.
+   - `createFolderExpansionSlice` holds `expandedFolders` and `toggleFolderExpansion`.
+   - Chat and scheduler use all three; storage is injected as closures. Chat keeps its inline `_meta.yaml` pin toggle (`toggleChatFolderPin`), which is equivalent to `toggleSchedulerFolderPin`.
+   - Tasks use `createFolderActions` and keep their own `createFolder`. A task folder is a backlog: a new one is selected, and its name is not de-duplicated, as before.
+   - Load-from-disk stays in each store, because each does different work after loading the tree: chat merges conversations, scheduler loads every schedule, tasks just set the tree.
+   - ❎ **Task-store "top-level-only `findNodeInTree`": not a bug.** The task tree is flat by storage design: `loadTaskTree` reads one level of `folder.yaml` directories. The local copy is replaced by the shared `findNodeInTree` anyway.
+
+Intentional differences:
+- **`scheduler.txt` respects the logging setting.** It used to be written whenever the app ran in Tauri, even with logging off. Now it is written only when logging is on, like `tasks.txt`.
+- **Folder failures are logged, not thrown, in the scheduler and task stores**, as the chat store already did. The log prefix is `[<store>] Failed to <action> folder:`. Before, a failed scheduler rename, delete or pin, or any failed task-folder operation, rejected to the sidebar.
+- The chat and scheduler stores create a subfolder only under a node of type `folder`. Chat already checked this; the scheduler accepted any node, which the UI never passes.
+- Deleting the selected task folder clears the selection only if the folder is gone from the reloaded tree, so a failed delete keeps it selected.
+
+Tests: `folder-tree-slice` (9). The chat, scheduler and task store tests pass unchanged. The runner tests gained checks for the log lines (start, completion, error, skipped) and for the logging gate. One scheduler test now turns logging on, because the scheduler log is gated.
+
+Verified: `tsc`, the full Vitest suite (95 files, 2126 tests) and Biome (54 warnings, unchanged). Phase 5 doesn't touch the CSP or webview dependencies, so a dev build is enough for the smoke test.
+
+Dev smoke test (`bun run dev`, Tauri):
+- Chat: create a folder twice ("New Folder", "New Folder 2"), a subfolder, rename, pin and unpin, and delete; expand and collapse.
+- Scheduler: the same, including a nested folder; then Run now on a schedule.
+- Tasks: create a backlog (it is selected), rename, pin, delete the selected one (the selection clears), and run a task.
+- With logging on, `~/.verbalis/logs/tasks.txt` and `scheduler.txt` get start and completion lines. With logging off, neither file grows.
+
+Follow-ups found in Phase 5 (not done here):
+- **Runtime store imports in `lib` remain:** the runners and `run-workflow` (`useChatStore`), `tools`, `image-tools`, `config-sync` and the speech/voice hooks (`useSettingsStore`), `toolbox-tools`, `memory-tools` and `toolbox-schemas` (`useToolboxStore`, `useAgentStore`). Moving types can't remove these; inverting them means passing state or callbacks in.
+- `AgentData` in `lib/storage.ts` has the same shape as `Agent`. Merge them when storage is split (Phase 6).
+- `task-store.ts` `startTask` and `redoTask` repeat the same ~40-line execute/track/complete block. Extract a shared `runTask(taskId)`.
+- The storage folder helpers are near duplicates: `renameChatFolder`/`renameSchedulerFolder` and `deleteChatFolder`/`deleteSchedulerFolder` are identical, and the chat pin toggle matches `toggleSchedulerFolderPin`. Fold them into generic `_meta.yaml` folder helpers in Phase 6.
 
 ## Phase 6: Split `storage.ts` (1107 lines) and `commands.rs` (960 lines)
 - **`lib/storage/` modules:**
