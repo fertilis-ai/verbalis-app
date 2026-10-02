@@ -18,16 +18,14 @@ import {
   deleteChatByPath,
   deleteChatFolder,
   renameChatFolder,
+  toggleChatFolderPin,
   createChatFolder,
-  saveFolderMeta,
-  loadFolderMeta,
   deletePath,
   getAppDataDir,
   isTauri,
   readFile,
   renamePath,
   type ChatTreeNode,
-  type ChatFolderMeta,
 } from "@/lib/storage";
 import { logAgent } from "@/lib/logger";
 import { resolveModelObject, unresolvedModelMessage } from "@/lib/llm/resolve-model";
@@ -147,15 +145,6 @@ function updateConversationInState(
   const conversations = [...s.conversations];
   conversations[index] = next;
   return { conversations };
-}
-
-async function toggleChatFolderPin(folderPath: string): Promise<void> {
-  const meta = await loadFolderMeta(folderPath);
-  const newMeta: ChatFolderMeta = {
-    isPinned: !(meta?.isPinned ?? false),
-    createdAt: meta?.createdAt || new Date().toISOString(),
-  };
-  await saveFolderMeta(folderPath, newMeta);
 }
 
 export const useChatStore = create<ChatState>((set, get) => {

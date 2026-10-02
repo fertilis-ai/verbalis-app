@@ -1,5 +1,6 @@
 import { Buffer } from "buffer";
 import matter from "gray-matter";
+import type { Agent } from "@/lib/types/agent";
 import { deletePath, getAppDataDirCached, listFiles, pathExists, readFile, writeFile } from "./fs";
 import { getSettingsOverlayDir, listOverlayFiles } from "./overlay";
 
@@ -14,17 +15,7 @@ if (typeof window !== "undefined" && !window.Buffer) {
 }
 
 // Agent storage (markdown with frontmatter)
-export interface AgentData {
-  name: string;
-  /** Optional model override. Undefined = the app's selected model. */
-  model?: string;
-  temperature: number;
-  systemPrompt: string;
-  /** Optional per-agent tool allowlist (tool names). Undefined = all tools. */
-  tools?: string[];
-}
-
-export async function saveAgent(agent: AgentData): Promise<void> {
+export async function saveAgent(agent: Agent): Promise<void> {
   const dir = await getAppDataDirCached();
   const path = `${dir}/agents/${agent.name}.md`;
   const frontmatter: Record<string, unknown> = {
@@ -41,7 +32,7 @@ export async function saveAgent(agent: AgentData): Promise<void> {
   await writeFile(path, content);
 }
 
-export async function loadAgent(name: string): Promise<AgentData | null> {
+export async function loadAgent(name: string): Promise<Agent | null> {
   const dir = await getAppDataDirCached();
   let path = `${dir}/agents/${name}.md`;
   if (!(await pathExists(path))) {

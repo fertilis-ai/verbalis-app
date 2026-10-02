@@ -1,8 +1,15 @@
 import YAML from "yaml";
 import type { FileNode } from "@/lib/tauri/commands";
-import { dirname } from "@/lib/path-resolution";
-import { deletePath, getAppDataDirCached, pathExists, readFile, renamePath, writeFile } from "./fs";
-import { createItemFolder, loadFolderMeta, loadTreeRecursive, saveFolderMeta, type SchedulerFolderMeta } from "./tree";
+import { deletePath, getAppDataDirCached, pathExists, readFile, writeFile } from "./fs";
+import {
+  createItemFolder,
+  deleteFolder,
+  loadFolderMeta,
+  loadTreeRecursive,
+  renameFolder,
+  saveFolderMeta,
+  toggleFolderPin,
+} from "./tree";
 
 // Schedule storage
 //
@@ -105,31 +112,7 @@ export async function deleteScheduleByPath(schedulePath: string): Promise<void> 
   await deletePath(schedulePath);
 }
 
-// Delete a scheduler folder and all its contents
-export async function deleteSchedulerFolder(folderPath: string): Promise<void> {
-  await deletePath(folderPath);
-}
-
-// Rename a scheduler folder (directory rename)
-export async function renameSchedulerFolder(oldPath: string, newName: string): Promise<string> {
-  const parentDir = dirname(oldPath);
-  const newPath = `${parentDir}/${newName}`;
-  await renamePath(oldPath, newPath);
-  return newPath;
-}
-
-// Toggle scheduler folder pin status
-export async function toggleSchedulerFolderPin(folderPath: string): Promise<void> {
-  const meta = await loadSchedulerFolderMeta(folderPath);
-  if (meta) {
-    meta.isPinned = !meta.isPinned;
-    await saveSchedulerFolderMeta(folderPath, meta);
-  } else {
-    // Create meta if it doesn't exist
-    const newMeta: SchedulerFolderMeta = {
-      isPinned: true,
-      createdAt: new Date().toISOString(),
-    };
-    await saveSchedulerFolderMeta(folderPath, newMeta);
-  }
-}
+// Folder operations (shared with chats)
+export const deleteSchedulerFolder = deleteFolder;
+export const renameSchedulerFolder = renameFolder;
+export const toggleSchedulerFolderPin = toggleFolderPin;

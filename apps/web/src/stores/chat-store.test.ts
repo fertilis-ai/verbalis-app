@@ -11,8 +11,7 @@ const {
   mockDeleteChatFolder,
   mockRenameChatFolder,
   mockCreateChatFolder,
-  mockSaveFolderMeta,
-  mockLoadFolderMeta,
+  mockToggleChatFolderPin,
   mockDeletePath,
   mockLoadChatByPath,
   mockReadFile,
@@ -41,8 +40,7 @@ const {
   mockDeleteChatFolder: vi.fn().mockResolvedValue(undefined),
   mockRenameChatFolder: vi.fn().mockResolvedValue(undefined),
   mockCreateChatFolder: vi.fn().mockResolvedValue("/mock-data/chats/folder"),
-  mockSaveFolderMeta: vi.fn().mockResolvedValue(undefined),
-  mockLoadFolderMeta: vi.fn().mockResolvedValue(null),
+  mockToggleChatFolderPin: vi.fn().mockResolvedValue(undefined),
   mockDeletePath: vi.fn().mockResolvedValue(undefined),
   mockLoadChatByPath: vi.fn().mockResolvedValue(null),
   mockReadFile: vi.fn().mockResolvedValue("file contents"),
@@ -106,8 +104,7 @@ vi.mock("@/lib/storage", () => ({
   deleteChatFolder: mockDeleteChatFolder,
   renameChatFolder: mockRenameChatFolder,
   createChatFolder: mockCreateChatFolder,
-  saveFolderMeta: mockSaveFolderMeta,
-  loadFolderMeta: mockLoadFolderMeta,
+  toggleChatFolderPin: mockToggleChatFolderPin,
   deletePath: mockDeletePath,
   loadChatByPath: mockLoadChatByPath,
   readFile: mockReadFile,
@@ -1347,62 +1344,38 @@ describe("chat-store", () => {
   // toggleFolderPin
   // -----------------------------------------------------------------------
   describe("toggleFolderPin", () => {
-    it("pins an unpinned folder", async () => {
+    // The _meta.yaml rule itself is tested in storage.test.ts (toggleFolderPin).
+    it("toggles the folder's pin on disk and reloads", async () => {
       const folder = makeFolderTreeNode({
         id: "f1",
         path: "/mock-data/chats/f1",
         isPinned: false,
       });
       useChatStore.setState({ chatTree: [folder] });
-      mockLoadFolderMeta.mockResolvedValueOnce(null);
 
       await useChatStore.getState().toggleFolderPin("f1");
 
-      expect(mockSaveFolderMeta).toHaveBeenCalledWith(
-        "/mock-data/chats/f1",
-        expect.objectContaining({ isPinned: true }),
-      );
+      expect(mockToggleChatFolderPin).toHaveBeenCalledWith("/mock-data/chats/f1");
       expect(mockLoadChatTree).toHaveBeenCalled();
-    });
-
-    it("unpins a pinned folder", async () => {
-      const folder = makeFolderTreeNode({
-        id: "f1",
-        path: "/mock-data/chats/f1",
-        isPinned: true,
-      });
-      useChatStore.setState({ chatTree: [folder] });
-      mockLoadFolderMeta.mockResolvedValueOnce({
-        isPinned: true,
-        createdAt: "2025-01-01T00:00:00.000Z",
-      });
-
-      await useChatStore.getState().toggleFolderPin("f1");
-
-      expect(mockSaveFolderMeta).toHaveBeenCalledWith(
-        "/mock-data/chats/f1",
-        expect.objectContaining({ isPinned: false, createdAt: "2025-01-01T00:00:00.000Z" }),
-      );
     });
 
     it("does nothing if folder not found in tree", async () => {
       useChatStore.setState({ chatTree: [] });
       await useChatStore.getState().toggleFolderPin("nonexistent");
-      expect(mockLoadFolderMeta).not.toHaveBeenCalled();
-      expect(mockSaveFolderMeta).not.toHaveBeenCalled();
+      expect(mockToggleChatFolderPin).not.toHaveBeenCalled();
     });
 
     it("does nothing if node is a chat, not a folder", async () => {
       const chatNode = makeChatTreeNode({ id: "c1" });
       useChatStore.setState({ chatTree: [chatNode] });
       await useChatStore.getState().toggleFolderPin("c1");
-      expect(mockLoadFolderMeta).not.toHaveBeenCalled();
+      expect(mockToggleChatFolderPin).not.toHaveBeenCalled();
     });
 
     it("handles errors gracefully", async () => {
       const folder = makeFolderTreeNode({ id: "f1", path: "/mock-data/chats/f1" });
       useChatStore.setState({ chatTree: [folder] });
-      mockLoadFolderMeta.mockRejectedValueOnce(new Error("Disk error"));
+      mockToggleChatFolderPin.mockRejectedValueOnce(new Error("Disk error"));
       await useChatStore.getState().toggleFolderPin("f1");
       // Should not throw
     });
@@ -1421,14 +1394,10 @@ describe("chat-store", () => {
         children: [nestedFolder],
       });
       useChatStore.setState({ chatTree: [parentFolder] });
-      mockLoadFolderMeta.mockResolvedValueOnce(null);
 
       await useChatStore.getState().toggleFolderPin("nested");
 
-      expect(mockSaveFolderMeta).toHaveBeenCalledWith(
-        "/mock-data/chats/parent/nested",
-        expect.objectContaining({ isPinned: true }),
-      );
+      expect(mockToggleChatFolderPin).toHaveBeenCalledWith("/mock-data/chats/parent/nested");
     });
   });
 

@@ -36,6 +36,7 @@ export {
   deleteChatFolder,
   renameChat,
   renameChatFolder,
+  toggleChatFolderPin,
 } from "./chats";
 export type {
   ChatTreeNode,
@@ -46,9 +47,6 @@ export {
   loadAgent,
   listAgents,
   deleteAgent,
-} from "./agents";
-export type {
-  AgentData,
 } from "./agents";
 export {
   loadTaskTree,

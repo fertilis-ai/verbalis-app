@@ -2,7 +2,7 @@ import YAML from "yaml";
 import type { FileNode } from "@/lib/tauri/commands";
 import { dirname } from "@/lib/path-resolution";
 import { deletePath, getAppDataDirCached, pathExists, readFile, renamePath, writeFile } from "./fs";
-import { createItemFolder, loadTreeRecursive } from "./tree";
+import { createItemFolder, deleteFolder, loadTreeRecursive, renameFolder, toggleFolderPin } from "./tree";
 
 // Chat tree node (folder or chat)
 export interface ChatTreeNode {
@@ -124,23 +124,15 @@ export async function deleteChatByPath(chatPath: string): Promise<void> {
   await deletePath(chatPath);
 }
 
-// Delete a folder and all its contents
-export async function deleteChatFolder(folderPath: string): Promise<void> {
-  await deletePath(folderPath);
-}
+// Folder operations (shared with the scheduler)
+export const deleteChatFolder = deleteFolder;
+export const renameChatFolder = renameFolder;
+export const toggleChatFolderPin = toggleFolderPin;
 
 // Rename a chat file
 export async function renameChat(oldPath: string, newId: string): Promise<string> {
   const dir = dirname(oldPath);
   const newPath = `${dir}/${newId}.json`;
-  await renamePath(oldPath, newPath);
-  return newPath;
-}
-
-// Rename a folder
-export async function renameChatFolder(oldPath: string, newName: string): Promise<string> {
-  const parentDir = dirname(oldPath);
-  const newPath = `${parentDir}/${newName}`;
   await renamePath(oldPath, newPath);
   return newPath;
 }

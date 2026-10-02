@@ -1,6 +1,7 @@
 import YAML from "yaml";
 import type { FileNode } from "@/lib/tauri/commands";
-import { createDirectory, pathExists, readDirectory, readFile, writeFile } from "./fs";
+import { dirname } from "@/lib/path-resolution";
+import { createDirectory, deletePath, pathExists, readDirectory, readFile, renamePath, writeFile } from "./fs";
 
 // Folder metadata (shared by chats, scheduler, etc.)
 export interface FolderMeta {
@@ -41,6 +42,31 @@ export async function loadFolderMeta(folderPath: string): Promise<FolderMeta | n
   if (!(await pathExists(metaPath))) return null;
   const content = await readFile(metaPath);
   return YAML.parse(content);
+}
+
+// Folder operations shared by the `_meta.yaml` sections (chats, scheduler).
+
+/** Rename a folder in place. Returns the new path. */
+export async function renameFolder(oldPath: string, newName: string): Promise<string> {
+  const newPath = `${dirname(oldPath)}/${newName}`;
+  await renamePath(oldPath, newPath);
+  return newPath;
+}
+
+/** Delete a folder and all its contents. */
+export async function deleteFolder(folderPath: string): Promise<void> {
+  await deletePath(folderPath);
+}
+
+/** Flip `isPinned` in the folder's `_meta.yaml`, creating it (pinned) if missing.
+ * Other keys are kept, and a missing `createdAt` is filled in. */
+export async function toggleFolderPin(folderPath: string): Promise<void> {
+  const meta = await loadFolderMeta(folderPath);
+  await saveFolderMeta(folderPath, {
+    ...meta,
+    isPinned: !meta?.isPinned,
+    createdAt: meta?.createdAt || new Date().toISOString(),
+  });
 }
 
 // Generic recursive tree loader for any folder-based storage section.

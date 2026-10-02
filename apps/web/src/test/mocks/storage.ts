@@ -24,6 +24,7 @@ export const deleteChatByPath = vi.fn().mockResolvedValue(undefined);
 export const deleteChatFolder = vi.fn().mockResolvedValue(undefined);
 export const renameChat = vi.fn().mockResolvedValue("/mock-data/chats/new.json");
 export const renameChatFolder = vi.fn().mockResolvedValue("/mock-data/chats/new-folder");
+export const toggleChatFolderPin = vi.fn().mockResolvedValue(undefined);
 export const saveAgent = vi.fn().mockResolvedValue(undefined);
 export const loadAgent = vi.fn().mockResolvedValue(null);
 export const listAgents = vi.fn().mockResolvedValue([]);

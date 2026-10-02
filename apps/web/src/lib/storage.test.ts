@@ -1245,6 +1245,34 @@ describe("storage", () => {
       expect(meta).not.toBeNull();
       expect(meta!.isPinned).toBe(true);
     });
+
+    it("is the same toggle as the chat one", async () => {
+      const { toggleSchedulerFolderPin, toggleChatFolderPin } = await importStorage();
+      expect(toggleChatFolderPin).toBe(toggleSchedulerFolderPin);
+    });
+
+    it("keeps createdAt and other keys, and fills a missing createdAt", async () => {
+      const { initAppDataDir, toggleChatFolderPin, loadFolderMeta, writeFile } =
+        await importStorage();
+      await initAppDataDir();
+
+      await writeFile(
+        "/verbalis-data/chats/kept/_meta.yaml",
+        "isPinned: true\ncreatedAt: 2025-01-01T00:00:00.000Z\ncolor: blue\n",
+      );
+      await toggleChatFolderPin("/verbalis-data/chats/kept");
+      expect(await loadFolderMeta("/verbalis-data/chats/kept")).toEqual({
+        isPinned: false,
+        createdAt: "2025-01-01T00:00:00.000Z",
+        color: "blue",
+      });
+
+      await writeFile("/verbalis-data/chats/no-date/_meta.yaml", "isPinned: false\n");
+      await toggleChatFolderPin("/verbalis-data/chats/no-date");
+      const meta = await loadFolderMeta("/verbalis-data/chats/no-date");
+      expect(meta!.isPinned).toBe(true);
+      expect(typeof meta!.createdAt).toBe("string");
+    });
   });
 
   // ==========================================================================
