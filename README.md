@@ -147,7 +147,7 @@ verbalis-app/
 │       │   └── test/               # Test setup and mocks
 │       └── src-tauri/
 │           ├── src/
-│           │   ├── commands.rs     # 28 Tauri commands (Rust)
+│           │   ├── commands/       # 28 Tauri commands: fs, http, logs, keychain
 │           │   ├── lib.rs          # Plugin initialization
 │           │   └── main.rs         # Entry point
 │           ├── icons/              # App icons (macOS, Windows, Linux, mobile)

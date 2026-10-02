@@ -1,5 +1,5 @@
 /**
- * Typed wrappers for the Rust commands in `src-tauri/src/commands.rs`, one
+ * Typed wrappers for the Rust commands in `src-tauri/src/commands/`, one
  * function per command. Call these instead of `invoke("…")` so a renamed
  * command or argument fails type-checking instead of at runtime.
  *

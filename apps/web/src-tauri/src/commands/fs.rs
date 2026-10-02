@@ -1,9 +1,11 @@
+//! File system commands, and the app data directory layout.
+
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
-use std::time::Duration;
+
+use super::app_dir;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileNode {
@@ -15,8 +17,8 @@ pub struct FileNode {
 }
 
 /// The default agent seeded into ~/.verbalis/agents. Shared with the web
-/// build's storage fallback (`src/lib/storage.ts`).
-const DEFAULT_AGENT_CONTENT: &str = include_str!("../../src/lib/toolbox/default-agent.md");
+/// build's storage fallback (`src/lib/storage/fs.ts`).
+const DEFAULT_AGENT_CONTENT: &str = include_str!("../../../src/lib/toolbox/default-agent.md");
 
 /// Get the user's home directory
 #[tauri::command]
@@ -24,12 +26,6 @@ pub fn get_home_dir() -> Result<String, String> {
     dirs::home_dir()
         .map(|h| h.to_string_lossy().to_string())
         .ok_or_else(|| "Could not find home directory".to_string())
-}
-
-/// The app data directory (~/.verbalis)
-fn app_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("Could not find home directory")?;
-    Ok(home.join(".verbalis"))
 }
 
 /// Get the app data directory (~/.verbalis)
@@ -313,86 +309,6 @@ fn expand_tilde(path: &str) -> String {
     path.to_string()
 }
 
-// ============================================================================
-// HTTP Requests
-// ============================================================================
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct HttpResponse {
-    pub status: u16,
-    pub headers: HashMap<String, String>,
-    pub body: String,
-    pub duration_ms: u64,
-}
-
-/// Make an HTTP request
-#[tauri::command]
-pub async fn http_request(
-    url: String,
-    method: String,
-    headers: Option<HashMap<String, String>>,
-    body: Option<String>,
-    timeout_ms: Option<u64>,
-) -> Result<HttpResponse, String> {
-    let start = std::time::Instant::now();
-    let timeout = Duration::from_millis(timeout_ms.unwrap_or(30000)); // Default 30s
-
-    let client = reqwest::Client::builder()
-        .timeout(timeout)
-        .build()
-        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
-
-    let method = method.to_uppercase();
-    let mut request = match method.as_str() {
-        "GET" => client.get(&url),
-        "POST" => client.post(&url),
-        "PUT" => client.put(&url),
-        "DELETE" => client.delete(&url),
-        "PATCH" => client.patch(&url),
-        "HEAD" => client.head(&url),
-        _ => return Err(format!("Unsupported HTTP method: {}", method)),
-    };
-
-    // Add headers
-    if let Some(hdrs) = headers {
-        for (key, value) in hdrs {
-            request = request.header(&key, &value);
-        }
-    }
-
-    // Add body
-    if let Some(b) = body {
-        request = request.body(b);
-    }
-
-    let response = request.send().await
-        .map_err(|e| format!("HTTP request failed: {}", e))?;
-
-    let status = response.status().as_u16();
-    let headers: HashMap<String, String> = response.headers()
-        .iter()
-        .map(|(k, v)| {
-            let value = v.to_str().unwrap_or_else(|_| {
-                log::warn!("Dropping non-UTF8 value for response header {}", k);
-                ""
-            });
-            (k.to_string(), value.to_string())
-        })
-        .collect();
-
-    let body = response.text().await
-        .map_err(|e| format!("Failed to read response body: {}", e))?;
-
-    let duration_ms = start.elapsed().as_millis() as u64;
-
-    Ok(HttpResponse {
-        status,
-        headers,
-        body,
-        duration_ms,
-    })
-}
-
 /// Rename/move a file or directory
 #[tauri::command]
 pub async fn rename_path(old_path: String, new_path: String) -> Result<(), String> {
@@ -415,245 +331,9 @@ pub async fn rename_path(old_path: String, new_path: String) -> Result<(), Strin
     fs::rename(old, new).map_err(|e| format!("Failed to rename: {}", e))
 }
 
-// ============================================================================
-// Debug Logging
-// ============================================================================
-
-/// Get the logs directory (~/.verbalis/logs)
-fn get_logs_dir() -> Result<PathBuf, String> {
-    Ok(app_dir()?.join("logs"))
-}
-
-/// Rejects log filenames that could escape the logs directory.
-fn validate_log_filename(filename: &str) -> Result<(), String> {
-    if filename.contains('/') || filename.contains('\\') || filename.contains("..") {
-        return Err("Invalid filename".to_string());
-    }
-    Ok(())
-}
-
-/// Get the log file path (~/.verbalis/logs/agent.txt)
-fn get_log_path() -> Result<PathBuf, String> {
-    Ok(get_logs_dir()?.join("agent.txt"))
-}
-
-/// Append a line to the debug log file
-#[tauri::command]
-pub fn append_log(line: String) -> Result<(), String> {
-    use std::io::Write;
-
-    let log_path = get_log_path()?;
-
-    // Ensure the directory exists
-    if let Some(parent) = log_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create log directory: {}", e))?;
-    }
-
-    // Open file in append mode, create if doesn't exist
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .map_err(|e| format!("Failed to open log file: {}", e))?;
-
-    // Write the line with a newline
-    writeln!(file, "{}", line)
-        .map_err(|e| format!("Failed to write to log file: {}", e))?;
-
-    Ok(())
-}
-
-/// Clear the debug log file
-#[tauri::command]
-pub fn clear_log() -> Result<(), String> {
-    let log_path = get_log_path()?;
-
-    if log_path.exists() {
-        fs::write(&log_path, "")
-            .map_err(|e| format!("Failed to clear log file: {}", e))?;
-    }
-
-    Ok(())
-}
-
-/// Read the debug log file contents
-#[tauri::command]
-pub fn read_log() -> Result<String, String> {
-    let log_path = get_log_path()?;
-
-    if !log_path.exists() {
-        return Ok(String::new());
-    }
-
-    fs::read_to_string(&log_path)
-        .map_err(|e| format!("Failed to read log file: {}", e))
-}
-
-/// List log files in ~/.verbalis/logs/
-#[tauri::command]
-pub fn list_log_files() -> Result<Vec<String>, String> {
-    let logs_dir = get_logs_dir()?;
-
-    if !logs_dir.exists() {
-        return Ok(Vec::new());
-    }
-
-    let entries =
-        fs::read_dir(&logs_dir).map_err(|e| format!("Failed to read logs directory: {}", e))?;
-
-    let mut files = Vec::new();
-    for entry in entries {
-        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
-        let path = entry.path();
-        if path.is_file() {
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                files.push(name.to_string());
-            }
-        }
-    }
-
-    files.sort();
-    Ok(files)
-}
-
-/// Read a specific log file from ~/.verbalis/logs/
-#[tauri::command]
-pub fn read_log_file(filename: String) -> Result<String, String> {
-    validate_log_filename(&filename)?;
-
-    let log_path = get_logs_dir()?.join(&filename);
-
-    if !log_path.exists() {
-        return Ok(String::new());
-    }
-
-    fs::read_to_string(&log_path).map_err(|e| format!("Failed to read log file: {}", e))
-}
-
-/// Append a line to a specific log file in ~/.verbalis/logs/
-#[tauri::command]
-pub fn append_log_file(filename: String, line: String) -> Result<(), String> {
-    validate_log_filename(&filename)?;
-
-    let logs_dir = get_logs_dir()?;
-    if !logs_dir.exists() {
-        fs::create_dir_all(&logs_dir)
-            .map_err(|e| format!("Failed to create logs directory: {}", e))?;
-    }
-
-    let log_path = logs_dir.join(&filename);
-
-    let mut file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .map_err(|e| format!("Failed to open log file: {}", e))?;
-
-    use std::io::Write;
-    writeln!(file, "{}", line).map_err(|e| format!("Failed to write to log file: {}", e))?;
-
-    Ok(())
-}
-
-/// Clear a specific log file in ~/.verbalis/logs/
-#[tauri::command]
-pub fn clear_log_file(filename: String) -> Result<(), String> {
-    validate_log_filename(&filename)?;
-
-    let log_path = get_logs_dir()?.join(&filename);
-
-    if log_path.exists() {
-        fs::write(&log_path, "").map_err(|e| format!("Failed to clear log file: {}", e))?;
-    }
-
-    Ok(())
-}
-
-/// Overwrite a log file with the given content (for debug logging of API requests, etc.)
-#[tauri::command]
-pub fn write_log_file(filename: String, content: String) -> Result<(), String> {
-    validate_log_filename(&filename)?;
-
-    let log_path = get_logs_dir()?.join(&filename);
-    fs::write(&log_path, content).map_err(|e| format!("Failed to write log file: {}", e))?;
-
-    Ok(())
-}
-
-// ============================================================================
-// Keychain (OS Secure Storage)
-// ============================================================================
-
-const KEYCHAIN_SERVICE: &str = "com.verbalis.app";
-
-/// Store an API key in the OS keychain
-#[tauri::command]
-pub fn store_api_key(provider: String, key: String) -> Result<(), String> {
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &provider)
-        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
-    entry
-        .set_password(&key)
-        .map_err(|e| format!("Failed to store key in keychain: {}", e))
-}
-
-/// Get an API key from the OS keychain. Returns None if not found.
-#[tauri::command]
-pub fn get_api_key(provider: String) -> Result<Option<String>, String> {
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &provider)
-        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
-    match entry.get_password() {
-        Ok(password) => Ok(Some(password)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(format!("Failed to read key from keychain: {}", e)),
-    }
-}
-
-/// Delete an API key from the OS keychain. Idempotent (no error if missing).
-#[tauri::command]
-pub fn delete_api_key(provider: String) -> Result<(), String> {
-    let entry = keyring::Entry::new(KEYCHAIN_SERVICE, &provider)
-        .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
-    match entry.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(format!("Failed to delete key from keychain: {}", e)),
-    }
-}
-
-/// Load all API keys from the OS keychain in one call.
-#[tauri::command]
-pub fn get_all_api_keys() -> Result<HashMap<String, String>, String> {
-    let providers = ["anthropic", "openai", "google", "openrouter"];
-    let mut keys = HashMap::new();
-    for provider in providers {
-        let entry = keyring::Entry::new(KEYCHAIN_SERVICE, provider)
-            .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
-        match entry.get_password() {
-            Ok(password) => {
-                keys.insert(provider.to_string(), password);
-            }
-            Err(keyring::Error::NoEntry) => {}
-            Err(e) => {
-                log::warn!("Failed to read {} key from keychain: {}", provider, e);
-            }
-        }
-    }
-    Ok(keys)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn validate_log_filename_rejects_traversal() {
-        assert!(validate_log_filename("agent.txt").is_ok());
-        assert!(validate_log_filename("../secrets").is_err());
-        assert!(validate_log_filename("sub/agent.txt").is_err());
-        assert!(validate_log_filename("sub\\agent.txt").is_err());
-        assert!(validate_log_filename("..").is_err());
-    }
 
     #[test]
     fn default_agent_has_frontmatter() {
