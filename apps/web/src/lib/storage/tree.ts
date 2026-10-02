@@ -2,6 +2,7 @@ import YAML from "yaml";
 import type { FileNode } from "@/lib/tauri/commands";
 import { dirname } from "@/lib/path-resolution";
 import { createDirectory, deletePath, pathExists, readDirectory, readFile, renamePath, writeFile } from "./fs";
+import { FolderMetaSchema, parseLoaded } from "./validate";
 
 // Folder metadata (shared by chats, scheduler, etc.)
 export interface FolderMeta {
@@ -37,11 +38,12 @@ export async function saveFolderMeta(folderPath: string, meta: FolderMeta): Prom
   await writeFile(`${folderPath}/_meta.yaml`, YAML.stringify(meta));
 }
 
-export async function loadFolderMeta(folderPath: string): Promise<FolderMeta | null> {
+// Returns null when the file is missing, unparseable or has the wrong shape.
+export async function loadFolderMeta(folderPath: string): Promise<Partial<FolderMeta> | null> {
   const metaPath = `${folderPath}/_meta.yaml`;
   if (!(await pathExists(metaPath))) return null;
   const content = await readFile(metaPath);
-  return YAML.parse(content);
+  return parseLoaded(FolderMetaSchema, content, metaPath, YAML.parse);
 }
 
 // Folder operations shared by the `_meta.yaml` sections (chats, scheduler).

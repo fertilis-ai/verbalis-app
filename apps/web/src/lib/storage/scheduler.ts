@@ -10,6 +10,7 @@ import {
   saveFolderMeta,
   toggleFolderPin,
 } from "./tree";
+import { ScheduleFileSchema, parseLoaded } from "./validate";
 
 // Schedule storage
 //
@@ -49,11 +50,12 @@ async function parseScheduleEntry(entry: FileNode): Promise<SchedulerTreeNode | 
   if (entry.name.endsWith(".yaml") && entry.name !== "_meta.yaml") {
     try {
       const content = await readFile(entry.path);
-      const schedule: ScheduleData = YAML.parse(content);
+      const schedule = parseLoaded(ScheduleFileSchema, content, entry.path, YAML.parse);
+      if (!schedule) return null;
       return {
         type: "schedule",
         id: schedule.id,
-        name: schedule.name,
+        name: schedule.name ?? "",
         path: entry.path,
         isPinned: false,
         cron: schedule.cron,
@@ -100,11 +102,11 @@ export async function saveSchedule(schedule: ScheduleData, folderPath?: string):
   return path;
 }
 
-// Load a schedule by path
+// Load a schedule by path. Returns null when the file is missing, unparseable or has the wrong shape.
 export async function loadSchedule(path: string): Promise<ScheduleData | null> {
   if (!(await pathExists(path))) return null;
   const content = await readFile(path);
-  return YAML.parse(content);
+  return parseLoaded(ScheduleFileSchema, content, path, YAML.parse) as ScheduleData | null;
 }
 
 // Delete a schedule by path

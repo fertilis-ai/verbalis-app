@@ -1666,4 +1666,174 @@ describe("storage", () => {
       expect(implicitDir!.is_directory).toBe(true);
     });
   });
+
+  // ==========================================================================
+  // Validate on load: lenient shape checks on files read back from disk
+  // ==========================================================================
+  describe("validate on load", () => {
+    let warn: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      // A fresh module drops the app-data dir the caching test above leaves cached.
+      vi.resetModules();
+      warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      warn.mockRestore();
+    });
+
+    // Files in the shapes older versions wrote must keep loading.
+    describe("legacy files still load", () => {
+      it("a legacy YAML chat with extra and missing fields", async () => {
+        const { writeFile, loadChatByPath, initAppDataDir, loadChatTree } = await importStorage();
+        await initAppDataDir();
+        const yaml = [
+          "id: legacy-1",
+          "title: Old chat",
+          "messages:",
+          "  - id: m1",
+          "    role: user",
+          "    content: hi",
+          "  - id: m2",
+          "    role: assistant",
+          "    content: ''",
+          "    toolCalls:",
+          "      - id: t1",
+          "        name: read_file",
+          "        status: done",
+          "    reasoning: extra key",
+          "createdAt: 2024-01-01T00:00:00Z",
+        ].join("\n");
+        await writeFile("/verbalis-data/chats/legacy-1.yaml", yaml);
+
+        const chat = await loadChatByPath("/verbalis-data/chats/legacy-1.yaml");
+        expect(chat?.id).toBe("legacy-1");
+        expect(chat?.messages).toHaveLength(2);
+        const tree = await loadChatTree();
+        expect(tree.map((n) => n.id)).toEqual(["legacy-1"]);
+        expect(warn).not.toHaveBeenCalled();
+      });
+
+      it("a schedule named by agent with no hasError", async () => {
+        const { writeFile, loadSchedule, initAppDataDir, loadSchedulerTree } = await importStorage();
+        await initAppDataDir();
+        const yaml = "id: s1\nname: Old\ncron: 0 9 * * *\nagentId: Assistant\nprompt: hi\nenabled: true\nlastRun: null\n";
+        await writeFile("/verbalis-data/scheduler/s1.yaml", yaml);
+
+        const schedule = await loadSchedule("/verbalis-data/scheduler/s1.yaml");
+        expect(schedule).toMatchObject({ id: "s1", agentId: "Assistant", enabled: true, lastRun: null });
+        expect(schedule).not.toHaveProperty("hasError");
+        const tree = await loadSchedulerTree();
+        expect(tree.map((n) => n.id)).toEqual(["s1"]);
+        expect(warn).not.toHaveBeenCalled();
+      });
+
+      it("a task folder.yaml with no tasks list", async () => {
+        const { writeFile, loadTaskFolder, initAppDataDir, loadTaskTree } = await importStorage();
+        await initAppDataDir();
+        await writeFile("/verbalis-data/tasks/f1/folder.yaml", "id: f1\nname: Backlog\n");
+
+        expect(await loadTaskFolder("/verbalis-data/tasks/f1")).toEqual({ id: "f1", name: "Backlog" });
+        const tree = await loadTaskTree();
+        expect(tree).toHaveLength(1);
+        expect(tree[0].tasks).toEqual([]);
+        expect(warn).not.toHaveBeenCalled();
+      });
+
+      it("a _meta.yaml with no isPinned", async () => {
+        const { writeFile, loadFolderMeta } = await importStorage();
+        await writeFile("/folder/_meta.yaml", "createdAt: 2024-01-01T00:00:00Z\ncolor: blue\n");
+        expect(await loadFolderMeta("/folder")).toEqual({
+          createdAt: "2024-01-01T00:00:00Z",
+          color: "blue",
+        });
+        expect(warn).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("invalid files are skipped or return null with a warning", () => {
+      it("loadChatByPath returns null for a chat whose messages lack content", async () => {
+        const { writeFile, loadChatByPath } = await importStorage();
+        await writeFile("/chats/bad.json", JSON.stringify({ id: "bad", messages: [{ role: "user" }] }));
+        expect(await loadChatByPath("/chats/bad.json")).toBeNull();
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("/chats/bad.json"));
+      });
+
+      it("loadChatTree skips a chat without an id and keeps the rest", async () => {
+        const { writeFile, initAppDataDir, loadChatTree } = await importStorage();
+        await initAppDataDir();
+        await writeFile("/verbalis-data/chats/good.json", JSON.stringify({ id: "good", messages: [] }));
+        await writeFile("/verbalis-data/chats/noid.json", JSON.stringify({ title: "x" }));
+        const tree = await loadChatTree();
+        expect(tree.map((n) => n.id)).toEqual(["good"]);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("noid.json"));
+      });
+
+      it("loadFolderMeta returns null for malformed YAML instead of throwing", async () => {
+        const { writeFile, loadFolderMeta } = await importStorage();
+        await writeFile("/folder/_meta.yaml", "isPinned: [unclosed");
+        await expect(loadFolderMeta("/folder")).resolves.toBeNull();
+      });
+
+      it("a malformed _meta.yaml no longer aborts the tree load", async () => {
+        const { writeFile, initAppDataDir, loadChatTree } = await importStorage();
+        await initAppDataDir();
+        await writeFile("/verbalis-data/chats/f/_meta.yaml", "isPinned: [unclosed");
+        await writeFile("/verbalis-data/chats/f/c.json", JSON.stringify({ id: "c", messages: [] }));
+        const tree = await loadChatTree();
+        expect(tree).toHaveLength(1);
+        expect(tree[0]).toMatchObject({ type: "folder", isPinned: false });
+        expect(tree[0].children?.map((n) => n.id)).toEqual(["c"]);
+      });
+
+      it("loadFolderMeta returns null for a non-boolean isPinned", async () => {
+        const { writeFile, loadFolderMeta } = await importStorage();
+        await writeFile("/folder/_meta.yaml", "isPinned: yes please\n");
+        expect(await loadFolderMeta("/folder")).toBeNull();
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("/isPinned"));
+      });
+
+      it("loadSchedule returns null for malformed YAML instead of throwing", async () => {
+        const { writeFile, loadSchedule } = await importStorage();
+        await writeFile("/s/bad.yaml", "id: [unclosed");
+        await expect(loadSchedule("/s/bad.yaml")).resolves.toBeNull();
+      });
+
+      it("loadSchedule returns null for a schedule with a non-boolean enabled", async () => {
+        const { writeFile, loadSchedule } = await importStorage();
+        await writeFile("/s/bad.yaml", "id: s1\nenabled: sometimes\n");
+        expect(await loadSchedule("/s/bad.yaml")).toBeNull();
+      });
+
+      it("loadSchedulerTree skips an invalid schedule and keeps the rest", async () => {
+        const { writeFile, initAppDataDir, loadSchedulerTree } = await importStorage();
+        await initAppDataDir();
+        await writeFile("/verbalis-data/scheduler/good.yaml", "id: good\nname: Good\n");
+        await writeFile("/verbalis-data/scheduler/bad.yaml", "name: No id\n");
+        const tree = await loadSchedulerTree();
+        expect(tree.map((n) => n.id)).toEqual(["good"]);
+      });
+
+      it("loadTaskFolder returns null for malformed YAML instead of throwing", async () => {
+        const { writeFile, loadTaskFolder } = await importStorage();
+        await writeFile("/t/folder.yaml", "id: [unclosed");
+        await expect(loadTaskFolder("/t")).resolves.toBeNull();
+      });
+
+      it("loadTaskTree skips a folder.yaml whose tasks are not a list", async () => {
+        const { writeFile, initAppDataDir, loadTaskTree } = await importStorage();
+        await initAppDataDir();
+        await writeFile("/verbalis-data/tasks/a/folder.yaml", "id: a\nname: A\ntasks: []\n");
+        await writeFile("/verbalis-data/tasks/b/folder.yaml", "id: b\nname: B\ntasks: oops\n");
+        const tree = await loadTaskTree();
+        expect(tree.map((n) => n.id)).toEqual(["a"]);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining("/tasks"));
+      });
+    });
+
+    it("returns valid files exactly as parsed (no defaults or coercion)", async () => {
+      const { writeFile, loadSchedule } = await importStorage();
+      await writeFile("/s/s.yaml", "id: s1\nname: '42'\nextra: kept\n");
+      expect(await loadSchedule("/s/s.yaml")).toEqual({ id: "s1", name: "42", extra: "kept" });
+    });
+  });
 });

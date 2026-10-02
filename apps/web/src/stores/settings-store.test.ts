@@ -51,7 +51,7 @@ vi.mock("@/lib/guardrails/presets", async () => {
   };
 });
 
-import { useSettingsStore } from "./settings-store";
+import { PERSISTED_FIELD_SCHEMAS, useSettingsStore } from "./settings-store";
 import { DEFAULT_GUARDRAILS_CONFIG } from "@/lib/guardrails/types";
 import { YOLO_MODE_CONFIG, ADVANCED_MODE_CONFIG, NORMAL_MODE_CONFIG } from "@/lib/guardrails/presets";
 
@@ -145,6 +145,91 @@ describe("settings-store", () => {
       const partialize = persistCapture.options?.partialize as Partialize;
       useSettingsStore.getState().setModelEffort("m1", "high");
       expect(partialize(useSettingsStore.getState()).modelEffort).toEqual({ m1: "high" });
+    });
+  });
+
+  describe("persist merge", () => {
+    type Merge = (persisted: unknown, current: Record<string, unknown>) => Record<string, unknown>;
+    const current = () => useSettingsStore.getState() as unknown as Record<string, unknown>;
+
+    beforeEach(() => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+    });
+
+    it("is wired into persist", () => {
+      expect(typeof persistCapture.options?.merge).toBe("function");
+    });
+
+    it("has a shape check for every persisted field", () => {
+      const partialize = persistCapture.options?.partialize as (state: unknown) => Record<string, unknown>;
+      // Web mode also persists apiKeys; check against that superset.
+      const persisted = Object.keys({ ...partialize(useSettingsStore.getState()), apiKeys: {} }).sort();
+      expect(Object.keys(PERSISTED_FIELD_SCHEMAS).sort()).toEqual(persisted);
+    });
+
+    it("keeps every field of a valid persisted state", () => {
+      const merge = persistCapture.options?.merge as Merge;
+      const partialize = persistCapture.options?.partialize as (state: unknown) => Record<string, unknown>;
+      const persisted = {
+        ...partialize(useSettingsStore.getState()),
+        theme: "light",
+        hue: "blue",
+        selectedAgentId: "Researcher",
+        selectedModels: [{ id: "m1", name: "Model 1" }],
+        modelEffort: { m1: "high" },
+        openRouterZdrOnly: true,
+      };
+      const merged = merge(JSON.parse(JSON.stringify(persisted)), current());
+      for (const [key, value] of Object.entries(persisted)) {
+        expect(merged[key]).toEqual(value);
+      }
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
+    it("drops only the invalid fields so their defaults refill them", () => {
+      const merge = persistCapture.options?.merge as Merge;
+      const defaults = current();
+      const merged = merge(
+        {
+          theme: "purple",
+          userMode: "advanced",
+          localLLM: "not an object",
+          selectedModels: { id: "m1" },
+          agentDebugLogging: "yes",
+          workingDirectory: "/work",
+        },
+        defaults,
+      );
+      expect(merged.theme).toBe(defaults.theme);
+      expect(merged.localLLM).toEqual(defaults.localLLM);
+      expect(merged.selectedModels).toEqual(defaults.selectedModels);
+      expect(merged.agentDebugLogging).toBe(defaults.agentDebugLogging);
+      expect(merged.userMode).toBe("advanced");
+      expect(merged.workingDirectory).toBe("/work");
+      expect(console.warn).toHaveBeenCalledTimes(4);
+    });
+
+    it("accepts a null selectedAgentId", () => {
+      const merge = persistCapture.options?.merge as Merge;
+      const merged = merge({ selectedAgentId: null }, { ...current(), selectedAgentId: "x" });
+      expect(merged.selectedAgentId).toBeNull();
+    });
+
+    it("passes unknown keys through like the default merge", () => {
+      const merge = persistCapture.options?.merge as Merge;
+      expect(merge({ legacyKey: 1 }, current()).legacyKey).toBe(1);
+    });
+
+    it("keeps the current state when nothing was persisted", () => {
+      const merge = persistCapture.options?.merge as Merge;
+      const state = current();
+      expect(merge(undefined, state)).toBe(state);
+    });
+
+    it("keeps the actions", () => {
+      const merge = persistCapture.options?.merge as Merge;
+      const merged = merge({ theme: "light" }, current());
+      expect(typeof merged.setTheme).toBe("function");
     });
   });
 

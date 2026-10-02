@@ -11,6 +11,8 @@ import { isTauri } from "@tauri-apps/api/core";
 import type { HueId } from "@/lib/hue-presets";
 import type { EffortLevel } from "@/lib/reasoning";
 import type { Theme, UserMode, LocalLlmProvider } from "@/lib/types/settings";
+import { Type, type TSchema } from "typebox";
+import { Value } from "typebox/value";
 
 export type { Theme, UserMode, LocalLlmProvider };
 
@@ -124,6 +126,53 @@ interface SettingsState {
   applyGuardrailsPreset: (preset: UserModePreset) => void;
   importGuardrailsConfig: (json: string) => boolean;
   exportGuardrailsConfig: () => string;
+}
+
+// Shape checks for the persisted settings, one per field. A field that fails
+// is dropped so the default refills it; the rest of the state is kept. Nested
+// objects and arrays are checked only for their outer type. Unknown keys pass
+// through, as they did before. `Value.Check` interprets the schema rather than
+// compiling it, so it works under the packaged app's CSP.
+const ObjectList = Type.Array(Type.Object({}));
+export const PERSISTED_FIELD_SCHEMAS: Record<string, TSchema> = {
+  theme: Type.Union([Type.Literal("system"), Type.Literal("light"), Type.Literal("dark")]),
+  hue: Type.String(),
+  workingDirectory: Type.String(),
+  settingsDirectory: Type.String(),
+  userMode: Type.Union([Type.Literal("normal"), Type.Literal("advanced")]),
+  apiKeys: Type.Object({}),
+  localLLM: Type.Object({}),
+  defaultModel: Type.String(),
+  selectedAgentId: Type.Union([Type.String(), Type.Null()]),
+  availableModels: ObjectList,
+  selectedModels: ObjectList,
+  openRouterZdrOnly: Type.Boolean(),
+  modelEffort: Type.Object({}),
+  imageModel: Type.String(),
+  availableImageModels: ObjectList,
+  transcriptionModel: Type.String(),
+  availableTranscriptionModels: ObjectList,
+  speechModel: Type.String(),
+  speechVoice: Type.String(),
+  availableSpeechModels: ObjectList,
+  guardrailsConfig: Type.Object({}),
+  agentDebugLogging: Type.Boolean(),
+  allowSelfEnhancement: Type.Boolean(),
+};
+
+/** Persist `merge`: the default shallow merge, minus persisted fields with the wrong type. */
+export function mergePersistedSettings<T extends object>(persisted: unknown, current: T): T {
+  if (!persisted || typeof persisted !== "object") return current;
+  const valid: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(persisted)) {
+    const schema = PERSISTED_FIELD_SCHEMAS[key];
+    if (schema && !Value.Check(schema, value)) {
+      console.warn(`[settings-store] Ignoring invalid persisted setting "${key}"; using the default`);
+      continue;
+    }
+    valid[key] = value;
+  }
+  return { ...current, ...valid };
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -399,6 +448,7 @@ export const useSettingsStore = create<SettingsState>()(
         }
         return persistedState;
       },
+      merge: mergePersistedSettings,
       partialize: (state) => ({
         theme: state.theme,
         hue: state.hue,

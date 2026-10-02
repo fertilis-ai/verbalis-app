@@ -3,6 +3,7 @@ import type { FileNode } from "@/lib/tauri/commands";
 import { dirname } from "@/lib/path-resolution";
 import { deletePath, getAppDataDirCached, pathExists, readFile, renamePath, writeFile } from "./fs";
 import { createItemFolder, deleteFolder, loadTreeRecursive, renameFolder, toggleFolderPin } from "./tree";
+import { ChatFileSchema, ChatSummarySchema, parseLoaded } from "./validate";
 
 // Chat tree node (folder or chat)
 export interface ChatTreeNode {
@@ -47,7 +48,8 @@ export async function loadChatByPath(path: string): Promise<ChatData | null> {
   if (!(await pathExists(path))) return null;
   try {
     const content = await readFile(path);
-    return path.endsWith(".yaml") ? YAML.parse(content) : JSON.parse(content);
+    const chat = parseLoaded(ChatFileSchema, content, path, path.endsWith(".yaml") ? YAML.parse : JSON.parse);
+    return chat as ChatData | null;
   } catch {
     return null;
   }
@@ -69,41 +71,24 @@ export async function saveChatToFolder(chat: ChatData, folderPath?: string): Pro
 
 // Parse a file entry as a ChatTreeNode (JSON or legacy YAML)
 async function parseChatEntry(entry: FileNode): Promise<ChatTreeNode | null> {
-  if (entry.name.endsWith(".json") && entry.name !== "_meta.json") {
-    try {
-      const content = await readFile(entry.path);
-      const chat: ChatData = JSON.parse(content);
-      return {
-        type: "chat",
-        id: chat.id,
-        name: entry.name.replace(".json", ""),
-        path: entry.path,
-        isPinned: false,
-        title: chat.title,
-        updatedAt: chat.updatedAt,
-      };
-    } catch {
-      return null;
-    }
+  const ext = entry.name.endsWith(".json") ? ".json" : entry.name.endsWith(".yaml") ? ".yaml" : null;
+  if (!ext || entry.name === `_meta${ext}`) return null;
+  try {
+    const content = await readFile(entry.path);
+    const chat = parseLoaded(ChatSummarySchema, content, entry.path, ext === ".yaml" ? YAML.parse : JSON.parse);
+    if (!chat) return null;
+    return {
+      type: "chat",
+      id: chat.id,
+      name: entry.name.replace(ext, ""),
+      path: entry.path,
+      isPinned: false,
+      title: chat.title,
+      updatedAt: chat.updatedAt,
+    };
+  } catch {
+    return null;
   }
-  if (entry.name.endsWith(".yaml") && entry.name !== "_meta.yaml") {
-    try {
-      const content = await readFile(entry.path);
-      const chat: ChatData = YAML.parse(content);
-      return {
-        type: "chat",
-        id: chat.id,
-        name: entry.name.replace(".yaml", ""),
-        path: entry.path,
-        isPinned: false,
-        title: chat.title,
-        updatedAt: chat.updatedAt,
-      };
-    } catch {
-      return null;
-    }
-  }
-  return null;
 }
 
 // Load entire chat tree from disk

@@ -1,5 +1,6 @@
 import YAML from "yaml";
 import { createDirectory, deletePath, getAppDataDirCached, pathExists, readDirectory, readFile, writeFile } from "./fs";
+import { TaskFolderFileSchema, parseLoaded } from "./validate";
 
 // Task storage
 //
@@ -63,7 +64,11 @@ export async function loadTaskTree(): Promise<TaskTreeNode[]> {
       if (await pathExists(folderDataPath)) {
         try {
           const content = await readFile(folderDataPath);
-          const folderData: TaskFolderData = YAML.parse(content);
+          const folderData = parseLoaded(TaskFolderFileSchema, content, folderDataPath, YAML.parse) as
+            | TaskFolderData
+            | null;
+          // Skip malformed folder files
+          if (!folderData) continue;
           nodes.push({
             type: "folder",
             id: folderData.id,
@@ -74,7 +79,7 @@ export async function loadTaskTree(): Promise<TaskTreeNode[]> {
             updatedAt: folderData.updatedAt,
           });
         } catch {
-          // Skip malformed folder files
+          // Skip unreadable folder files
         }
       }
     }
@@ -115,12 +120,12 @@ export async function saveTaskFolder(folderData: TaskFolderData, folderPath: str
   await writeFile(`${folderPath}/folder.yaml`, YAML.stringify(folderData));
 }
 
-// Load a task folder
+// Load a task folder. Returns null when the file is missing, unparseable or has the wrong shape.
 export async function loadTaskFolder(folderPath: string): Promise<TaskFolderData | null> {
   const path = `${folderPath}/folder.yaml`;
   if (!(await pathExists(path))) return null;
   const content = await readFile(path);
-  return YAML.parse(content);
+  return parseLoaded(TaskFolderFileSchema, content, path, YAML.parse) as TaskFolderData | null;
 }
 
 // Delete a task folder and all its contents
