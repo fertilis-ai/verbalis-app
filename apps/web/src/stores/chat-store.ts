@@ -41,8 +41,8 @@ import {
   saveConversation,
 } from "@/lib/chat-persistence";
 import { rejectToolCall, stopInFlightToolCalls, upsertToolCall } from "@/lib/tool-call-patch";
-import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
-import { toggleInSet } from "@/lib/set-utils";
+import { findNodeInTree } from "@/lib/tree-utils";
+import { createFolderExpansionSlice, createFolderTreeSlice } from "./folder-tree-slice";
 
 export type { Message, Conversation, ContextFile, ToolCallState, ToolCallStatus };
 
@@ -147,6 +147,15 @@ function updateConversationInState(
   const conversations = [...s.conversations];
   conversations[index] = next;
   return { conversations };
+}
+
+async function toggleChatFolderPin(folderPath: string): Promise<void> {
+  const meta = await loadFolderMeta(folderPath);
+  const newMeta: ChatFolderMeta = {
+    isPinned: !(meta?.isPinned ?? false),
+    createdAt: meta?.createdAt || new Date().toISOString(),
+  };
+  await saveFolderMeta(folderPath, newMeta);
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
@@ -465,7 +474,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       return state.conversations.find((c) => c.id === state.currentConversationId) ?? null;
     },
     chatTree: [],
-    expandedFolders: new Set<string>(),
+    ...createFolderExpansionSlice(set),
     model: useSettingsStore.getState().defaultModel,
     agentId: null,
     isStreaming: false,
@@ -665,68 +674,17 @@ export const useChatStore = create<ChatState>((set, get) => {
     }
   },
 
-  createFolder: async (name: string, parentFolderId?: string) => {
-    try {
-      const existingNames = getSiblingFolderNames(get().chatTree, parentFolderId);
-      const uniqueName = getUniqueName(name, existingNames);
-      let parentPath: string | undefined;
-      if (parentFolderId) {
-        const folder = findNodeInTree(get().chatTree, parentFolderId);
-        if (folder && folder.type === "folder") {
-          parentPath = folder.path;
-        }
-      }
-      await createChatFolder(uniqueName, parentPath);
-      await get().loadChatsFromDisk();
-    } catch (error) {
-      console.error("[chat-store] Failed to create folder:", error);
-    }
-  },
-
-  renameFolder: async (folderId: string, newName: string) => {
-    try {
-      const folder = findNodeInTree(get().chatTree, folderId);
-      if (folder && folder.type === "folder") {
-        await renameChatFolder(folder.path, newName);
-        await get().loadChatsFromDisk();
-      }
-    } catch (error) {
-      console.error("Failed to rename folder:", error);
-    }
-  },
-
-  deleteFolder: async (folderId: string) => {
-    try {
-      const folder = findNodeInTree(get().chatTree, folderId);
-      if (folder && folder.type === "folder") {
-        await deleteChatFolder(folder.path);
-        await get().loadChatsFromDisk();
-      }
-    } catch (error) {
-      console.error("Failed to delete folder:", error);
-    }
-  },
-
-  toggleFolderExpansion: (folderId: string) => {
-    set((state) => ({ expandedFolders: toggleInSet(state.expandedFolders, folderId) }));
-  },
-
-  toggleFolderPin: async (folderId: string) => {
-    try {
-      const folder = findNodeInTree(get().chatTree, folderId);
-      if (folder && folder.type === "folder") {
-        const meta = await loadFolderMeta(folder.path);
-        const newMeta: ChatFolderMeta = {
-          isPinned: !(meta?.isPinned ?? false),
-          createdAt: meta?.createdAt || new Date().toISOString(),
-        };
-        await saveFolderMeta(folder.path, newMeta);
-        await get().loadChatsFromDisk();
-      }
-    } catch (error) {
-      console.error("Failed to toggle folder pin:", error);
-    }
-  },
+  ...createFolderTreeSlice({
+    logPrefix: "chat-store",
+    getTree: () => get().chatTree,
+    reload: () => get().loadChatsFromDisk(),
+    storage: {
+      create: createChatFolder,
+      rename: renameChatFolder,
+      remove: deleteChatFolder,
+      togglePin: toggleChatFolderPin,
+    },
+  }),
 
   // Chat management
   renameChat: async (chatId: string, newTitle: string) => {

@@ -19,8 +19,8 @@ import { runScheduleNow as runScheduleNowByPath } from "@/lib/scheduler-runner";
 import { DEFAULT_AGENT_NAME } from "@/stores/agent-store";
 import { useChatStore, type Message } from "@/stores/chat-store";
 import { useAgenticLoopStore } from "@/stores/agentic-loop-store";
-import { collectFromTree, findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
-import { toggleInSet } from "@/lib/set-utils";
+import { collectFromTree, findNodeInTree } from "@/lib/tree-utils";
+import { createFolderExpansionSlice, createFolderTreeSlice } from "./folder-tree-slice";
 import { dirname, basename } from "@/lib/path-resolution";
 
 export type { ScheduleData, SchedulerTreeNode };
@@ -106,7 +106,7 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
   schedulerTree: [],
   schedules: [],
   selectedScheduleId: null,
-  expandedFolders: new Set<string>(),
+  ...createFolderExpansionSlice(set),
   runningScheduleId: null,
   runningConversationId: null,
   schedulerLog: "",
@@ -119,49 +119,17 @@ export const useSchedulerStore = create<SchedulerState>((set, get) => ({
     set({ schedulerTree: tree, schedules });
   },
 
-  createFolder: async (name, parentFolderId) => {
-    try {
-      const existingNames = getSiblingFolderNames(get().schedulerTree, parentFolderId);
-      const uniqueName = getUniqueName(name, existingNames);
-      let parentPath: string | undefined;
-      if (parentFolderId) {
-        const parentNode = findNodeInTree(get().schedulerTree, parentFolderId);
-        parentPath = parentNode?.path;
-      }
-      await createSchedulerFolder(uniqueName, parentPath);
-      await get().loadSchedulersFromDisk();
-    } catch (error) {
-      console.error("[scheduler-store] Failed to create folder:", error);
-    }
-  },
-
-  renameFolder: async (folderId, newName) => {
-    const node = findNodeInTree(get().schedulerTree, folderId);
-    if (node?.path && node.type === "folder") {
-      await renameSchedulerFolder(node.path, newName);
-      await get().loadSchedulersFromDisk();
-    }
-  },
-
-  deleteFolder: async (folderId) => {
-    const node = findNodeInTree(get().schedulerTree, folderId);
-    if (node?.path && node.type === "folder") {
-      await deleteSchedulerFolder(node.path);
-      await get().loadSchedulersFromDisk();
-    }
-  },
-
-  toggleFolderPin: async (folderId) => {
-    const node = findNodeInTree(get().schedulerTree, folderId);
-    if (node?.path && node.type === "folder") {
-      await toggleSchedulerFolderPin(node.path);
-      await get().loadSchedulersFromDisk();
-    }
-  },
-
-  toggleFolderExpansion: (folderId) => {
-    set({ expandedFolders: toggleInSet(get().expandedFolders, folderId) });
-  },
+  ...createFolderTreeSlice({
+    logPrefix: "scheduler-store",
+    getTree: () => get().schedulerTree,
+    reload: () => get().loadSchedulersFromDisk(),
+    storage: {
+      create: createSchedulerFolder,
+      rename: renameSchedulerFolder,
+      remove: deleteSchedulerFolder,
+      togglePin: toggleSchedulerFolderPin,
+    },
+  }),
 
   createSchedule: async (name, folderId) => {
     const dir = await getAppDataDir();
