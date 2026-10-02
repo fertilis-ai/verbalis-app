@@ -1,19 +1,13 @@
 import { create } from "zustand";
 import { v4 as uuid } from "uuid";
 import type { Api, Model, ThinkingLevel } from "@earendil-works/pi-ai";
-import {
-  type ToolCallState,
-  type ToolCallStatus,
-  getToolsForContext,
-} from "@/lib/tools";
-import { computeContextBudget, type ContextBudget } from "@/lib/context/token-estimate";
-import { trimMessagesToBudget } from "@/lib/context/trim";
+import type { ToolCallState, ToolCallStatus } from "@/lib/tools";
+import type { ContextBudget } from "@/lib/context/token-estimate";
 import { buildSystemPrompt, loadToolboxPromptSections } from "@/lib/prompt/build-system-prompt";
 import { useSettingsStore } from "./settings-store";
 import { useAgentStore } from "./agent-store";
 import { useAgenticLoopStore, subscribeToLoopEvents } from "./agentic-loop-store";
-import type { AgentLoopEvent } from "@/lib/agentic/types";
-import type { VerbalisAdapterConfig } from "@/lib/agentic/verbalis-agent-adapter";
+import { runConversation, updateLastAssistantMessage } from "@/lib/agentic/run-conversation";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import { getActiveModels, type ModelId, type ChatModelId } from "@/lib/models";
 import { resolveEffortFor, toReasoningOption } from "@/lib/reasoning";
@@ -46,7 +40,7 @@ import {
   deserializeMessages,
   saveConversation,
 } from "@/lib/chat-persistence";
-import { mergeToolCalls, rejectToolCall, stopInFlightToolCalls, upsertToolCall } from "@/lib/tool-call-patch";
+import { rejectToolCall, stopInFlightToolCalls, upsertToolCall } from "@/lib/tool-call-patch";
 import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
 import { toggleInSet } from "@/lib/set-utils";
 
@@ -157,26 +151,31 @@ function deriveConversationTitle(content: string, maxLength = 50): string | null
   return trimmed.slice(0, maxLength);
 }
 
-/** Update the last assistant message in a messages array with the given partial updates. */
-function updateLastAssistantMessage(messages: Message[], updates: Partial<Message>): Message[] {
-  const result = [...messages];
-  const lastIdx = result.length - 1;
-  if (lastIdx >= 0 && result[lastIdx].role === "assistant") {
-    result[lastIdx] = { ...result[lastIdx], ...updates };
+/**
+ * Apply `updater` to the conversation with this id, ghost or regular. Returns
+ * the state unchanged when there is no such conversation or nothing changed.
+ */
+function updateConversationInState(
+  s: ChatState,
+  conversationId: string,
+  updater: (c: Conversation) => Conversation
+): ChatState | Partial<ChatState> {
+  if (s.ghostConversation?.id === conversationId) {
+    const next = updater(s.ghostConversation);
+    return next === s.ghostConversation ? s : { ghostConversation: next };
   }
-  return result;
+  const index = s.conversations.findIndex((c) => c.id === conversationId);
+  if (index === -1) return s;
+  const next = updater(s.conversations[index]);
+  if (next === s.conversations[index]) return s;
+  const conversations = [...s.conversations];
+  conversations[index] = next;
+  return { conversations };
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
-  /** Apply an update function to a conversation, handling ghost-vs-regular dispatch. */
-  const applyUpdate = (conversationId: string, updateFn: (c: Conversation) => Conversation) => {
-    const { isGhostMode, ghostConversation } = get();
-    const isGhost = isGhostMode && ghostConversation?.id === conversationId;
-    if (isGhost) {
-      set((s) => s.ghostConversation ? { ghostConversation: updateFn(s.ghostConversation) } : s);
-    } else {
-      set((s) => ({ conversations: s.conversations.map((c) => c.id === conversationId ? updateFn(c) : c) }));
-    }
+  const applyUpdate = (conversationId: string, updater: (c: Conversation) => Conversation) => {
+    set((s) => updateConversationInState(s, conversationId, updater));
   };
 
   const createConversationInternal = async (options: {
@@ -262,20 +261,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       createdAt: new Date(),
     };
 
-    const updateConversation = (updater: (conv: Conversation) => Conversation) => {
-      if (isGhost) {
-        set((state) => {
-          if (!state.ghostConversation) return state;
-          return { ghostConversation: updater(state.ghostConversation) };
-        });
-      } else {
-        set((state) => ({
-          conversations: state.conversations.map((c) =>
-            c.id === conversationId ? updater(c) : c
-          ),
-        }));
-      }
-    };
+    const updateConversation = (updater: (conv: Conversation) => Conversation) => applyUpdate(conversationId, updater);
 
     // Log user input (truncate for privacy/size)
     const messagePreview = content.length > 100 ? `${content.slice(0, 100)}...` : content;
@@ -336,187 +322,33 @@ export const useChatStore = create<ChatState>((set, get) => {
         imageGeneration: !!(settings.apiKeys.openrouter?.trim() && settings.imageModel),
       });
 
-      // Helper: run a model through the VerbalisAgentAdapter (Tauri only)
-      // Shared by both local and cloud models for consistent tool execution,
-      // guardrails, debug logging, and event flow.
-      const runWithAdapter = async (
-        adapterModel: Model<Api>,
-        adapterApiKey: string,
-        adapterReasoning?: ThinkingLevel
-      ) => {
-        const loopStore = useAgenticLoopStore.getState();
-        const guardrailsConfig = guardrailsConfigOverride ?? settings.guardrailsConfig;
-
-        // Sliding-window aggressiveness: tightened on a context-overflow retry.
-        let historyBudgetFactor = 1;
-
-        // Get or create adapter for this conversation
-        let adapter = loopStore.getAdapter(conversationId);
-        if (adapter) {
-          adapter.stop();
-        }
-        adapter = loopStore.createAdapter(conversationId, agentId);
-
-        // Message provider - gets fresh messages each iteration, trimmed to the
-        // context budget via a sliding window over message history.
-        const messageProvider = () => {
-          const conv = isGhost
-            ? get().ghostConversation
-            : get().conversations.find((c) => c.id === conversationId);
-          const messages = conv?.messages ?? [];
-          const trim = trimMessagesToBudget({
-            messages,
+      // Run a model through the VerbalisAgentAdapter (Tauri only). Shared by
+      // local and cloud models for consistent tool execution, guardrails,
+      // debug logging, and event flow.
+      const runWithAdapter = (adapterModel: Model<Api>, adapterApiKey: string, adapterReasoning?: ThinkingLevel) =>
+        runConversation(
+          {
+            conversationId,
+            agentId,
+            model: adapterModel,
+            apiKey: adapterApiKey,
+            reasoning: adapterReasoning,
             systemPrompt,
-            tools: getToolsForContext(allowedTools),
-            contextWindow: adapterModel.contextWindow,
-            maxTokens: adapterModel.maxTokens,
-            historyBudgetFactor,
-          });
-          if (trim.trimmed) {
-            set({ contextWindowTrimmed: true });
-            logAgent("CONTEXT", "Sliding window dropped older messages", {
-              droppedCount: trim.droppedCount,
-              kept: trim.messages.length,
-            });
+            temperature,
+            guardrailsConfig: guardrailsConfigOverride ?? settings.guardrailsConfig,
+            allowedTools,
+          },
+          {
+            loopStore: useAgenticLoopStore.getState(),
+            getMessages: () =>
+              (isGhost
+                ? get().ghostConversation?.messages
+                : get().conversations.find((c) => c.id === conversationId)?.messages) ?? [],
+            updateConversation,
+            onContextBudget: (contextBudget) => set({ contextBudget, contextWindowTrimmed: false }),
+            onContextTrimmed: () => set({ contextWindowTrimmed: true }),
           }
-          return trim.messages;
-        };
-        adapter.setMessageProvider(messageProvider);
-
-        // Context-overflow retry bookkeeping (see run block below).
-        let retriedContextExceeded = false;
-        let pendingContextRetry = false;
-
-        // Event handler for UI sync (reused across a context-overflow retry).
-        const onAdapterEvent = (event: AgentLoopEvent) => {
-          switch (event.type) {
-            case "assistant_message_started": {
-              updateConversation((c) => {
-                const messages = [...c.messages];
-                const lastMsg = messages[messages.length - 1];
-
-                // If last message has content and tool calls, this is a follow-up turn
-                if (lastMsg?.role === "assistant" && (lastMsg.content.trim() !== "" || (lastMsg.toolCalls && lastMsg.toolCalls.length > 0))) {
-                  const newAssistantMessage: Message = {
-                    id: event.messageId,
-                    role: "assistant",
-                    content: "",
-                    createdAt: new Date(),
-                  };
-                  return { ...c, messages: [...messages, newAssistantMessage], updatedAt: new Date() };
-                }
-                return c; // First turn - use existing empty message
-              });
-              break;
-            }
-            case "text_delta":
-              updateConversation((c) => ({
-                ...c,
-                messages: updateLastAssistantMessage(c.messages, { content: event.fullContent }),
-                updatedAt: new Date(),
-              }));
-              break;
-            case "thinking_completed":
-              updateConversation((c) => {
-                const messages = [...c.messages];
-                const lastIdx = messages.length - 1;
-                if (lastIdx < 0 || messages[lastIdx].role !== "assistant") {
-                  return c;
-                }
-                messages[lastIdx] = {
-                  ...messages[lastIdx],
-                  content: event.content,
-                  ...(event.toolCalls.length > 0 ? {
-                    toolCalls: mergeToolCalls(messages[lastIdx].toolCalls ?? [], event.toolCalls),
-                  } : {}),
-                };
-                return { ...c, messages, updatedAt: new Date() };
-              });
-              break;
-            case "loop_error":
-              // If the context overflowed and we can still retry with a
-              // tighter window, suppress the error in the UI and let the retry
-              // run; otherwise surface it.
-              if (event.errorType === "context_exceeded" && !retriedContextExceeded) {
-                pendingContextRetry = true;
-                break;
-              }
-              updateConversation((c) => {
-                const lastContent = c.messages[c.messages.length - 1]?.content || "";
-                return {
-                  ...c,
-                  messages: updateLastAssistantMessage(c.messages, {
-                    content: `${lastContent}\n\nError: ${event.error}`,
-                  }),
-                  updatedAt: new Date(),
-                };
-              });
-              break;
-          }
-        };
-
-        // Estimate the context-window budget for this send and surface it.
-        // Trimming/summarization is layered on top of this in trim.ts.
-        const budgetMessages = (isGhost
-          ? get().ghostConversation?.messages
-          : get().conversations.find((c) => c.id === conversationId)?.messages) ?? [];
-        const budget = computeContextBudget({
-          systemPrompt,
-          tools: getToolsForContext(allowedTools),
-          messages: budgetMessages,
-          contextWindow: adapterModel.contextWindow,
-          maxTokens: adapterModel.maxTokens,
-        });
-        set({ contextBudget: budget, contextWindowTrimmed: false });
-        if (!budget.withinBudget) {
-          logAgent("CONTEXT", "Estimated prompt exceeds context budget", {
-            used: budget.used,
-            available: budget.available,
-            remaining: budget.remaining,
-          });
-        }
-
-        // Build adapter config
-        const adapterConfig: VerbalisAdapterConfig = {
-          model: adapterModel,
-          systemPrompt,
-          apiKey: adapterApiKey,
-          temperature,
-          reasoning: adapterReasoning,
-          guardrailsConfig,
-          allowedTools,
-          onEvent: () => {}, // Events already handled via onEvent subscription
-        };
-
-        // Run the adapter, subscribing the (reusable) event handler each attempt.
-        // Tool-call state reaches the conversation via the loop bus
-        // (subscribeToLoopEvents below), not this handler.
-        const runOnce = async () => {
-          const runAdapter = adapter!;
-          const unsub = runAdapter.onEvent(onAdapterEvent);
-          loopStore.setCurrentLoop(conversationId);
-          try {
-            await runAdapter.run(adapterConfig);
-          } finally {
-            unsub();
-            loopStore.releaseAdapter(conversationId, runAdapter);
-          }
-        };
-
-        await runOnce();
-
-        // If the context overflowed, retry once with a tighter sliding window
-        // and a fresh adapter (run() can't be re-entered after it finishes).
-        if (pendingContextRetry && !retriedContextExceeded) {
-          retriedContextExceeded = true;
-          pendingContextRetry = false;
-          historyBudgetFactor = 0.5;
-          logAgent("CONTEXT", "Context exceeded — retrying with a tighter window");
-          adapter = loopStore.createAdapter(conversationId, agentId);
-          adapter.setMessageProvider(messageProvider);
-          await runOnce();
-        }
-      };
+        );
 
       const showStreamedContent = (content: string) =>
         updateConversation((c) => ({
@@ -1063,20 +895,7 @@ subscribeToLoopEvents((event) => {
   }
 
   const { conversationId, toolCall } = event;
-  const state = useChatStore.getState();
-  const isGhost = state.isGhostMode && state.ghostConversation?.id === conversationId;
-
-  if (isGhost) {
-    useChatStore.setState((s) =>
-      s.ghostConversation ? { ghostConversation: upsertToolCall(s.ghostConversation, toolCall) } : s
-    );
-  } else if (state.conversations.some((c) => c.id === conversationId)) {
-    useChatStore.setState((s) => ({
-      conversations: s.conversations.map((c) =>
-        c.id === conversationId ? upsertToolCall(c, toolCall) : c
-      ),
-    }));
-  }
+  useChatStore.setState((s) => updateConversationInState(s, conversationId, (c) => upsertToolCall(c, toolCall)));
 });
 
 // ============================================================================
