@@ -109,7 +109,7 @@ Fixes for these (branch `fix/smoke-test-bugs`):
    - `app_dir()` replaces the `home.join(".verbalis")` copies; there were three, not six, since Phase 1 deleted commands.
    - `validate_log_filename()` replaces four copies of the traversal check.
    - Both have unit tests (`cargo test --lib`), the first in the crate.
-   - The default agent lives only in `src/lib/toolbox/default-agent.md`: `include_str!` in `commands.rs`, `?raw` in `storage.ts`. The two copies were byte-identical before the move.
+   - The default agent lives only in `src/lib/toolbox/default-agent.md`: `include_str!` in `commands.rs` (now `commands/fs.rs`), `?raw` in `storage.ts` (now `storage/fs.ts`). The two copies were byte-identical before the move.
 
 Verified: `tsc`, the full Vitest suite (87 files, 2038 tests), Biome (no new warnings), `cargo check`, `cargo test --lib` and the Vite production build.
 
@@ -236,34 +236,59 @@ Result (2026-10-01, `bunx tauri dev`, driven through macOS accessibility): all p
 Follow-ups found in Phase 5 (not done here):
 - **Background runs report model failures as success.** Because `streamMessage` swallows send errors, a task whose model call fails ends done/success. A schedule in the same situation keeps `hasError: false`, and the logs say "Completed". This is unchanged from before Phase 5. A fix needs `sendMessageToConversation` to report the failure, either by returning a status or rethrowing for background sends.
 - **Runtime store imports in `lib` remain:** the runners and `run-workflow` (`useChatStore`), `tools`, `image-tools`, `config-sync` and the speech/voice hooks (`useSettingsStore`), `toolbox-tools`, `memory-tools` and `toolbox-schemas` (`useToolboxStore`, `useAgentStore`). Moving types can't remove these; inverting them means passing state or callbacks in.
-- `AgentData` in `lib/storage.ts` has the same shape as `Agent`. Merge them when storage is split (Phase 6).
+- ✅ `AgentData` in `lib/storage.ts` has the same shape as `Agent`. Merged in Phase 6.
 - `task-store.ts` `startTask` and `redoTask` repeat the same ~40-line execute/track/complete block. Extract a shared `runTask(taskId)`.
-- The storage folder helpers are near duplicates: `renameChatFolder`/`renameSchedulerFolder` and `deleteChatFolder`/`deleteSchedulerFolder` are identical, and the chat pin toggle matches `toggleSchedulerFolderPin`. Fold them into generic `_meta.yaml` folder helpers in Phase 6.
+- ✅ The storage folder helpers are near duplicates: `renameChatFolder`/`renameSchedulerFolder` and `deleteChatFolder`/`deleteSchedulerFolder` are identical, and the chat pin toggle matches `toggleSchedulerFolderPin`. Folded into generic `_meta.yaml` folder helpers in Phase 6.
 
-## Phase 6: Split `storage.ts` (1107 lines) and `commands.rs` (960 lines)
-- **`lib/storage/` modules:**
-  - `web-fs.ts` (24–194)
-  - `fs.ts` (227–367)
-  - `tree.ts` (369–427)
-  - `chats.ts`, `agents.ts`, `tasks.ts`, `scheduler.ts`, `toolbox.ts`, `defaults.ts`
-  - Keep an `index.ts` re-export so imports stay stable.
-- **Validate on load.** Check YAML/JSON reads with Typebox (storage load points and `settings-store.ts:391`).
-- **`src-tauri/src/commands/` modules:** `fs.rs`, `http.rs`, `logs.rs`, `keychain.rs`, following the existing section banners.
+## Phase 6: Split `storage.ts` (1107 lines) and `commands.rs` (960 lines) — ✅ done (branch `refactor/phase-6`, stacked on `refactor/phase-5`)
+1. ✅ **`src-tauri/src/commands/` modules.** `fs.rs` (file and directory commands, `include_str!` of the default agent), `http.rs`, `logs.rs` and `keychain.rs`. `commands/mod.rs` holds the shared `app_dir()`. `lib.rs` registers the same 28 commands by module path (`fs::read_file`, …), so the JS command names are unchanged.
+2. ✅ **`lib/storage/` modules.** The code moved as is:
+   - `web-fs.ts` (the localStorage virtual FS), `fs.ts` (the Tauri/web switch and the cached app-data dir), `tree.ts` (`_meta.yaml` folders and the recursive tree loader)
+   - `chats.ts`, `agents.ts`, `tasks.ts`, `scheduler.ts`, `toolbox.ts`, `overlay.ts` (the settings-directory overlay), `defaults.ts`
+   - `index.ts` re-exports the same public API by name, so every `@/lib/storage` import and mock is unchanged. `storage.test.ts` stays where it is and imports the index.
+3. ✅ **Phase 5 follow-ups.**
+   - `AgentData` is gone; agent storage uses `Agent` from `lib/types/agent.ts`.
+   - `tree.ts` has generic `renameFolder`, `deleteFolder` and `toggleFolderPin` for `_meta.yaml` folders. The chat and scheduler names (`renameChatFolder`, `toggleSchedulerFolderPin`, …) are aliases of them, and the chat store's inline pin toggle is replaced by `toggleChatFolderPin`.
+4. ✅ **Validate on load.** `lib/storage/validate.ts` checks parsed files with TypeBox `Value.Check`, which interprets the schema (no `new Function`, so it works under the packaged CSP):
+   - Chat files (`id` in the tree; `id` plus `messages[].content` when opened), schedule files (`id`), task `folder.yaml` (`id`, `name`, and `tasks[].id` if present) and `_meta.yaml`.
+   - The schemas are lenient. They require only what the loaders and their callers dereference, type the optional fields, and allow extra keys. They only check; nothing is cleaned, defaulted or converted.
+   - All files in a real `~/.verbalis` passed (9 chats, 1 folder meta, 1 schedule, 2 task folders).
+   - Settings: `mergePersistedSettings` is the persist `merge`. It checks each persisted field's outer type and drops only the invalid ones, so their defaults refill them. Unknown keys pass through, as with the default merge.
 
-## Phase 7: Components
-- **`CodeOverlayEditor`.** One shared component for `file-editor.tsx` and `toolbox-editor.tsx`, covering highlight with fallback, scroll sync, Tab indent and the gutter. The CLAUDE.md invariants (`text-transparent` only when the overlay is non-empty, `leading-5` placement) must live inside it, and `editor-highlight-fallback.test.tsx` has to keep passing for both callers.
-- **`settings-view.tsx` (749 lines):**
-  - Put each section in `components/settings/sections/*`.
-  - Add a `SettingsSection` wrapper (about 9 copies of the header today) and a `useScrollSpy` hook.
-  - Add a `DiscoverableModelSelect` to replace the four Refresh/spinner/error/select blocks.
-- **Sidebars:** build a generic folder-tree sidebar for chat and scheduler (only a 96-line diff between them). The toolbox and file sidebars should adopt `useInlineEditing`, `shared/item-context-menu.tsx`, `usePollingLoader` and `confirm-modal` instead of native `confirm()`.
-- **Split large components:**
-  - `tool-call-card.tsx`: Header/Details/Actions; move `useToolboxDiff` into the toolbox layer.
-  - `guardrails-section.tsx`
-  - `loop-progress-panel.tsx`
-  - `chat-input.tsx`: `ModelQuickSelect` and `EffortSelect`
-- **Store selectors.** Replace whole-store `useXStore()` subscriptions with selectors or `useShallow` in `settings-view`, `model-picker`, `guardrails-section`, `chat-view`, `chat-sidebar` and the editors.
-- **Bootstrap hook.** Move the `routes/__root.tsx:55–78` bootstrap into `useAppBootstrap`.
+Intentional differences:
+- **Malformed or wrong-shaped files are skipped with a warning.** The direct loaders (`loadFolderMeta`, `loadSchedule`, `loadTaskFolder`) return null instead of throwing on malformed YAML. Before, one bad `_meta.yaml` aborted the whole chat or scheduler tree load, and one bad schedule aborted the scheduler tick. Trees skip the file and keep the rest. The warning is `[storage] Ignoring invalid file <path>: <pointer> <message>`.
+- **Files that parsed but lack a required field are now skipped too**, e.g. a chat or schedule without an `id`, or a chat message without string `content`. Before, these loaded and failed later, or showed as nodes without an id.
+- **A pin toggle on a malformed `_meta.yaml` rewrites it** (`isPinned: true` and a new `createdAt`) instead of throwing.
+- **The shared pin toggle keeps extra `_meta.yaml` keys** for chat folders (the inline chat toggle wrote only `isPinned` and `createdAt`), and **fills in a missing `createdAt`** for scheduler folders.
+- **Invalid persisted settings fields fall back to their defaults** (e.g. `theme: "purple"`, a non-object `localLLM`), with a `[settings-store]` warning.
+- A schedule without a `name` shows as an empty name in the tree instead of `undefined`, which also keeps the tree sort from throwing.
+
+Tests:
+- The existing storage, store and Rust tests pass unchanged, except the chat-store `toggleFolderPin` tests, which now assert calls to `toggleChatFolderPin`.
+- `storage.test.ts` gained the shared-toggle checks (2) and a validate-on-load block (15): legacy files that must keep loading (a YAML chat with extra keys and tool calls, a schedule with `agentId: Assistant` and no `hasError`, a `folder.yaml` with no `tasks`, a `_meta.yaml` with no `isPinned`), rejections in trees and direct loads, and a check that valid files come back exactly as parsed.
+- `validate.csp.test.ts` (2) blocks the `Function` constructor and checks that validation still accepts and rejects.
+- `settings-store.test.ts` gained 8 merge tests, including one that every partialized field has a shape check.
+
+Verified: `tsc`, the full Vitest suite (96 files, 2152 tests), `bun run quick_test`, Biome (55 warnings, the same as the Phase 5 tip; one moved from `storage.ts` to `storage/web-fs.ts`), `cargo check`, `cargo test --lib` (2 tests), and `vite build`.
+
+The release build (`bunx tauri build --bundles dmg`) compiled; `bundle_dmg.sh` then failed, an environment problem: earlier builds today left stale `rw.*.dmg` files too. The smoke test used the built `Verbalis.app`, which runs under the release CSP.
+
+Packaged smoke test (2026-10-01). Before the run, broken and edge-case fixtures were added to a backed-up `~/.verbalis`: a malformed chat-folder `_meta.yaml` next to a legacy YAML chat, a schedule with no `id`, a malformed schedule, a scheduler `_meta.yaml` with an extra `color: blue`, and a `folder.yaml` with `tasks: oops`. Every item passed:
+- Settings hydrated through the new merge: the hue, directories, selected models, ZDR and default model were all restored. The keychain reloaded the OpenRouter key.
+- The chat tree loaded, and the folder with the malformed meta was listed. The legacy YAML chat opened with both messages and was migrated to `.json`, with the `.yaml` deleted.
+- Pinning the malformed-meta folder moved it to the top and rewrote its meta as `isPinned: true` plus a new `createdAt`.
+- The scheduler tree showed the real schedule and the folder, and skipped both invalid schedules. Pin and rename (by Enter) of the folder kept `color: blue` in its `_meta.yaml`.
+- The tasks tree showed both real backlogs and skipped the invalid one.
+- A Toolbox agent opened with highlighting. The Workspace tree listed files, and a file opened with highlighting.
+- The log viewer listed and read logs.
+- A live chat ran an `http_fetch` tool call through `http_request`: status 200 and the full body in 137ms. The chat was saved.
+- Afterwards the fixtures and the smoke chat were removed. `~/.verbalis` matched the backup, apart from logs.
+
+Not covered in this run:
+- A schedule Run now, selecting a schedule, and a task run. A relaunch for them was blocked by the macOS keychain password prompt.
+- A tool confirmation. Guardrails are off (YOLO) in this profile, so the live tool call ran without one.
+- Voice, read-aloud and image generation. Phase 6 doesn't touch their code paths or the CSP; the moved Rust commands were checked through the log viewer, keychain, fs and HTTP items above.
+- `loadSchedule`, the per-schedule load used by the scheduler tick, is covered by the unit tests (a legacy valid file, malformed YAML, and a non-boolean `enabled`).
 
 ## Phase 8: Tooling and tests
 - **Strict TS config.** Make `apps/web/tsconfig.json` extend `@verbalis-app/config/tsconfig.base.json` (`noUncheckedIndexedAccess`, `noUnused*`) and fix the resulting errors. This can run in parallel with earlier phases, one directory at a time.
