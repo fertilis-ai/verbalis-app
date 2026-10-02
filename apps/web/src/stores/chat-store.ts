@@ -8,10 +8,7 @@ import {
 } from "@/lib/tools";
 import { computeContextBudget, type ContextBudget } from "@/lib/context/token-estimate";
 import { trimMessagesToBudget } from "@/lib/context/trim";
-import { resolveMemories } from "@/lib/memory/resolve-memories";
-import { resolveSkills, renderSkillsForPrompt } from "@/lib/skills/resolve-skills";
-import { buildToolboxInventory } from "@/lib/toolbox/toolbox-inventory";
-import { renderToolboxFormatReference } from "@/lib/toolbox/toolbox-schemas";
+import { buildSystemPrompt, loadToolboxPromptSections } from "@/lib/prompt/build-system-prompt";
 import { useSettingsStore } from "./settings-store";
 import { useAgentStore } from "./agent-store";
 import { useAgenticLoopStore, subscribeToLoopEvents } from "./agentic-loop-store";
@@ -325,66 +322,19 @@ export const useChatStore = create<ChatState>((set, get) => {
 
       const model = (modelOverride ?? get().model) as ChatModelId;
       const isLocal = model === "local";
-      const baseSystemPrompt = agent?.systemPrompt ?? "You are a helpful AI assistant.";
       const temperature = agent?.temperature ?? 0.7;
       // Per-agent tool scoping: when the agent declares a `tools:` list, only
       // those tools are exposed for this run.
       const allowedTools = agent?.tools;
 
-      let systemPrompt = baseSystemPrompt;
-
-      // Load persistent memories. Canonical store is the app-data memories dir
-      // (Toolbox "memories"); SOUL/USER and any `alwaysInclude` memory are
-      // injected, bounded in size, with a legacy read of settingsDir/memories/.
-      const memories = await resolveMemories({ settingsDir: settings.settingsDirectory });
-      for (const mem of memories) {
-        systemPrompt += `\n\n## ${mem.heading}\n${mem.body}`;
-      }
-
-      // Inject skill index (always) + matched skill bodies (by trigger).
-      try {
-        const resolvedSkills = await resolveSkills(content);
-        systemPrompt += renderSkillsForPrompt(resolvedSkills);
-      } catch (error) {
-        console.warn("[chat-store] Failed to resolve skills:", error);
-      }
-
-      // Toolbox awareness: compact inventory of every category so the agent
-      // knows what exists without a list_toolbox_items round-trip. Always
-      // injected (read-only), independent of allowSelfEnhancement.
-      try {
-        systemPrompt += await buildToolboxInventory();
-      } catch (error) {
-        console.warn("[chat-store] Failed to build toolbox inventory:", error);
-      }
-
-      // Inject current agent context
-      if (agent) {
-        systemPrompt += `\n\n## Current Agent\nName: ${agent.name}${agent.model ? `\nModel: ${agent.model}` : ""}\nTemperature: ${agent.temperature}`;
-      }
-
-      // Inject file context into system prompt
-      const contextFiles = get().contextFiles;
-      if (contextFiles.length > 0) {
-        const fileContext = contextFiles
-          .map((f) => `### ${f.name}\n\`\`\`\n${f.content}\n\`\`\``)
-          .join("\n\n");
-        systemPrompt += `\n\n## File Context\nThe user has attached the following files for reference:\n\n${fileContext}`;
-      }
-
-      // Inject Working Directory context
-      if (settings.workingDirectory) {
-        systemPrompt += `\n\n## Working Directory\nThe user's current working directory is: ${settings.workingDirectory}\n- Relative paths in file tools (read_file, write_file, etc.) automatically resolve to this directory.\n- Paths starting with agents/, prompts/, memories/, skills/, workflows/ automatically resolve to the Verbalis data directory.`;
-      }
-
-      // Memory / self-enhancement guidance
-      systemPrompt += `\n\n## Memory\nUse the \`remember\` tool to persist durable facts about the user or task so they are available in future sessions. Don't remember trivial or ephemeral details.`;
-      if (settings.allowSelfEnhancement) {
-        systemPrompt += `\n\n## Self-Enhancement\nYou may improve your own Toolbox using \`list_toolbox_items\`, \`read_toolbox_item\`, \`write_toolbox_item\`, \`edit_toolbox_item\`, and \`delete_toolbox_item\` (categories: prompts, memories, agents, skills, workflows). Writes and deletes require user confirmation. Prefer \`edit_toolbox_item\` for small changes and \`write_toolbox_item\` for new items or rewrites. Create referenced agents before workflows that name them.\n\n${renderToolboxFormatReference()}`;
-      }
-      if (settings.apiKeys.openrouter?.trim() && settings.imageModel) {
-        systemPrompt += `\n\n## Image Generation\nWhen the user asks you to create, draw, or generate an image or picture, use the \`generate_image\` tool. To edit or vary a previously generated image, pass its file path (the "Saved to:" line of the earlier tool result) as \`source_image\`. Generated images are saved to ~/.verbalis/images and shown to the user automatically — after the tool succeeds, just briefly describe the image; never embed image data in your reply.`;
-      }
+      const systemPrompt = buildSystemPrompt({
+        agent,
+        sections: await loadToolboxPromptSections({ settingsDir: settings.settingsDirectory, userMessage: content }),
+        contextFiles: get().contextFiles,
+        workingDirectory: settings.workingDirectory,
+        allowSelfEnhancement: settings.allowSelfEnhancement,
+        imageGeneration: !!(settings.apiKeys.openrouter?.trim() && settings.imageModel),
+      });
 
       // Helper: run a model through the VerbalisAgentAdapter (Tauri only)
       // Shared by both local and cloud models for consistent tool execution,
