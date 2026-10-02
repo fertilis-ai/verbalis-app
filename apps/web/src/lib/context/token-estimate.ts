@@ -10,7 +10,7 @@
  */
 
 import type { Tool, Usage } from "@earendil-works/pi-ai";
-import type { Message } from "@/stores/chat-store";
+import type { Message } from "@/lib/types/chat";
 
 /** Average characters per token for English-ish text. */
 const CHARS_PER_TOKEN = 4;

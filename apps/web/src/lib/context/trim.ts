@@ -14,7 +14,7 @@
  */
 
 import type { Tool } from "@earendil-works/pi-ai";
-import type { Message } from "@/stores/chat-store";
+import type { Message } from "@/lib/types/chat";
 import {
   estimateTokensForText,
   estimateTokensForTools,

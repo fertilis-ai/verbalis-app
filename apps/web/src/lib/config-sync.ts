@@ -15,7 +15,7 @@ import type { HueId } from "@/lib/hue-presets";
 import type { ChatModelId, ImageProviderModel, ProviderModel } from "@/lib/models";
 import type { EffortLevel } from "@/lib/reasoning";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
-import type { UserMode, Theme, LocalLlmProvider } from "@/stores/settings-store";
+import type { UserMode, Theme, LocalLlmProvider } from "@/lib/types/settings";
 
 /** The subset of settings state persisted to config.yaml */
 interface ConfigYaml {

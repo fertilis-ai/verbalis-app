@@ -1,6 +1,6 @@
 import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import { validateToolArguments } from "@earendil-works/pi-ai";
-import type { ToolCategory, RiskLevel } from "./tools/categories";
+import type { ToolCallStatus } from "./types/chat";
 import { getToolRegistry, getToolSpec } from "./tools/registry";
 import { TOOLBOX_TOOL_NAMES as TOOLBOX_TOOL_NAME_LIST } from "./tools/toolbox-tools";
 import { resolvePath, type ResolvePathResult } from "./path-resolution";
@@ -8,6 +8,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { getAppDataDir, isTauri } from "@/lib/storage";
 
 export { getToolCategory, getToolRiskLevel, toolSupportsUndo } from "./tools/registry";
+export type { ToolCallState, ToolCallStatus } from "./types/chat";
 
 const TOOLBOX_TOOL_NAMES = new Set<string>(TOOLBOX_TOOL_NAME_LIST);
 
@@ -18,37 +19,6 @@ export interface ToolResult {
   status: "success" | "error";
   result?: string;
   error?: string;
-}
-
-// Tool call state for UI tracking
-export type ToolCallStatus =
-  | "pending"
-  | "pending_confirmation"
-  | "executing"
-  | "success"
-  | "error"
-  | "cancelled"
-  | "timeout"
-  | "stopped";
-
-export interface ToolCallState {
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
-  status: ToolCallStatus;
-  result?: string;
-  error?: string;
-  // Enhanced tracking
-  queuedAt?: Date;
-  startedAt?: Date;
-  completedAt?: Date;
-  durationMs?: number;
-  category?: ToolCategory;
-  riskLevel?: RiskLevel;
-  undoAvailable?: boolean;
-  // Guardrail context
-  guardrailReason?: string;
-  guardrailViolations?: Array<{ type: string; message: string; severity: string }>;
 }
 
 /**

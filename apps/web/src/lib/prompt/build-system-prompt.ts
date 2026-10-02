@@ -2,8 +2,8 @@ import { resolveMemories, type ResolvedMemory } from "@/lib/memory/resolve-memor
 import { resolveSkills, renderSkillsForPrompt } from "@/lib/skills/resolve-skills";
 import { buildToolboxInventory } from "@/lib/toolbox/toolbox-inventory";
 import { renderToolboxFormatReference } from "@/lib/toolbox/toolbox-schemas";
-import type { Agent } from "@/stores/agent-store";
-import type { ContextFile } from "@/stores/chat-store";
+import type { Agent } from "@/lib/types/agent";
+import type { ContextFile } from "@/lib/types/chat";
 
 export const DEFAULT_SYSTEM_PROMPT = "You are a helpful AI assistant.";
 

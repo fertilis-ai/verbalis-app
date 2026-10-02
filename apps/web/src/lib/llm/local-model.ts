@@ -1,7 +1,7 @@
 import type { Model } from "@earendil-works/pi-ai";
 import { appFetch } from "@/lib/http";
 import { normalizeBaseUrl, buildOpenAiBaseUrl, buildOpenAiUrl } from "@/lib/url-utils";
-import type { LocalLlmProvider } from "@/stores/settings-store";
+import type { LocalLlmProvider } from "@/lib/types/settings";
 
 /**
  * The model id to use on a local server: the configured one if set, otherwise

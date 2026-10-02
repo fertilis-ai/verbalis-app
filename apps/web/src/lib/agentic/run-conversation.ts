@@ -1,14 +1,13 @@
 import type { Api, Model, ThinkingLevel } from "@earendil-works/pi-ai";
-import type { AgentLoopEvent } from "@/lib/agentic/types";
-import type { VerbalisAdapterConfig } from "@/lib/agentic/verbalis-agent-adapter";
+import type { AgentLoopConfig, AgentLoopEvent } from "@/lib/agentic/types";
+import type { VerbalisAdapterConfig, VerbalisAgentAdapter } from "@/lib/agentic/verbalis-agent-adapter";
 import { computeContextBudget, type ContextBudget } from "@/lib/context/token-estimate";
 import { trimMessagesToBudget } from "@/lib/context/trim";
 import type { GuardrailsConfig } from "@/lib/guardrails/types";
 import { logAgent } from "@/lib/logger";
 import { mergeToolCalls } from "@/lib/tool-call-patch";
 import { getToolsForContext } from "@/lib/tools";
-import type { useAgenticLoopStore } from "@/stores/agentic-loop-store";
-import type { Conversation, Message } from "@/stores/chat-store";
+import type { Conversation, Message } from "@/lib/types/chat";
 
 /** Update the last assistant message in a messages array with the given partial updates. */
 export function updateLastAssistantMessage(messages: Message[], updates: Partial<Message>): Message[] {
@@ -71,10 +70,17 @@ export function applyAdapterEvent(c: Conversation, event: AgentLoopEvent, now = 
   }
 }
 
-type LoopStore = Pick<
-  ReturnType<typeof useAgenticLoopStore.getState>,
-  "getAdapter" | "createAdapter" | "setCurrentLoop" | "releaseAdapter"
->;
+/** The agentic-loop store actions this module uses. */
+interface LoopStore {
+  getAdapter: (conversationId: string) => VerbalisAgentAdapter | null;
+  createAdapter: (
+    conversationId: string,
+    agentId: string | null,
+    config?: Partial<AgentLoopConfig>
+  ) => VerbalisAgentAdapter;
+  setCurrentLoop: (conversationId: string | null) => void;
+  releaseAdapter: (conversationId: string, adapter: VerbalisAgentAdapter) => void;
+}
 
 export interface RunConversationParams {
   conversationId: string;

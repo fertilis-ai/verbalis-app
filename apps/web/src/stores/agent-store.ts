@@ -1,15 +1,8 @@
 import { create } from "zustand";
 import { listAgents, loadAgent } from "@/lib/storage";
+import type { Agent } from "@/lib/types/agent";
 
-export interface Agent {
-  name: string;
-  /** Optional model override. Undefined = the app's selected model. */
-  model?: string;
-  temperature: number;
-  systemPrompt: string;
-  /** Optional per-agent tool allowlist (tool names). Undefined = all tools. */
-  tools?: string[];
-}
+export type { Agent };
 
 interface AgentState {
   agents: Agent[];

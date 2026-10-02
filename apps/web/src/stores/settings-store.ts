@@ -10,10 +10,9 @@ import { storeApiKey } from "@/lib/keychain";
 import { isTauri } from "@tauri-apps/api/core";
 import type { HueId } from "@/lib/hue-presets";
 import type { EffortLevel } from "@/lib/reasoning";
+import type { Theme, UserMode, LocalLlmProvider } from "@/lib/types/settings";
 
-export type Theme = "system" | "light" | "dark";
-export type UserMode = "normal" | "advanced";
-export type LocalLlmProvider = "lmstudio" | "ollama";
+export type { Theme, UserMode, LocalLlmProvider };
 
 interface SettingsState {
   theme: Theme;

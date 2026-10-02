@@ -1,7 +1,7 @@
 import { streamSimple, type Api, type Model, type SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { messagesToPiMessages } from "@/lib/message-conversion";
 import { stripProtocolMarkers } from "@/lib/protocol-parser";
-import type { Message } from "@/stores/chat-store";
+import type { Message } from "@/lib/types/chat";
 
 /**
  * Stream a reply without tools (the web-only path, where the agent adapter

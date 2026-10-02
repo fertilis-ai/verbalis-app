@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { v4 as uuid } from "uuid";
 import type { Api, Model, ThinkingLevel } from "@earendil-works/pi-ai";
-import type { ToolCallState, ToolCallStatus } from "@/lib/tools";
+import type { Message, Conversation, ContextFile, ToolCallState, ToolCallStatus } from "@/lib/types/chat";
 import type { ContextBudget } from "@/lib/context/token-estimate";
 import { buildSystemPrompt, loadToolboxPromptSections } from "@/lib/prompt/build-system-prompt";
 import { useSettingsStore } from "./settings-store";
@@ -44,34 +44,7 @@ import { rejectToolCall, stopInFlightToolCalls, upsertToolCall } from "@/lib/too
 import { findNodeInTree, getUniqueName, getSiblingFolderNames } from "@/lib/tree-utils";
 import { toggleInSet } from "@/lib/set-utils";
 
-export interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  toolCalls?: ToolCallState[];
-  createdAt: Date;
-}
-
-export type { ToolCallState, ToolCallStatus };
-
-export interface Conversation {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: Date;
-  updatedAt: Date;
-  // File system location
-  path?: string;
-  folderId?: string;
-  // Background conversations are hidden from the chat sidebar (e.g. scheduler runs)
-  background?: boolean;
-}
-
-export interface ContextFile {
-  path: string;
-  name: string;
-  content: string;
-}
+export type { Message, Conversation, ContextFile, ToolCallState, ToolCallStatus };
 
 interface ChatState {
   // Conversations (in-memory + synced to disk)

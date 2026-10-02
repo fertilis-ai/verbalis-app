@@ -41,7 +41,7 @@ import {
   toolSupportsUndo,
   type ToolCallState,
 } from "@/lib/tools";
-import type { Message } from "@/stores/chat-store";
+import type { Message } from "@/lib/types/chat";
 import { messagesToPiMessages } from "@/lib/message-conversion";
 import type {
   AgentLoopEvent,

@@ -1,5 +1,5 @@
 import { normalizeToolCallStatus, type ToolCallState, type ToolCallStatus } from "@/lib/tools";
-import type { Conversation } from "@/stores/chat-store";
+import type { Conversation } from "@/lib/types/chat";
 
 /** True for a tool call that has not reached a final state yet. */
 export function isToolCallInFlight(status: ToolCallStatus): boolean {

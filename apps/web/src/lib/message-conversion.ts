@@ -5,7 +5,7 @@ import type {
   Api,
   Usage,
 } from "@earendil-works/pi-ai";
-import type { Message } from "@/stores/chat-store";
+import type { Message } from "@/lib/types/chat";
 
 export function buildEmptyUsage(): Usage {
   return {

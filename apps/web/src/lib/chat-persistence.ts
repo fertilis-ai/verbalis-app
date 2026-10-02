@@ -2,7 +2,7 @@ import { getAppDataDir, saveChatToFolder, type ChatData } from "@/lib/storage";
 import { dirname } from "@/lib/path-resolution";
 import { stripProtocolMarkers } from "@/lib/protocol-parser";
 import { restoreToolCall } from "@/lib/tool-call-patch";
-import type { Conversation, Message } from "@/stores/chat-store";
+import type { Conversation, Message } from "@/lib/types/chat";
 
 /** Serialize a Conversation's messages to ChatData message format for disk persistence. */
 export function serializeMessages(messages: Message[]): ChatData["messages"] {
