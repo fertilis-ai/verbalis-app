@@ -1,6 +1,7 @@
 import { MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
+import { useShallow } from "zustand/react/shallow";
 import { FolderTreeSidebar } from "@/components/shared/folder-tree-sidebar";
 import type { SidebarTreeNodeData } from "@/components/shared/sidebar-tree-node";
 
@@ -27,7 +28,27 @@ export function ChatSidebar() {
     renameChat,
     moveConversation,
     loadChatsFromDisk,
-  } = useChatStore();
+  } = useChatStore(
+    useShallow((s) => ({
+      chatTree: s.chatTree,
+      conversations: s.conversations,
+      currentConversationId: s.currentConversationId,
+      expandedFolders: s.expandedFolders,
+      isGhostMode: s.isGhostMode,
+      ghostConversation: s.ghostConversation,
+      createConversation: s.createConversation,
+      selectConversation: s.selectConversation,
+      deleteConversation: s.deleteConversation,
+      createFolder: s.createFolder,
+      renameFolder: s.renameFolder,
+      deleteFolder: s.deleteFolder,
+      toggleFolderExpansion: s.toggleFolderExpansion,
+      toggleFolderPin: s.toggleFolderPin,
+      renameChat: s.renameChat,
+      moveConversation: s.moveConversation,
+      loadChatsFromDisk: s.loadChatsFromDisk,
+    }))
+  );
 
   const handleCreateFolder = async () => {
     try {

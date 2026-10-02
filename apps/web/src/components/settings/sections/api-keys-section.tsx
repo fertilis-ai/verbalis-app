@@ -3,13 +3,22 @@ import { Eye, EyeOff, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { getProviderLabel } from "@/lib/models";
 import { isTauri } from "@/lib/storage";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { SettingsSectionLayout } from "../settings-section-layout";
 
 export function ApiKeysSection() {
-  const { apiKeys, setApiKey } = useSettingsStore();
+  const {
+    apiKeys,
+    setApiKey,
+  } = useSettingsStore(
+    useShallow((s) => ({
+      apiKeys: s.apiKeys,
+      setApiKey: s.setApiKey,
+    }))
+  );
   const [showKeys, setShowKeys] = React.useState<Record<string, boolean>>({});
 
   const providers = [

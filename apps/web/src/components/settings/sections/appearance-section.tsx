@@ -1,13 +1,22 @@
 import { Moon, Sun, Monitor, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { useTheme } from "@/components/theme-provider";
 import { HUE_PRESETS } from "@/lib/hue-presets";
 import { SettingsSectionLayout } from "../settings-section-layout";
 
 export function AppearanceSection() {
   const { setTheme, theme, resolvedTheme } = useTheme();
-  const { hue, setHue } = useSettingsStore();
+  const {
+    hue,
+    setHue,
+  } = useSettingsStore(
+    useShallow((s) => ({
+      hue: s.hue,
+      setHue: s.setHue,
+    }))
+  );
   const mode = resolvedTheme === "dark" ? "dark" : "light";
   const selectedPreset = HUE_PRESETS.find((p) => p.id === hue);
 

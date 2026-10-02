@@ -2,10 +2,19 @@ import { Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { SettingsSectionLayout } from "../settings-section-layout";
 
 export function LocalLlmSection() {
-  const { localLLM, setLocalLLM } = useSettingsStore();
+  const {
+    localLLM,
+    setLocalLLM,
+  } = useSettingsStore(
+    useShallow((s) => ({
+      localLLM: s.localLLM,
+      setLocalLLM: s.setLocalLLM,
+    }))
+  );
   const baseDefaults = {
     lmstudio: "http://localhost:1234/v1",
     ollama: "http://localhost:11434/v1",

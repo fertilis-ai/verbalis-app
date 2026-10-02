@@ -2,6 +2,7 @@ import * as React from "react";
 import { Shield, Download, Upload, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import type { CategoryConfirmationMatrix } from "@/lib/guardrails/types";
 import type { ToolCategory } from "@/lib/tools/categories";
 import { downloadFile } from "@/lib/download";
@@ -19,7 +20,16 @@ export function GuardrailsSection() {
     applyGuardrailsPreset,
     importGuardrailsConfig,
     exportGuardrailsConfig,
-  } = useSettingsStore();
+  } = useSettingsStore(
+    useShallow((s) => ({
+      guardrailsConfig: s.guardrailsConfig,
+      setGuardrailsConfig: s.setGuardrailsConfig,
+      resetGuardrailsToDefaults: s.resetGuardrailsToDefaults,
+      applyGuardrailsPreset: s.applyGuardrailsPreset,
+      importGuardrailsConfig: s.importGuardrailsConfig,
+      exportGuardrailsConfig: s.exportGuardrailsConfig,
+    }))
+  );
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 

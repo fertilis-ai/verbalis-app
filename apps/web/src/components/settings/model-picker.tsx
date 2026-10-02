@@ -3,6 +3,7 @@ import { ChevronRight, ChevronDown, ChevronsRight, ChevronsLeft, ChevronRightIco
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { cn } from "@/lib/utils";
 import { getProviderLabel, type ProviderModel } from "@/lib/models";
 
@@ -45,7 +46,16 @@ export function ModelPicker() {
     removeSelectedModels,
     setSelectedModels,
     openRouterZdrOnly,
-  } = useSettingsStore();
+  } = useSettingsStore(
+    useShallow((s) => ({
+      availableModels: s.availableModels,
+      selectedModels: s.selectedModels,
+      addSelectedModels: s.addSelectedModels,
+      removeSelectedModels: s.removeSelectedModels,
+      setSelectedModels: s.setSelectedModels,
+      openRouterZdrOnly: s.openRouterZdrOnly,
+    }))
+  );
 
   const [leftSearch, setLeftSearch] = React.useState("");
   const [rightSearch, setRightSearch] = React.useState("");

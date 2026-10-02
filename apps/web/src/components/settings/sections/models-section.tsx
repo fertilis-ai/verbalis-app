@@ -1,5 +1,6 @@
 import { Cpu } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import {
   LOCAL_MODEL_ID,
   filterZdrModels,
@@ -18,12 +19,70 @@ import { SettingsSectionLayout } from "../settings-section-layout";
 
 export function ModelsSection() {
   const {
-    defaultModel, setDefaultModel, localLLM, selectedModels, modelFetchStatus, modelFetchError, fetchModels,
-    openRouterZdrOnly, setOpenRouterZdrOnly,
-    apiKeys, imageModel, setImageModel, availableImageModels, imageModelFetchStatus, imageModelFetchError, fetchImageModels,
-    transcriptionModel, setTranscriptionModel, availableTranscriptionModels, transcriptionModelFetchStatus, transcriptionModelFetchError, fetchTranscriptionModels,
-    speechModel, setSpeechModel, speechVoice, setSpeechVoice, availableSpeechModels, speechModelFetchStatus, speechModelFetchError, fetchSpeechModels,
-  } = useSettingsStore();
+    defaultModel,
+    setDefaultModel,
+    localLLM,
+    selectedModels,
+    modelFetchStatus,
+    modelFetchError,
+    fetchModels,
+    openRouterZdrOnly,
+    setOpenRouterZdrOnly,
+    apiKeys,
+    imageModel,
+    setImageModel,
+    availableImageModels,
+    imageModelFetchStatus,
+    imageModelFetchError,
+    fetchImageModels,
+    transcriptionModel,
+    setTranscriptionModel,
+    availableTranscriptionModels,
+    transcriptionModelFetchStatus,
+    transcriptionModelFetchError,
+    fetchTranscriptionModels,
+    speechModel,
+    setSpeechModel,
+    speechVoice,
+    setSpeechVoice,
+    availableSpeechModels,
+    speechModelFetchStatus,
+    speechModelFetchError,
+    fetchSpeechModels,
+  } = useSettingsStore(
+    useShallow((s) => ({
+      defaultModel: s.defaultModel,
+      setDefaultModel: s.setDefaultModel,
+      localLLM: s.localLLM,
+      selectedModels: s.selectedModels,
+      modelFetchStatus: s.modelFetchStatus,
+      modelFetchError: s.modelFetchError,
+      fetchModels: s.fetchModels,
+      openRouterZdrOnly: s.openRouterZdrOnly,
+      setOpenRouterZdrOnly: s.setOpenRouterZdrOnly,
+      apiKeys: s.apiKeys,
+      imageModel: s.imageModel,
+      setImageModel: s.setImageModel,
+      availableImageModels: s.availableImageModels,
+      imageModelFetchStatus: s.imageModelFetchStatus,
+      imageModelFetchError: s.imageModelFetchError,
+      fetchImageModels: s.fetchImageModels,
+      transcriptionModel: s.transcriptionModel,
+      setTranscriptionModel: s.setTranscriptionModel,
+      availableTranscriptionModels: s.availableTranscriptionModels,
+      transcriptionModelFetchStatus: s.transcriptionModelFetchStatus,
+      transcriptionModelFetchError: s.transcriptionModelFetchError,
+      fetchTranscriptionModels: s.fetchTranscriptionModels,
+      speechModel: s.speechModel,
+      setSpeechModel: s.setSpeechModel,
+      speechVoice: s.speechVoice,
+      setSpeechVoice: s.setSpeechVoice,
+      availableSpeechModels: s.availableSpeechModels,
+      speechModelFetchStatus: s.speechModelFetchStatus,
+      speechModelFetchError: s.speechModelFetchError,
+      fetchSpeechModels: s.fetchSpeechModels,
+    }))
+  );
   const speechVoices = availableSpeechModels.find((m) => m.id === speechModel)?.voices ?? [];
   const imageOptions = filterZdrModels(availableImageModels, openRouterZdrOnly, imageModel);
   const transcriptionOptions = filterZdrModels(

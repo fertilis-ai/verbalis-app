@@ -1,5 +1,6 @@
 import { Bug } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { isTauri } from "@/lib/storage";
 import { SettingsSectionLayout } from "../settings-section-layout";
 
@@ -8,7 +9,13 @@ export function DebugSection() {
     homeDir,
     agentDebugLogging,
     setAgentDebugLogging,
-  } = useSettingsStore();
+  } = useSettingsStore(
+    useShallow((s) => ({
+      homeDir: s.homeDir,
+      agentDebugLogging: s.agentDebugLogging,
+      setAgentDebugLogging: s.setAgentDebugLogging,
+    }))
+  );
 
   // Only show in Tauri (desktop) environment
   if (!isTauri()) {

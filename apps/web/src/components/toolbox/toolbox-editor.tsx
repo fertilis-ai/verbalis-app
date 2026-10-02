@@ -2,6 +2,7 @@ import * as React from "react";
 import { Wrench, Play, Loader2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { useToolboxStore, itemKey, type ToolboxCategory } from "@/stores/toolbox-store";
+import { useShallow } from "zustand/react/shallow";
 import { ToolboxTabs } from "./toolbox-tabs";
 import { CodeOverlayEditor } from "@/components/shared/code-overlay-editor";
 import { runWorkflowByName } from "@/lib/workflows/run-workflow";
@@ -26,8 +27,21 @@ function getLanguage(category: ToolboxCategory): string {
 }
 
 export function ToolboxEditor() {
-  const { openItems, activeItemKey, updateItem, updateOpenItemContent, markOpenItemSaved } =
-    useToolboxStore();
+  const {
+    openItems,
+    activeItemKey,
+    updateItem,
+    updateOpenItemContent,
+    markOpenItemSaved,
+  } = useToolboxStore(
+    useShallow((s) => ({
+      openItems: s.openItems,
+      activeItemKey: s.activeItemKey,
+      updateItem: s.updateItem,
+      updateOpenItemContent: s.updateOpenItemContent,
+      markOpenItemSaved: s.markOpenItemSaved,
+    }))
+  );
   const [isRunning, setIsRunning] = React.useState(false);
 
   const activeItem = openItems.find(

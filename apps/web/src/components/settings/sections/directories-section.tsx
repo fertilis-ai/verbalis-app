@@ -2,11 +2,26 @@ import { FolderOpen, FolderCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { isTauri } from "@/lib/storage";
 import { SettingsSectionLayout } from "../settings-section-layout";
 
 export function DirectoriesSection() {
-  const { homeDir, workingDirectory, setWorkingDirectory, settingsDirectory, setSettingsDirectory } = useSettingsStore();
+  const {
+    homeDir,
+    workingDirectory,
+    setWorkingDirectory,
+    settingsDirectory,
+    setSettingsDirectory,
+  } = useSettingsStore(
+    useShallow((s) => ({
+      homeDir: s.homeDir,
+      workingDirectory: s.workingDirectory,
+      setWorkingDirectory: s.setWorkingDirectory,
+      settingsDirectory: s.settingsDirectory,
+      setSettingsDirectory: s.setSettingsDirectory,
+    }))
+  );
 
   const handlePickDirectory = async (setter: (dir: string) => void, current: string) => {
     if (!isTauri()) return;

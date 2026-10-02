@@ -2,6 +2,7 @@ import * as React from "react";
 import { Bot, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/chat-store";
+import { useShallow } from "zustand/react/shallow";
 import { useAgenticLoopStore } from "@/stores/agentic-loop-store";
 import { ChatInput } from "./chat-input";
 import { ChatHeader } from "./chat-header";
@@ -22,7 +23,17 @@ export function ChatView() {
     rejectToolExecution,
     addContextFiles,
     removeContextFile,
-  } = useChatStore();
+  } = useChatStore(
+    useShallow((s) => ({
+      sendMessage: s.sendMessage,
+      isStreaming: s.isStreaming,
+      isGhostMode: s.isGhostMode,
+      confirmToolExecution: s.confirmToolExecution,
+      rejectToolExecution: s.rejectToolExecution,
+      addContextFiles: s.addContextFiles,
+      removeContextFile: s.removeContextFile,
+    }))
+  );
   const contextFiles = useChatStore((s) => s.contextFiles);
   const currentConversation = useChatStore((s) => s.getCurrentConversation());
 

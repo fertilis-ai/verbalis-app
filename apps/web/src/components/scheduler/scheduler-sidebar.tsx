@@ -1,5 +1,6 @@
 import { Clock } from "lucide-react";
 import { useSchedulerStore } from "@/stores/scheduler-store";
+import { useShallow } from "zustand/react/shallow";
 import { FolderTreeSidebar } from "@/components/shared/folder-tree-sidebar";
 import type { SidebarTreeNodeData } from "@/components/shared/sidebar-tree-node";
 
@@ -24,7 +25,25 @@ export function SchedulerSidebar() {
     moveSchedule,
     selectSchedule,
     loadSchedulersFromDisk,
-  } = useSchedulerStore();
+  } = useSchedulerStore(
+    useShallow((s) => ({
+      schedulerTree: s.schedulerTree,
+      schedules: s.schedules,
+      selectedScheduleId: s.selectedScheduleId,
+      expandedFolders: s.expandedFolders,
+      createFolder: s.createFolder,
+      renameFolder: s.renameFolder,
+      deleteFolder: s.deleteFolder,
+      toggleFolderPin: s.toggleFolderPin,
+      toggleFolderExpansion: s.toggleFolderExpansion,
+      createSchedule: s.createSchedule,
+      renameSchedule: s.renameSchedule,
+      deleteSchedule: s.deleteSchedule,
+      moveSchedule: s.moveSchedule,
+      selectSchedule: s.selectSchedule,
+      loadSchedulersFromDisk: s.loadSchedulersFromDisk,
+    }))
+  );
 
   const items = schedules.map((s) => ({ id: s.id, label: s.name || "New Schedule" }));
 

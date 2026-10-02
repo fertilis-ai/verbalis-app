@@ -1,9 +1,18 @@
 import { Bot } from "lucide-react";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useShallow } from "zustand/react/shallow";
 import { SettingsSectionLayout } from "../settings-section-layout";
 
 export function AgentSection() {
-  const { allowSelfEnhancement, setAllowSelfEnhancement } = useSettingsStore();
+  const {
+    allowSelfEnhancement,
+    setAllowSelfEnhancement,
+  } = useSettingsStore(
+    useShallow((s) => ({
+      allowSelfEnhancement: s.allowSelfEnhancement,
+      setAllowSelfEnhancement: s.setAllowSelfEnhancement,
+    }))
+  );
 
   return (
     <SettingsSectionLayout id="agent" icon={Bot} title="Agent" className="space-y-4">
