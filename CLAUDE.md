@@ -57,7 +57,9 @@ packaged build — `cd apps/web && bunx tauri build --bundles dmg` — not just 
 
 ## Notes
 
-- Tests use Vitest (jsdom). `bun run quick_test` runs a fast subset, not the whole suite
+- Tests use Vitest (jsdom). `bun run quick_test` runs the **whole** suite with a 2000ms per-test
+  timeout and the verbose reporter, then prints per-test durations and writes them to
+  `apps/web/test-durations.log`. It is not a subset
 - Biome is linter-only — the **formatter is disabled**, so do not reach for `biome format`
 - Bun is the package manager - do not use npm/yarn/pnpm
 - The `routeTree.gen.ts` file is auto-generated - never edit manually
