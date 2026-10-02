@@ -297,7 +297,7 @@ A second packaged run (2026-10-01, the same `Verbalis.app`, from a fresh backup 
 
 `loadSchedule`, the per-schedule load used by the scheduler tick, is covered by the unit tests (a legacy valid file, malformed YAML, and a non-boolean `enabled`).
 
-## Phase 7: Components — ✅ code done (branch `refactor/phase-7`, stacked on `refactor/phase-6`); packaged smoke test still to run, see below
+## Phase 7: Components — ⏳ code done (branch `refactor/phase-7`, stacked on `refactor/phase-6`); packaged smoke test partly run, items needing API keys still open (see below)
 1. ✅ **`CodeOverlayEditor`.** `components/shared/code-overlay-editor.tsx` holds the highlight-with-fallback effect, scroll sync, Tab indent and the gutter. `file-editor.tsx` and `toolbox-editor.tsx` pass `content`, `language` and `onChange`; the Toolbox adds Cmd+S through `onKeyDown`. The CLAUDE.md invariants (`text-transparent` only when the overlay is non-empty, the `.catch` fallback, `leading-5` after `text-sm`) now live in this one component, and CLAUDE.md names it.
 2. ✅ **`useAppBootstrap`.** The `routes/__root.tsx` startup moved to `lib/hooks/use-app-bootstrap.ts` with the same promise chain, the scheduler start after init, and the agent restore.
 3. ✅ **Split large components.**
@@ -334,21 +334,28 @@ Verified: `tsc`, the full Vitest suite (102 files, 2181 tests), `bun run quick_t
 
 Dev run (2026-10-01, `vite dev` in Chrome, a fresh browser profile). There were no console errors or warnings in any view; React's dev build warns about uncached `getSnapshot` results and update loops, and none appeared.
 - Settings: every section rendered. Sidebar clicks scrolled to the section, and scrolling the content moved the sidebar highlight. The Advanced preset applied (badge and checkboxes). Entering an OpenRouter key showed the Image and Transcription selects, and ZDR toggled.
-- Chat sidebar: a new folder and a new chat, pin (the menu then shows Unpin), and rename by Enter. Incognito mode toggled. The model quick select opened.
+- Chat sidebar: a new folder and a new chat, pin (the menu then shows Unpin), and rename by Enter. Incognito mode was entered. The model quick select opened.
 - Scheduler: a new schedule opened in the form.
 - Toolbox: an agent opened with highlighting and an aligned gutter; typing marked it dirty; the row menu showed Rename and Delete.
 - Not covered by the browser: Files (needs the Tauri filesystem), the Debug section (Tauri-only, as before), model Refresh, real data, chat moves, and anything needing an API key.
 
 Packaged build (2026-10-01): `bunx tauri build --bundles dmg` compiled and bundled `Verbalis.app`, then `bundle_dmg.sh` failed again. This time the cause is visible with `--verbose`: `hdiutil` could not unmount the temporary volume ("Resource busy"), so it is the build machine, not the code. Two stale images from earlier runs were still attached and were detached.
 
-**Packaged smoke test: not yet run.** The automated run could not drive the app: the computer-use daemon was not set up, and screen capture was not permitted. A cold launch of the built `Verbalis.app` in an isolated `HOME` started without errors (its log held only the expected keychain warnings). The installed app was left alone and `~/.verbalis` matched the backup afterwards. Still to check by hand in the built `Verbalis.app`, highest risk first:
-1. Cold launch: settings hydrate, the agent is restored, and the scheduler starts.
-2. Files: the tree fills on launch without a 5s wait (`immediate: false`), and a file created from the shell appears within about 5s. Delete confirm and cancel on a throwaway file and folder, and check that Cancel, the backdrop and Escape close the dialog without selecting the row underneath. The Workspace editor highlights.
-3. ToolCallCard: a confirmation, accepted and declined; an `edit_toolbox_item` confirmation shows the diff; a `generate_image` preview renders in the card; the copy tick resets on collapse.
-4. `ModelQuickSelect` and `EffortSelect` with a real reasoning model.
-5. Chat sidebar with real conversations: move a chat to a folder.
-6. Settings: the Debug toggle, Refresh on the text and speech selects, and the voice select for a speech model with voices.
-7. One scheduler Run now and one task run (the runners were not touched).
+**Packaged smoke test (2026-10-01), partly run.** The built `Verbalis.app` ran with `HOME` and `CFFIXED_USER_HOME` pointed at a scratch copy of `~/.verbalis`, so the installed app and the real data were not touched. It was driven through the macOS Accessibility API, reading the WKWebView's tree and pressing its elements; there were no screenshots. The keychain is unavailable under a scratch `HOME`, so there were no API keys and nothing reached a model. The copied settings pointed the working directory at the real `~/Projects`, so it was first switched to a scratch folder in Settings, by setting the field's value. Afterwards the real `~/.verbalis` matched the backup, apart from logs, and nothing under `~/Projects` had changed.
+1. Cold launch: passed as far as it could be observed. The UI rendered with the hydrated settings (default model, effort, theme, directories), the Toolbox listed the four agents, and the Rust log held only the expected keychain warnings. Not shown: that the scheduler started, because no schedule was due during the run.
+2. Files: passed, except for Escape and the backdrop.
+   - The tree was filled on opening Files, and filled again straight away after the working directory changed.
+   - A file created from the shell appeared within 4s.
+   - The row menu opened `ConfirmDialog` with the file name ("Delete File") and the folder name ("Delete Folder"). For the file and for the folder, Cancel closed it and kept the entry, and Delete removed it from disk and from the tree.
+   - Escape could not be tested: synthetic key events sent to a window in the background never reach WebKit. The backdrop was not tried. `confirm-dialog.test.tsx` covers Escape.
+   - The Workspace editor highlighted `hello.ts` (the overlay was split into Shiki token spans over the textarea), so the JS regex engine works under the packaged CSP. The Toolbox editor also rendered an agent with its overlay.
+3. ToolCallCard: not run (needs a model).
+4. `ModelQuickSelect` and `EffortSelect`: passed, without sending a message. Both menus opened, effort changed Max → Low → Max, and switching the model and back kept the effort select.
+5. Moving a chat to a folder: passed. "Move to folder" → "New Folder" took the chat out of the root list, and its JSON file moved into `chats/New Folder/`.
+6. Settings: the Debug Logging toggle went 1 → 0 → 1, and its path showed the scratch home. Text-model Refresh ran without an error. The speech Refresh and voice select are hidden without an OpenRouter key, so they were not run.
+7. Scheduler Run now and a task run: not run (needs a model). The Scheduler and Tasks views rendered their lists.
+
+Still to check by hand with real keys, in the built `Verbalis.app` (`apps/web/src-tauri/target/release/bundle/macos/Verbalis.app`): item 3, item 7, the speech Refresh and voice select, and Escape and the backdrop on the delete dialog.
 Voice was not re-checked: Phase 7 changed only its settings select. The highlight fallback is covered by `editor-highlight-fallback` and `highlighter.csp.test` rather than a staged failure.
 
 Follow-ups:
