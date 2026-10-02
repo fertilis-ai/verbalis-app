@@ -74,9 +74,7 @@ vi.mock("@/lib/models", async (importOriginal) => ({
   ],
 }));
 
-vi.mock("@/lib/storage", () => ({
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@/lib/storage", () => import("@/test/mocks/storage"));
 
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn(),

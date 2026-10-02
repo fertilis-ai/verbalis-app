@@ -4,10 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
 const mockLoadSchedulerTree = vi.fn().mockResolvedValue([]);
 const mockCreateSchedulerFolder = vi.fn().mockResolvedValue("/mock-data/scheduler/folder");
@@ -20,7 +17,8 @@ const mockDeleteScheduleByPath = vi.fn().mockResolvedValue(undefined);
 const mockGetAppDataDir = vi.fn().mockResolvedValue("/mock-data");
 const mockRenamePath = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   loadSchedulerTree: (...args: unknown[]) => mockLoadSchedulerTree(...args),
   createSchedulerFolder: (...args: unknown[]) => mockCreateSchedulerFolder(...args),
   deleteSchedulerFolder: (...args: unknown[]) => mockDeleteSchedulerFolder(...args),

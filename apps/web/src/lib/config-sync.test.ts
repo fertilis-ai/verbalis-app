@@ -8,7 +8,8 @@ const mockPathExists = vi.fn();
 const mockGetAppDataDir = vi.fn();
 const mockIsTauri = vi.fn();
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   isTauri: (...args: unknown[]) => mockIsTauri(...args),
   readFile: (...args: unknown[]) => mockReadFile(...args),
   writeFile: (...args: unknown[]) => mockWriteFile(...args),

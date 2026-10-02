@@ -28,9 +28,7 @@ vi.mock("@/stores/settings-store", () => ({
   useSettingsStore: () => mockSettingsStore,
 }));
 
-vi.mock("@/lib/storage", () => ({
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@/lib/storage", () => import("@/test/mocks/storage"));
 
 vi.mock("lucide-react", () => ({
   RefreshCw: (props: any) => <span data-testid="icon-RefreshCw" {...props} />,

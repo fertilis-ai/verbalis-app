@@ -17,7 +17,8 @@ vi.mock("@earendil-works/pi-agent-core", () => ({
   agentLoop: (...args: unknown[]) => mockAgentLoop(...args),
 }));
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   isTauri: () => mockIsTauri(),
 }));
 

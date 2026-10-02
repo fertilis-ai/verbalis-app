@@ -26,7 +26,8 @@ Object.defineProperty(globalThis, "localStorage", { value: localStorageMock, wri
 const mockInvoke = vi.fn();
 const mockIsTauri = vi.fn(() => false);
 
-vi.mock("@tauri-apps/api/core", () => ({
+vi.mock("@tauri-apps/api/core", async () => ({
+  ...(await import("@/test/mocks/tauri")),
   invoke: (...args: unknown[]) => mockInvoke(...args),
   isTauri: () => mockIsTauri(),
 }));

@@ -4,25 +4,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
-vi.mock("@/lib/storage", () => ({
-  isTauri: vi.fn(() => false),
-  getAppDataDir: vi.fn().mockResolvedValue("/mock-data"),
-  loadChatTree: vi.fn().mockResolvedValue([]),
-  saveChatToFolder: vi.fn().mockResolvedValue(undefined),
-  deleteChatByPath: vi.fn().mockResolvedValue(undefined),
-  loadChatByPath: vi.fn().mockResolvedValue(null),
-  deleteChatFolder: vi.fn().mockResolvedValue(undefined),
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   renameChatFolder: vi.fn().mockResolvedValue(undefined),
-  createChatFolder: vi.fn().mockResolvedValue("/mock-data/chats/folder"),
-  saveFolderMeta: vi.fn().mockResolvedValue(undefined),
-  loadFolderMeta: vi.fn().mockResolvedValue(null),
-  deletePath: vi.fn().mockResolvedValue(undefined),
-  readFile: vi.fn().mockResolvedValue(""),
 }));
 
 vi.mock("@/lib/logger", () => ({

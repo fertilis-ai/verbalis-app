@@ -1,14 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock dependencies before importing the module
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
-vi.mock("@/lib/storage", () => ({
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@/lib/storage", () => import("@/test/mocks/storage"));
 
 import {
   WEB_TOOLS,

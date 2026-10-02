@@ -18,11 +18,8 @@ vi.mock("lucide-react", () => ({
 }));
 
 // Mock transitive deps for categories -> web-tools/image-tools chain
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
-vi.mock("@/lib/storage", () => ({ isTauri: vi.fn(() => false) }));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
+vi.mock("@/lib/storage", () => import("@/test/mocks/storage"));
 vi.mock("@earendil-works/pi-ai", () => ({
   StringEnum: vi.fn((values: readonly string[]) => ({ type: "string", enum: values })),
 }));

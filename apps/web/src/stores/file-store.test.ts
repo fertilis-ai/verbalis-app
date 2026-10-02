@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
 const mockReadDirectory = vi.fn().mockResolvedValue([]);
 const mockReadFile = vi.fn().mockResolvedValue("");
@@ -12,7 +9,8 @@ const mockDeletePath = vi.fn().mockResolvedValue(undefined);
 const mockCreateDirectory = vi.fn().mockResolvedValue(undefined);
 const mockRenamePath = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   readDirectory: (...args: unknown[]) => mockReadDirectory(...args),
   readFile: (...args: unknown[]) => mockReadFile(...args),
   writeFile: (...args: unknown[]) => mockWriteFile(...args),

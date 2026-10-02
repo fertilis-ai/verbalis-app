@@ -5,7 +5,8 @@ const mockLoad = vi.fn();
 const mockReadFile = vi.fn();
 const mockListFiles = vi.fn();
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   listToolboxItems: (...a: unknown[]) => mockList(...a),
   loadToolboxItem: (...a: unknown[]) => mockLoad(...a),
   readFile: (...a: unknown[]) => mockReadFile(...a),

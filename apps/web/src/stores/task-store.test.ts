@@ -4,10 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
 const mockLoadTaskTree = vi.fn().mockResolvedValue([]);
 const mockCreateTaskFolder = vi.fn().mockResolvedValue("/mock-data/tasks/new-folder");
@@ -17,7 +14,8 @@ const mockToggleTaskFolderPin = vi.fn().mockResolvedValue(undefined);
 const mockLoadTaskFolder = vi.fn().mockResolvedValue(null);
 const mockSaveTaskFolder = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   loadTaskTree: (...args: unknown[]) => mockLoadTaskTree(...args),
   createTaskFolder: (...args: unknown[]) => mockCreateTaskFolder(...args),
   deleteTaskFolder: (...args: unknown[]) => mockDeleteTaskFolder(...args),

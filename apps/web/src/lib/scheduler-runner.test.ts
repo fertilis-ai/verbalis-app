@@ -7,7 +7,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockInvoke = vi.fn();
 const mockIsTauri = vi.fn(() => false);
 
-vi.mock("@tauri-apps/api/core", () => ({
+vi.mock("@tauri-apps/api/core", async () => ({
+  ...(await import("@/test/mocks/tauri")),
   invoke: (...args: unknown[]) => mockInvoke(...args),
   isTauri: () => mockIsTauri(),
 }));
@@ -16,7 +17,8 @@ const mockLoadSchedulerTree = vi.fn();
 const mockLoadSchedule = vi.fn();
 const mockSaveSchedule = vi.fn();
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   loadSchedulerTree: (...args: unknown[]) => mockLoadSchedulerTree(...args),
   loadSchedule: (...args: unknown[]) => mockLoadSchedule(...args),
   saveSchedule: (...args: unknown[]) => mockSaveSchedule(...args),

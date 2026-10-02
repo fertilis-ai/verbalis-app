@@ -7,13 +7,10 @@ vi.mock("zustand/middleware", () => ({
   persist: (fn: unknown) => fn,
 }));
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
-vi.mock("@/lib/storage", () => ({
-  isTauri: vi.fn(() => false),
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   getAppDataDir: vi.fn(async () => "/Users/test/.verbalis"),
 }));
 

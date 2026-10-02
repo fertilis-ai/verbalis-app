@@ -5,7 +5,8 @@ const mockDelete = vi.fn().mockResolvedValue(undefined);
 const mockList = vi.fn().mockResolvedValue([]);
 const mockLoad = vi.fn().mockResolvedValue(null);
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   saveToolboxItem: (...a: unknown[]) => mockSave(...a),
   deleteToolboxItem: (...a: unknown[]) => mockDelete(...a),
   listToolboxItems: (...a: unknown[]) => mockList(...a),

@@ -11,10 +11,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
  * blocked before `./tools` is imported.
  */
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
 const original = globalThis.Function;
 let evalAttempts = 0;

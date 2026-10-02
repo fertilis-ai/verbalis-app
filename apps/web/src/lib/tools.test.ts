@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { useSettingsStore } from "@/stores/settings-store";
 
 // Mock @tauri-apps/api/core
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
 // Passthrough mock so gating tests can flip isTauri
 vi.mock("@/lib/storage", async (importOriginal) => {

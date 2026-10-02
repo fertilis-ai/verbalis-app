@@ -3,11 +3,13 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const mockInvoke = vi.fn();
 const mockIsTauri = vi.fn(() => false);
 
-vi.mock("@tauri-apps/api/core", () => ({
+vi.mock("@tauri-apps/api/core", async () => ({
+  ...(await import("@/test/mocks/tauri")),
   invoke: (...args: unknown[]) => mockInvoke(...args),
 }));
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   isTauri: () => mockIsTauri(),
 }));
 

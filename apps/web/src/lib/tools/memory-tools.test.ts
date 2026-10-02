@@ -4,7 +4,8 @@ import matter from "gray-matter";
 const mockSave = vi.fn().mockResolvedValue(undefined);
 const mockLoad = vi.fn().mockResolvedValue(null);
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   saveToolboxItem: (...a: unknown[]) => mockSave(...a),
   loadToolboxItem: (...a: unknown[]) => mockLoad(...a),
 }));

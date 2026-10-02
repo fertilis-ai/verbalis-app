@@ -5,7 +5,8 @@ const { mockSaveChatToFolder } = vi.hoisted(() => ({
   mockSaveChatToFolder: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   getAppDataDir: vi.fn().mockResolvedValue("/data"),
   saveChatToFolder: mockSaveChatToFolder,
 }));

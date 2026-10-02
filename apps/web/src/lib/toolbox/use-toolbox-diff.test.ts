@@ -4,7 +4,10 @@ import type { ToolCallState } from "@/lib/types/chat";
 
 const { loadToolboxItem } = vi.hoisted(() => ({ loadToolboxItem: vi.fn() }));
 
-vi.mock("@/lib/storage", () => ({ loadToolboxItem }));
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
+  loadToolboxItem,
+}));
 
 import { useToolboxDiff } from "./use-toolbox-diff";
 

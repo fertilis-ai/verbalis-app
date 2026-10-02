@@ -3,7 +3,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const mockLoad = vi.fn();
 const mockList = vi.fn();
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   loadToolboxItem: (...a: unknown[]) => mockLoad(...a),
   listToolboxItems: (...a: unknown[]) => mockList(...a),
 }));

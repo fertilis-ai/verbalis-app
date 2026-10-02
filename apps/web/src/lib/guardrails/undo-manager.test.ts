@@ -2,14 +2,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getUndoManager, resetUndoManager } from "./undo-manager";
 
 // Mock @tauri-apps/api/core
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
 // Mock @/lib/storage
-vi.mock("@/lib/storage", () => ({
-  isTauri: vi.fn(() => false),
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   getAppDataDir: vi.fn(async () => "/mock-app-data"),
 }));
 

@@ -3,7 +3,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const mockListAgents = vi.fn();
 const mockLoadAgent = vi.fn();
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   listAgents: (...args: unknown[]) => mockListAgents(...args),
   loadAgent: (...args: unknown[]) => mockLoadAgent(...args),
 }));

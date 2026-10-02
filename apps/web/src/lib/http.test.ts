@@ -6,7 +6,8 @@ const mockIsTauri = vi.fn(() => false);
 const mockTauriFetch = vi.fn();
 const mockInvoke = vi.fn();
 
-vi.mock("@tauri-apps/api/core", () => ({
+vi.mock("@tauri-apps/api/core", async () => ({
+  ...(await import("@/test/mocks/tauri")),
   invoke: (...args: unknown[]) => mockInvoke(...args),
   isTauri: () => mockIsTauri(),
 }));

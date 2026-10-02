@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
 const mockListToolboxItems = vi.fn().mockResolvedValue([]);
 const mockLoadToolboxItem = vi.fn().mockResolvedValue(null);
@@ -11,7 +8,8 @@ const mockSaveToolboxItem = vi.fn().mockResolvedValue(undefined);
 const mockDeleteToolboxItem = vi.fn().mockResolvedValue(undefined);
 const mockRenameToolboxItem = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   listToolboxItems: (...args: unknown[]) => mockListToolboxItems(...args),
   loadToolboxItem: (...args: unknown[]) => mockLoadToolboxItem(...args),
   saveToolboxItem: (...args: unknown[]) => mockSaveToolboxItem(...args),

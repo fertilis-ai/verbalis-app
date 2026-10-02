@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
+vi.mock("@tauri-apps/api/core", async () => ({
+  ...(await import("@/test/mocks/tauri")),
   convertFileSrc: vi.fn((path: string) => `asset://${path}`),
 }));
 

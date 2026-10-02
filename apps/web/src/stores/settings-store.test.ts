@@ -22,10 +22,7 @@ vi.mock("zustand/middleware", () => ({
   },
 }));
 
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@tauri-apps/api/core", () => import("@/test/mocks/tauri"));
 
 vi.mock("@/lib/keychain", () => ({
   storeApiKey: (...args: unknown[]) => mockStoreApiKey(...args),

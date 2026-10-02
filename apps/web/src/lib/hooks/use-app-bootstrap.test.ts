@@ -19,7 +19,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/http", () => ({ initFetchPolyfill: mocks.initFetchPolyfill }));
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  ...(await import("@/test/mocks/storage")),
   initAppDataDir: mocks.initAppDataDir,
   ensureWellKnownMemories: mocks.ensureWellKnownMemories,
   ensureDefaultToolboxItems: mocks.ensureDefaultToolboxItems,

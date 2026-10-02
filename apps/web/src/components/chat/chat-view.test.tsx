@@ -73,9 +73,7 @@ vi.mock("@/lib/guardrails/undo-manager", () => ({
   }),
 }));
 
-vi.mock("@/lib/storage", () => ({
-  isTauri: vi.fn(() => false),
-}));
+vi.mock("@/lib/storage", () => import("@/test/mocks/storage"));
 
 // Mock child components to isolate ChatView
 vi.mock("./chat-input", () => ({
