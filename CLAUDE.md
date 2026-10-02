@@ -18,8 +18,9 @@ App logs are written to `~/.verbalis/logs/`.
 
 ## Code Editors & Syntax Highlighting
 
-**Editor text must never depend on syntax highlighting.** `components/files/file-editor.tsx`
-(Workspace) and `components/toolbox/toolbox-editor.tsx` (Toolbox) layer a transparent
+**Editor text must never depend on syntax highlighting.** The Workspace
+(`components/files/file-editor.tsx`) and Toolbox (`components/toolbox/toolbox-editor.tsx`)
+editors both render `components/shared/code-overlay-editor.tsx`, which layers a transparent
 `<textarea>` over a Shiki HTML overlay injected with `dangerouslySetInnerHTML`. The
 line-number gutter is independent DOM, so when the overlay is empty the panel renders
 **only line numbers** — a bug this project has hit more than once. Rules:

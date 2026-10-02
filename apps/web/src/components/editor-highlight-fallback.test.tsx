@@ -4,8 +4,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 /**
  * Regression guard for the "only line numbers show" bug.
  *
- * The Workspace and Toolbox editors layer a transparent <textarea> over a Shiki
- * HTML overlay, so the overlay is normally the only visible text layer. When
+ * The Workspace and Toolbox editors share CodeOverlayEditor, which layers a
+ * transparent <textarea> over a Shiki HTML overlay, so the overlay is normally
+ * the only visible text layer. When
  * highlighting failed (e.g. the packaged app's CSP blocking Shiki's WASM regex
  * engine) the overlay stayed empty and the panels rendered nothing but their
  * line-number gutter.

@@ -3,10 +3,9 @@ import { Wrench, Play, Loader2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { useToolboxStore, itemKey, type ToolboxCategory } from "@/stores/toolbox-store";
 import { ToolboxTabs } from "./toolbox-tabs";
-import { highlightCode, escapeHtml } from "@/lib/highlighter";
+import { CodeOverlayEditor } from "@/components/shared/code-overlay-editor";
 import { runWorkflowByName } from "@/lib/workflows/run-workflow";
 import { validateToolboxContent } from "@/lib/toolbox/toolbox-schemas";
-import { cn } from "@/lib/utils";
 
 // Map category to language for syntax highlighting
 function getLanguage(category: ToolboxCategory): string {
@@ -29,47 +28,12 @@ function getLanguage(category: ToolboxCategory): string {
 export function ToolboxEditor() {
   const { openItems, activeItemKey, updateItem, updateOpenItemContent, markOpenItemSaved } =
     useToolboxStore();
-  const [highlightedHtml, setHighlightedHtml] = React.useState("");
   const [isRunning, setIsRunning] = React.useState(false);
-
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
-  const lineNumbersRef = React.useRef<HTMLDivElement>(null);
-  const highlightRef = React.useRef<HTMLDivElement>(null);
 
   const activeItem = openItems.find(
     (i) => itemKey(i.category, i.name) === activeItemKey
   );
   const hasOpenItems = openItems.length > 0;
-
-  // Update syntax highlighting when content or category changes
-  React.useEffect(() => {
-    if (!activeItem) {
-      setHighlightedHtml("");
-      return;
-    }
-
-    let cancelled = false;
-    const lang = getLanguage(activeItem.category);
-
-    const plain = `<pre><code>${escapeHtml(activeItem.currentContent)}</code></pre>`;
-
-    highlightCode(activeItem.currentContent, lang)
-      .then((html) => {
-        if (cancelled) return;
-        setHighlightedHtml(html ?? plain);
-      })
-      .catch((error: unknown) => {
-        // The overlay is the only visible text layer, so a swallowed failure
-        // would leave the editor showing nothing but line numbers.
-        console.warn("[toolbox-editor] Syntax highlighting failed:", error);
-        if (cancelled) return;
-        setHighlightedHtml(plain);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeItem?.currentContent, activeItem?.category]);
 
   // Same schema contract the agent's tools enforce, but advisory here: a
   // human can always save (warn-but-allow), the agent's writes are rejected.
@@ -105,24 +69,6 @@ export function ToolboxEditor() {
       setIsRunning(false);
     }
   };
-
-  // Sync scroll between textarea, line numbers, and highlight overlay
-  const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
-    const scrollTop = e.currentTarget.scrollTop;
-    const scrollLeft = e.currentTarget.scrollLeft;
-
-    if (lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = scrollTop;
-    }
-    if (highlightRef.current) {
-      highlightRef.current.scrollTop = scrollTop;
-      highlightRef.current.scrollLeft = scrollLeft;
-    }
-  };
-
-  const content = activeItem?.currentContent ?? "";
-  const lineCount = content.split("\n").length;
-  const lineNumbers = Array.from({ length: lineCount }, (_, i) => i + 1);
 
   return (
     <div className="flex h-full flex-col">
@@ -166,76 +112,20 @@ export function ToolboxEditor() {
             </button>
           </div>
         )}
-        <div className="flex flex-1 overflow-hidden font-mono text-sm">
-          {/* Line numbers */}
-          <div
-            ref={lineNumbersRef}
-            className="flex-shrink-0 select-none overflow-hidden bg-muted/30 text-muted-foreground text-right pr-2 pl-2 py-4"
-            style={{ minWidth: `${String(lineCount).length + 2}ch` }}
-          >
-            {lineNumbers.map((num) => (
-              <div key={num} className="leading-5">
-                {num}
-              </div>
-            ))}
-          </div>
-
-          {/* Editor area with overlay */}
-          <div className="relative flex-1 overflow-hidden">
-            {/* Syntax highlighted overlay */}
-            <div
-              ref={highlightRef}
-              className="absolute inset-0 overflow-hidden pointer-events-none p-4 [&_pre]:!bg-transparent [&_pre]:m-0 [&_pre]:p-0 [&_span]:!bg-transparent [&_code]:leading-5 [&_code]:whitespace-pre"
-              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-            />
-
-            {/* Transparent textarea for input */}
-            <textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => {
-                if (activeItem) {
-                  updateOpenItemContent(activeItem.category, activeItem.name, e.target.value);
-                }
-              }}
-              onScroll={handleScroll}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-                  e.preventDefault();
-                  handleSave();
-                }
-                // Tab key inserts 2 spaces
-                if (e.key === "Tab") {
-                  e.preventDefault();
-                  const textarea = e.currentTarget;
-                  const start = textarea.selectionStart;
-                  const end = textarea.selectionEnd;
-                  const newValue =
-                    `${content.substring(0, start)}  ${content.substring(end)}`;
-                  if (activeItem) {
-                    updateOpenItemContent(activeItem.category, activeItem.name, newValue);
-                  }
-                  requestAnimationFrame(() => {
-                    textarea.selectionStart = textarea.selectionEnd = start + 2;
-                  });
-                }
-              }}
-              wrap="off"
-              className={cn(
-                // `leading-5` must stay after `text-sm`: tailwind-merge drops a
-                // preceding `leading-*` because text-size utilities also set
-                // line-height, and the overlay depends on the two matching.
-                "relative z-10 h-full w-full resize-none bg-transparent p-4 focus:outline-none caret-foreground selection:bg-primary/30 font-mono text-sm leading-5 overflow-x-auto",
-                // Only hide the textarea's own text once the overlay actually
-                // has something to show in its place.
-                highlightedHtml ? "text-transparent" : "text-foreground",
-              )}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoCorrect="off"
-            />
-          </div>
-        </div>
+        <CodeOverlayEditor
+          className="flex flex-1 overflow-hidden font-mono text-sm"
+          content={activeItem.currentContent}
+          language={getLanguage(activeItem.category)}
+          onChange={(value) =>
+            updateOpenItemContent(activeItem.category, activeItem.name, value)
+          }
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+              e.preventDefault();
+              handleSave();
+            }
+          }}
+        />
         </div>
       )}
     </div>
