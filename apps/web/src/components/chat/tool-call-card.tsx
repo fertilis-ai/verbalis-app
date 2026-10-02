@@ -11,7 +11,7 @@ import { ToolCallActions } from "./tool-call-card-actions";
 /** Extract saved image paths from a generate_image tool result. */
 export function extractImagePaths(result?: string): string[] {
   if (!result) return [];
-  return [...result.matchAll(/^Saved to: (.+)$/gm)].map((m) => m[1].trim());
+  return [...result.matchAll(/^Saved to: (.+)$/gm)].map((m) => m[1]!.trim());
 }
 
 // ============================================================================

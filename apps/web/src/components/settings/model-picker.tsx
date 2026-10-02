@@ -173,7 +173,7 @@ export function ModelPicker() {
               </div>
             )}
             {providerOrder.map((provider) => {
-              const models = availableGroups[provider];
+              const models = availableGroups[provider]!;
               const isCollapsed = collapsedGroups.has(provider);
               return (
                 <div key={provider}>
