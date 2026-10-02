@@ -1,19 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { HeadContent, Outlet, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import {
-  initAppDataDir,
-  ensureWellKnownMemories,
-  ensureDefaultToolboxItems,
-} from "@/lib/storage";
-import { initConfigSync } from "@/lib/config-sync";
-import { initFetchPolyfill } from "@/lib/http";
-import { startSchedulerRunner } from "@/lib/scheduler-runner";
-import { useAgentStore } from "@/stores/agent-store";
-import { useChatStore } from "@/stores/chat-store";
+import { useAppBootstrap } from "@/lib/hooks/use-app-bootstrap";
 import { useSettingsStore } from "@/stores/settings-store";
 import { getHueCssOverrides, applyHueOverrides, clearHueOverrides } from "@/lib/hue-presets";
 
@@ -43,38 +34,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 });
 
 function RootComponent() {
-  const [initialized, setInitialized] = useState(false);
-  const loadAgentsFromDisk = useAgentStore((state) => state.loadAgentsFromDisk);
-  const agents = useAgentStore((state) => state.agents);
-  const agentId = useChatStore((state) => state.agentId);
-  const setAgentId = useChatStore((state) => state.setAgentId);
-
-  // Initialize storage directories on app start - must complete before rendering children
-  useEffect(() => {
-    initFetchPolyfill()
-      .then(() => initAppDataDir())
-      .then(() => ensureWellKnownMemories())
-      .then(() => ensureDefaultToolboxItems())
-      .then(() => initConfigSync())
-      .catch((err) => console.error("[init] Startup error:", err))
-      .finally(() => setInitialized(true));
-  }, []);
-
-  useEffect(() => {
-    if (!initialized) return;
-    loadAgentsFromDisk();
-    startSchedulerRunner();
-  }, [initialized, loadAgentsFromDisk]);
-
-  useEffect(() => {
-    if (!initialized) return;
-    if (!agentId && agents.length > 0) {
-      // Restore the persisted agent selection if it still exists, else default.
-      const persisted = useSettingsStore.getState().selectedAgentId;
-      const restored = persisted && agents.some((a) => a.name === persisted) ? persisted : agents[0].name;
-      setAgentId(restored);
-    }
-  }, [initialized, agentId, agents, setAgentId]);
+  const initialized = useAppBootstrap();
 
   // Don't render children until storage directories are initialized
   // This prevents race conditions where stores try to load before directories exist
