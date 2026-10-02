@@ -140,7 +140,7 @@ function updateConversationInState(
   }
   const index = s.conversations.findIndex((c) => c.id === conversationId);
   if (index === -1) return s;
-  const next = updater(s.conversations[index]);
+  const next = updater(s.conversations[index]!);
   if (next === s.conversations[index]) return s;
   const conversations = [...s.conversations];
   conversations[index] = next;

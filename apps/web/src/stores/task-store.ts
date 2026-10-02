@@ -167,7 +167,7 @@ export const useTaskStore = create<TaskState>((set, get) => {
       if (taskIndex === -1) return;
 
       folderData.tasks[taskIndex] = {
-        ...folderData.tasks[taskIndex],
+        ...folderData.tasks[taskIndex]!,
         ...updates,
         updatedAt: new Date().toISOString(),
       };

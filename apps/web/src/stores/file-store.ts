@@ -465,7 +465,7 @@ export const useFileStore = create<FileState>((set, get) => ({
   },
 
   renameItem: async (oldPath: string, newName: string) => {
-    const { refreshTree, openFiles } = get();
+    const { refreshTree } = get();
     const parentDir = dirname(oldPath);
     const newPath = `${parentDir}/${newName}`;
     try {

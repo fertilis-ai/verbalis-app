@@ -245,7 +245,7 @@ export const useToolboxStore = create<ToolboxState>((set, get) => ({
     let newActiveKey = activeItemKey;
     if (activeItemKey === key) {
       if (newOpenItems.length > 0) {
-        const nextItem = newOpenItems[Math.min(closedIndex, newOpenItems.length - 1)];
+        const nextItem = newOpenItems[Math.min(closedIndex, newOpenItems.length - 1)]!;
         newActiveKey = itemKey(nextItem.category, nextItem.name);
       } else {
         newActiveKey = null;
