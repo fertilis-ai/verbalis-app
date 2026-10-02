@@ -365,12 +365,37 @@ Follow-ups:
 - Dead code: the `paused` branches, the shell-command guardrails UI and the task-store `runTask`.
 - The guardrails import still reports errors with `alert()`.
 
-## Phase 8: Tooling and tests
-- **Strict TS config.** Make `apps/web/tsconfig.json` extend `@verbalis-app/config/tsconfig.base.json` (`noUncheckedIndexedAccess`, `noUnused*`) and fix the resulting errors. This can run in parallel with earlier phases, one directory at a time.
-- **Biome.** Set `noExplicitAny: warn`, and make `noDangerouslySetInnerHtml` an error everywhere except `CodeOverlayEditor` and the markdown renderer (per-line ignores there).
-- **`chat-store.test.ts` (2380 lines).** Split it by concern: conversations/folders, tool execution, sendMessage/reasoning/ZDR, context. Use the unused shared mocks `test/mocks/storage.ts` and `test/mocks/tauri.ts` in place of 29 inline `@/lib/storage` mocks.
-- **New tests:** `scheduler-view`, the new pure modules (prompt builder, event reducer, resolve-model, openrouter helper), and `image-tools` ZDR.
-- **Quick test script.** Fix the CLAUDE.md note, or the script: `quick_test` currently runs the full suite, not a subset.
+## Phase 8: Tooling and tests — ✅ done (branch `refactor/phase-8`, stacked on `refactor/phase-7`, whose packaged smoke test is still only partly run)
+1. ✅ **Strict TS config.** `apps/web/tsconfig.json` extends `packages/config/tsconfig.base.json`, which adds `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch` and `isolatedModules`. It overrides `lib` (the base has no DOM) and `types` (`vite/client` instead of `node`), and keeps `jsx`, `rootDirs`, `baseUrl` and `paths`. The config change is the last commit; the fixes come first, by directory.
+   - Production code (49 errors in 21 files): only `!` on index accesses the code already guards (`lastIdx >= 0`, a `findIndex` check, a regex match), a `_` prefix on unused parameters, and dropped dead bindings. The dead bindings are `currentAssistantContent` in the agent adapter (written by a callback, never read), `const result =` before `await eventStream.result` (the `await` stays), and an unused `openFiles` destructuring in `file-store.ts`. No `??` or `?.` was added, so no runtime path changed.
+   - Tests (406 errors): 382 `!`, inserted at the end of each diagnostic's span using the TypeScript API. Where a `!` would have landed inside an optional chain (5 places) it is `?.` instead, which Biome prefers. The 19 unused bindings: unused `...rest` siblings in Button mocks were dropped, mock parameters got a `_` prefix, an unused `makeTree` helper and an unused `originalStyle` setup were removed, and two `const r1 =`/`r2 =` bindings were dropped while keeping the `createRecord` calls. No assertion changed.
+2. ✅ **Biome.** `noExplicitAny` is `warn` and `noDangerouslySetInnerHtml` is `error`. The one use is in `code-overlay-editor.tsx` (the Shiki overlay), which has a per-line `biome-ignore`. The markdown renderer needs no exception: chat markdown goes through Streamdown, and our code has no `dangerouslySetInnerHTML` there. Turning on `noExplicitAny` took the count from 50 to 217 warnings. With the strict-TS fixes it is now 192:
+
+   | Rule | Count |
+   |---|---|
+   | noExplicitAny | 168 |
+   | noImportantStyles | 7 |
+   | useExhaustiveDependencies | 6 |
+   | noAssignInExpressions | 5 |
+   | noArrayIndexKey | 2 |
+   | noTemplateCurlyInString, noDescendingSpecificity, useOptionalChain, noBannedTypes | 1 each |
+
+   The strict-TS fixes cleared all 17 `noUnusedFunctionParameters` and 8 `noUnusedVariables` warnings.
+3. ✅ **`chat-store.test.ts` split.** It is now five files, `chat-store.{conversations,folders,tools,send,context}.test.ts`, each wrapped in `describe("chat-store")` so the full test names are unchanged. Conversations and folders are separate files because together they were over 1100 lines. Their module mocks, mock handles, fixtures and per-test reset are in `test/chat-store-harness.ts`, which is outside the test glob, so it doesn't run as a test. Two Vitest constraints shape the harness:
+   - A `vi.hoisted` result can't be exported in the same statement; it is re-exported in a separate list.
+   - `vi.mock` paths in the harness resolve from `src/test/`, so the store mocks use `@/stores/…`.
+4. ✅ **Shared mocks.** Every inline `@/lib/storage` and `@tauri-apps/api/core` mock now starts from `test/mocks/storage.ts` or `test/mocks/tauri.ts`. A file keeps only the exports it controls, as overrides spread over the shared module (`async () => ({ ...(await import("@/test/mocks/storage")), loadTaskTree: … })`), so its own handles and defaults are unchanged. Overrides that matched the shared default were dropped, and files with none left use the one-line `() => import(...)`. `tools.test.ts` keeps its `importOriginal` mock: it runs the real storage module with `isTauri` forced off, which the shared mock can't stand in for. The shared storage mock gained `ensureWellKnownMemories` and `ensureDefaultToolboxItems`, the two exports it lacked.
+5. ✅ **New tests.**
+   - `scheduler-view.test.tsx` (13): empty state, field rendering, agent-only options and the legacy `Assistant` mapping, Run now (and its two disabled states), Stop and the running preview, the log scoped to its schedule, the enabled toggle, agent change, the debounced name edit, and the error indicator.
+   - `image-tools.test.ts` (+2): ZDR on sends `provider: { zdr: true }`; ZDR off sends no `provider`. The ZDR-on test fails if the code hard-codes `zdr: false`.
+   - Already covered by earlier phases, so not duplicated: the prompt builder (`lib/prompt/build-system-prompt.test.ts`, 10), the event reducer (`applyAdapterEvent` in `lib/agentic/run-conversation.test.ts`, 17 in the file), `lib/llm/resolve-model.test.ts` (9) and `lib/openrouter.test.ts` (9).
+6. ✅ **Quick test script.** CLAUDE.md now says what `quick_test` does: the whole suite with a 2000ms per-test timeout, then per-test durations in `apps/web/test-durations.log`. The script is unchanged.
+
+Checks on the test refactor: a sorted list of every full test name with its status was saved before the split and compared after the split, after the mock conversion and after the strict-TS fixes. All three were identical (2196 tests, all passing).
+
+Verified: `tsc` under the new config (and `bun run check-types`), the full Vitest suite (107 files, 2196 tests), `bun run quick_test` (2196 passed), Biome (192 warnings, no errors), and `vite build`.
+
+No packaged build: the production changes are type-only (`!`, erased at build) plus `_` renames and dead-binding removals, and `vite build` passes under the new tsconfig. The Phase 7 smoke items still open are listed under Phase 7.
 
 ## Out of scope / later
 - Consolidating zod and Typebox (zod has one use, in `toolbox-schemas.ts`).
