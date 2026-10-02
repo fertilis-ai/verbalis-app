@@ -297,7 +297,7 @@ A second packaged run (2026-10-01, the same `Verbalis.app`, from a fresh backup 
 
 `loadSchedule`, the per-schedule load used by the scheduler tick, is covered by the unit tests (a legacy valid file, malformed YAML, and a non-boolean `enabled`).
 
-## Phase 7: Components — ⏳ code done (branch `refactor/phase-7`, stacked on `refactor/phase-6`); packaged smoke test partly run, items needing API keys still open (see below)
+## Phase 7: Components — ⏳ code done (branch `refactor/phase-7`, stacked on `refactor/phase-6`); packaged smoke test partly run, some items still open (see below)
 1. ✅ **`CodeOverlayEditor`.** `components/shared/code-overlay-editor.tsx` holds the highlight-with-fallback effect, scroll sync, Tab indent and the gutter. `file-editor.tsx` and `toolbox-editor.tsx` pass `content`, `language` and `onChange`; the Toolbox adds Cmd+S through `onKeyDown`. The CLAUDE.md invariants (`text-transparent` only when the overlay is non-empty, the `.catch` fallback, `leading-5` after `text-sm`) now live in this one component, and CLAUDE.md names it.
 2. ✅ **`useAppBootstrap`.** The `routes/__root.tsx` startup moved to `lib/hooks/use-app-bootstrap.ts` with the same promise chain, the scheduler start after init, and the agent restore.
 3. ✅ **Split large components.**
@@ -341,21 +341,21 @@ Dev run (2026-10-01, `vite dev` in Chrome, a fresh browser profile). There were 
 
 Packaged build (2026-10-01): `bunx tauri build --bundles dmg` compiled and bundled `Verbalis.app`, then `bundle_dmg.sh` failed again. This time the cause is visible with `--verbose`: `hdiutil` could not unmount the temporary volume ("Resource busy"), so it is the build machine, not the code. Two stale images from earlier runs were still attached and were detached.
 
-**Packaged smoke test (2026-10-01), partly run.** The built `Verbalis.app` ran with `HOME` and `CFFIXED_USER_HOME` pointed at a scratch copy of `~/.verbalis`, so the installed app and the real data were not touched. It was driven through the macOS Accessibility API, reading the WKWebView's tree and pressing its elements; there were no screenshots. The keychain is unavailable under a scratch `HOME`, so there were no API keys and nothing reached a model. The copied settings pointed the working directory at the real `~/Projects`, so it was first switched to a scratch folder in Settings, by setting the field's value. Afterwards the real `~/.verbalis` matched the backup, apart from logs, and nothing under `~/Projects` had changed.
+**Packaged smoke test (2026-10-01), partly run.** The built `Verbalis.app` ran with `HOME` and `CFFIXED_USER_HOME` pointed at a scratch copy of `~/.verbalis`, so the installed app and the real data were not touched. It was driven through the macOS Accessibility API, reading the WKWebView's tree and pressing its elements; there were no screenshots. The keychain is unavailable under a scratch `HOME`, so there were no API keys and nothing reached a model. The copied settings pointed the working directory at the real `~/Projects`, so it was first switched to a scratch folder in Settings, by setting the field's value. Afterwards the real `~/.verbalis` matched the backup, apart from logs, nothing under `~/Projects` had changed, and the settings directory the copied config named (`~/.verbalis-app`) had not been created.
 1. Cold launch: passed as far as it could be observed. The UI rendered with the hydrated settings (default model, effort, theme, directories), the Toolbox listed the four agents, and the Rust log held only the expected keychain warnings. Not shown: that the scheduler started, because no schedule was due during the run.
 2. Files: passed, except for Escape and the backdrop.
    - The tree was filled on opening Files, and filled again straight away after the working directory changed.
    - A file created from the shell appeared within 4s.
    - The row menu opened `ConfirmDialog` with the file name ("Delete File") and the folder name ("Delete Folder"). For the file and for the folder, Cancel closed it and kept the entry, and Delete removed it from disk and from the tree.
-   - Escape could not be tested: synthetic key events sent to a window in the background never reach WebKit. The backdrop was not tried. `confirm-dialog.test.tsx` covers Escape.
+   - Escape could not be tested: synthetic key events were not delivered in two attempts (unfocused, and with the Cancel button focused through Accessibility), probably because the window was not key. The backdrop was not tried. `confirm-dialog.test.tsx` covers Escape.
    - The Workspace editor highlighted `hello.ts` (the overlay was split into Shiki token spans over the textarea), so the JS regex engine works under the packaged CSP. The Toolbox editor also rendered an agent with its overlay.
 3. ToolCallCard: not run (needs a model).
 4. `ModelQuickSelect` and `EffortSelect`: passed, without sending a message. Both menus opened, effort changed Max → Low → Max, and switching the model and back kept the effort select.
 5. Moving a chat to a folder: passed. "Move to folder" → "New Folder" took the chat out of the root list, and its JSON file moved into `chats/New Folder/`.
-6. Settings: the Debug Logging toggle went 1 → 0 → 1, and its path showed the scratch home. Text-model Refresh ran without an error. The speech Refresh and voice select are hidden without an OpenRouter key, so they were not run.
+6. Settings: the Debug Logging toggle went 1 → 0 → 1, and its path showed the scratch home. Text-model Refresh showed no error, but the run did not confirm that a fetch happened. The speech Refresh and voice select are hidden without an OpenRouter key, so they were not run.
 7. Scheduler Run now and a task run: not run (needs a model). The Scheduler and Tasks views rendered their lists.
 
-Still to check by hand with real keys, in the built `Verbalis.app` (`apps/web/src-tauri/target/release/bundle/macos/Verbalis.app`): item 3, item 7, the speech Refresh and voice select, and Escape and the backdrop on the delete dialog.
+Still to check by hand with real keys, in the built `Verbalis.app` (`apps/web/src-tauri/target/release/bundle/macos/Verbalis.app`): item 3, item 7, the speech Refresh and voice select, Escape and the backdrop on the delete dialog, and that Cancel, Escape and the backdrop don't select the row underneath (not checked).
 Voice was not re-checked: Phase 7 changed only its settings select. The highlight fallback is covered by `editor-highlight-fallback` and `highlighter.csp.test` rather than a staged failure.
 
 Follow-ups:
