@@ -9,6 +9,7 @@ import { CategorySection } from "./guardrails/category-section";
 import { RestrictionsList } from "./guardrails/restrictions-list";
 import { GuardrailsPresets } from "./guardrails/guardrails-presets";
 import { RateLimitsEditor } from "./guardrails/rate-limits-editor";
+import { SettingsSectionLayout } from "./settings-section-layout";
 
 export function GuardrailsSection() {
   const {
@@ -71,11 +72,7 @@ export function GuardrailsSection() {
   // ============================================================================
 
   return (
-    <section className="space-y-6">
-      <h2 className="text-lg font-medium mb-4 flex items-center gap-2">
-        <Shield className="h-4.5 w-4.5 text-muted-foreground" />
-        Guardrails
-      </h2>
+    <SettingsSectionLayout id="guardrails" icon={Shield} title="Guardrails" className="space-y-6">
 
       <GuardrailsPresets
         guardrailsConfig={guardrailsConfig}
@@ -213,6 +210,6 @@ export function GuardrailsSection() {
           onChange={handleFileChange}
         />
       </div>
-    </section>
+    </SettingsSectionLayout>
   );
 }
