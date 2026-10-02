@@ -2,9 +2,6 @@ import * as React from "react";
 import {
   Plus,
   ChevronRight,
-  MoreVertical,
-  Pencil,
-  Trash2,
   MessageSquareText,
   Brain,
   Bot,
@@ -13,13 +10,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { LeafContextMenu } from "@/components/shared/item-context-menu";
 import { cn } from "@/lib/utils";
 import { getUniqueName } from "@/lib/tree-utils";
 import { useToolboxStore, itemKey as makeItemKey, type ToolboxCategory, type ToolboxItem } from "@/stores/toolbox-store";
@@ -210,8 +201,7 @@ export function ToolboxSidebar() {
 
                           {/* Context menu */}
                           <div className="flex items-center opacity-0 group-hover:opacity-100">
-                            <ItemContextMenu
-                              item={item}
+                            <LeafContextMenu
                               onRename={() => handleStartRename(item)}
                               onDelete={() => handleDelete(item)}
                             />
@@ -227,35 +217,5 @@ export function ToolboxSidebar() {
         </div>
       </div>
     </div>
-  );
-}
-
-interface ItemContextMenuProps {
-  item: ToolboxItem;
-  onRename: () => void;
-  onDelete: () => void;
-}
-
-function ItemContextMenu({ onRename, onDelete }: ItemContextMenuProps) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon-xs" className="h-5 w-5" />}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MoreVertical className="h-3 w-3" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem onClick={onRename}>
-          <Pencil className="mr-2 h-4 w-4" />
-          Rename
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onDelete} className="text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
