@@ -22,5 +22,19 @@ const target = resolve(
 );
 
 mkdirSync(dirname(target), { recursive: true });
-copyFileSync(source, target);
-chmodSync(target, 0o755);
+
+if (targetTriple.includes("windows")) {
+  // Windows cannot exec a shebang script, so compile pi's CLI into a
+  // standalone executable that Tauri can spawn as `pi-sidecar.exe`.
+  const piCli = resolve(
+    dirname(fileURLToPath(import.meta.resolve("@earendil-works/pi-coding-agent"))),
+    "cli.js"
+  );
+  execSync(
+    `bun build --compile --target=bun-windows-x64 "${piCli}" --outfile "${target}.exe"`,
+    { stdio: "inherit" }
+  );
+} else {
+  copyFileSync(source, target);
+  chmodSync(target, 0o755);
+}
